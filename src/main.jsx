@@ -1019,17 +1019,21 @@ function ResultCard({ match }) {
   const hasResult = Number.isInteger(homeScore) && Number.isInteger(awayScore);
   const homeWon = hasResult && homeScore > awayScore;
   const awayWon = hasResult && awayScore > homeScore;
+  const isLive = !hasResult && isMatchClosed(match);
+
+  const statusLabel = hasResult ? "Resultado atualizado" : isLive ? "Em andamento" : "Aguardando resultado";
+  const statusClass = hasResult ? "finished" : isLive ? "live" : "pending";
 
   return (
-    <article className={`match-card result-card ${hasResult ? "finished" : "pending"}`}>
+    <article className={`match-card result-card ${statusClass}`}>
       <div className="result-card-header">
         <div>
           <span className="badge">{match.phase}</span>
           <p>{formatDate(match.date)}</p>
           <p className="match-location">{formatVenue(match)}</p>
         </div>
-        <span className={`result-status ${hasResult ? "finished" : "pending"}`}>
-          {hasResult ? "Resultado atualizado" : "Aguardando resultado"}
+        <span className={`result-status ${statusClass}`}>
+          {statusLabel}
         </span>
       </div>
       <div className="result-board">

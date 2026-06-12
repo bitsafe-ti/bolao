@@ -862,6 +862,10 @@ h3 {
   border-left-color: var(--success);
 }
 
+.result-card.live {
+  border-left-color: var(--primary);
+}
+
 .result-card.pending {
   border-left-color: var(--warning);
 }
@@ -895,6 +899,11 @@ h3 {
 .result-status.finished {
   background: var(--success-soft);
   color: var(--success);
+}
+
+.result-status.live {
+  background: rgba(201, 100, 66, 0.12);
+  color: var(--primary);
 }
 
 .result-status.pending {
