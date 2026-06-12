@@ -48,11 +48,57 @@ export function scorePrediction(prediction, match) {
   return 1;
 }
 
+export function hasSavedPrediction(prediction) {
+  return parseScore(prediction?.home) !== null && parseScore(prediction?.away) !== null;
+}
+
+function getMatchKickoffTime(match) {
+  if (!match?.date) return null;
+  const time = Date.parse(match.date);
+  return Number.isNaN(time) ? null : time;
+}
+
+export function isMatchClosed(match, now = new Date()) {
+  const kickoffTime = getMatchKickoffTime(match);
+  if (kickoffTime === null) return false;
+  return kickoffTime <= now.getTime();
+}
+
+function isLatePrediction(prediction, match, now = new Date()) {
+  if (!hasSavedPrediction(prediction) || !isMatchClosed(match, now)) return false;
+  const kickoffTime = getMatchKickoffTime(match);
+  const savedAt = Date.parse(prediction.savedAt || prediction.updatedAt || "");
+  return Number.isNaN(savedAt) || savedAt >= kickoffTime;
+}
+
+export function purgeExpiredPredictions(state, now = new Date()) {
+  const matchesById = new Map((state.matches ?? []).map((match) => [match.id, match]));
+  let changed = false;
+
+  const predictions = Object.fromEntries(
+    Object.entries(state.predictions ?? {}).map(([participantId, perMatch]) => {
+      const filtered = Object.fromEntries(
+        Object.entries(perMatch ?? {}).filter(([matchId, prediction]) => {
+          const match = matchesById.get(matchId);
+          const keep = !match || !isLatePrediction(prediction, match, now);
+          if (!keep) changed = true;
+          return keep;
+        })
+      );
+      return [participantId, filtered];
+    })
+  );
+
+  if (!changed) return state;
+  return { ...state, predictions };
+}
+
 export function calculateRanking(participants, matches, predictions) {
   return participants
     .map((participant) => {
+      const participantPredictions = predictions?.[participant.id] ?? {};
       const perMatch = matches.map((match) => {
-        const points = scorePrediction(predictions?.[participant.id]?.[match.id], match);
+        const points = scorePrediction(participantPredictions?.[match.id], match);
         return { matchId: match.id, points };
       });
 
@@ -61,7 +107,8 @@ export function calculateRanking(participants, matches, predictions) {
         total: perMatch.reduce((sum, item) => sum + item.points, 0),
         exactScores: perMatch.filter((item) => item.points === 3).length,
         winnerHits: perMatch.filter((item) => item.points === 1).length,
-        scoredMatches: perMatch.filter((item) => item.points > 0).length
+        scoredMatches: perMatch.filter((item) => item.points > 0).length,
+        predictedMatches: matches.filter((match) => hasSavedPrediction(participantPredictions?.[match.id])).length
       };
     })
     .sort((a, b) => b.total - a.total || b.exactScores - a.exactScores || a.name.localeCompare(b.name));

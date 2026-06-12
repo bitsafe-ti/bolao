@@ -6,10 +6,12 @@ import {
   emptyPrediction,
   getActiveRound,
   getMatchRound,
+  isMatchClosed,
   isSuperAdminEmail,
   makeId,
   normalizeEmailList,
   normalizeUsers,
+  purgeExpiredPredictions,
   purgeFutureRoundPredictions
 } from "./domain.js";
 import { getFlagUrl, teamsById, worldCupTeams } from "./teams.js";
@@ -26,6 +28,7 @@ import "./styles.css";
 const SESSION_KEY = "bolao-copa-2026:session";
 const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
 const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva25@gmail.com,guilhermesaraiva.rocha@hotmail.com";
+const ENTRY_FEE = 20;
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
 const SUPER_ADMIN_EMAILS = normalizeEmailList(
@@ -61,29 +64,18 @@ const adminTabs = [
 
 const defaultRounds = [1, 2, 3];
 
-function getMatchDateKey(match) {
-  return match.date?.slice(0, 10) || "";
-}
-
-function getTodayKey() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date());
-  const getPart = (type) => parts.find((part) => part.type === type)?.value;
-  return `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
-}
-
 function applyRemoteData(current, remoteData, superAdminEmails) {
   const merged = mergePublicPoolState(current, remoteData, { prefer: "shared" });
-  return {
+  return purgeExpiredPredictions({
     ...merged,
     users: normalizeUsers(merged.users ?? [], superAdminEmails),
     currentUserId: current.currentUserId,
     activeParticipantId: current.activeParticipantId
-  };
+  });
+}
+
+function cleanPoolState(state) {
+  return purgeExpiredPredictions(purgeFutureRoundPredictions(state));
 }
 
 function App() {
@@ -95,7 +87,7 @@ function App() {
   const [sharedStatus, setSharedStatus] = useState({ state: "idle", message: "Carregando dados do bolão..." });
   const [selectedPredictionRound, setSelectedPredictionRound] = useState(null);
   const [selectedOverviewRound, setSelectedOverviewRound] = useState(null);
-  const [selectedResultDate, setSelectedResultDate] = useState("");
+  const [selectedResultRound, setSelectedResultRound] = useState(null);
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -107,9 +99,6 @@ function App() {
     [state.matches, state.participants, state.predictions]
   );
   const activeRound = useMemo(() => getActiveRound(state.matches), [state.matches]);
-  const predictionDates = useMemo(() => {
-    return [...new Set(state.matches.map(getMatchDateKey).filter(Boolean))].sort();
-  }, [state.matches]);
   const availableRounds = useMemo(() => {
     return [...new Set(
       state.matches.map((m) => getMatchRound(m)).filter((r) => r !== null && !Number.isNaN(r))
@@ -117,12 +106,7 @@ function App() {
   }, [state.matches]);
   const activePredictionRound = selectedPredictionRound ?? activeRound;
   const activeOverviewRound = selectedOverviewRound ?? activeRound;
-  const activeResultDate = useMemo(() => {
-    if (predictionDates.includes(selectedResultDate)) return selectedResultDate;
-    const today = getTodayKey();
-    if (predictionDates.includes(today)) return today;
-    return predictionDates.find((date) => date >= today) ?? predictionDates[0] ?? "";
-  }, [predictionDates, selectedResultDate]);
+  const activeResultRound = selectedResultRound ?? activeRound;
   const predictionMatches = state.matches
     .filter((match) => getMatchRound(match) === activePredictionRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
@@ -130,7 +114,7 @@ function App() {
     .filter((match) => getMatchRound(match) === activeOverviewRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const resultMatches = state.matches
-    .filter((match) => getMatchDateKey(match) === activeResultDate)
+    .filter((match) => getMatchRound(match) === activeResultRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
   // Initial load from Supabase (with one-time migration from legacy localStorage)
@@ -150,27 +134,25 @@ function App() {
           }
         } catch {}
 
-        let stateToSync = null;
+        const base = legacyData
+          ? mergePublicPoolState(remote, legacyData, { prefer: "current" })
+          : remote;
+        const cleanedBase = cleanPoolState(base);
         setState((current) => {
           // If legacy data exists, merge it so we don't lose local-only registrations
-          const base = legacyData
-            ? mergePublicPoolState(remote, legacyData, { prefer: "current" })
-            : remote;
-          const merged = mergePublicPoolState(current, base, { prefer: "shared" });
+          const merged = mergePublicPoolState(current, cleanedBase, { prefer: "shared" });
           const next = {
             ...merged,
             users: normalizeUsers(merged.users ?? [], SUPER_ADMIN_EMAILS),
             currentUserId: session.currentUserId ?? "",
             activeParticipantId: session.activeParticipantId ?? ""
           };
-          const purged = purgeFutureRoundPredictions(next);
-          if (legacyData || purged !== next) stateToSync = purged;
-          return purged;
+          return cleanPoolState(next);
         });
 
-        // Persist if data was migrated from localStorage or future-round predictions were purged
-        if (stateToSync) {
-          try { await persistPoolState(stateToSync); } catch {}
+        // Persist if data was migrated from localStorage or expired/future predictions were purged.
+        if (legacyData || cleanedBase !== base) {
+          try { await persistPoolState(cleanedBase); } catch {}
         }
 
         setSharedStatus({ state: "success", message: "Dados sincronizados com o banco." });
@@ -186,7 +168,9 @@ function App() {
   // Real-time subscription
   useEffect(() => {
     const channel = subscribeToPoolChanges((remoteData) => {
-      setState((current) => applyRemoteData(current, remoteData, SUPER_ADMIN_EMAILS));
+      const cleanedRemote = cleanPoolState(remoteData);
+      setState((current) => applyRemoteData(current, cleanedRemote, SUPER_ADMIN_EMAILS));
+      if (cleanedRemote !== remoteData) void persistPoolState(cleanedRemote);
       setSharedStatus({ state: "success", message: "Atualizado em tempo real." });
     });
     return () => unsubscribeFromPoolChanges(channel);
@@ -197,7 +181,9 @@ function App() {
     const intervalId = window.setInterval(async () => {
       try {
         const remote = await fetchPoolState();
-        setState((current) => applyRemoteData(current, remote, SUPER_ADMIN_EMAILS));
+        const cleanedRemote = cleanPoolState(remote);
+        setState((current) => applyRemoteData(current, cleanedRemote, SUPER_ADMIN_EMAILS));
+        if (cleanedRemote !== remote) void persistPoolState(cleanedRemote);
       } catch {}
     }, 30_000);
     return () => window.clearInterval(intervalId);
@@ -317,11 +303,29 @@ function App() {
     const form = new FormData(event.currentTarget);
     const name = form.get("name").trim();
     const email = (form.get("email") || "").trim().toLowerCase();
-    if (!name) return;
+    const password = (form.get("password") || "").trim();
+    if (!name || !email || !password) return;
+    if (state.users.some((user) => user.email === email)) {
+      setSharedStatus({ state: "error", message: "Este e-mail jÃ¡ estÃ¡ cadastrado." });
+      return;
+    }
     updateState((current) => {
-      const participant = { id: makeId("participant"), name, email, updatedAt: new Date().toISOString() };
+      const now = new Date().toISOString();
+      const participant = { id: makeId("participant"), name, email, updatedAt: now };
+      const user = {
+        id: makeId("user"),
+        name,
+        email,
+        password,
+        role: "user",
+        favoriteTeamId: "",
+        participantId: participant.id,
+        createdAt: now,
+        updatedAt: now
+      };
       return {
         ...current,
+        users: [...current.users, user],
         participants: [...current.participants, participant],
         activeParticipantId: current.activeParticipantId || participant.id
       };
@@ -334,9 +338,7 @@ function App() {
       const predictions = { ...current.predictions };
       delete predictions[participantId];
       const participants = current.participants.filter((participant) => participant.id !== participantId);
-      const users = current.users.map((user) =>
-        user.participantId === participantId ? { ...user, participantId: "", updatedAt: new Date().toISOString() } : user
-      );
+      const users = current.users.filter((user) => user.participantId !== participantId);
       return {
         ...current,
         users,
@@ -409,8 +411,9 @@ function App() {
 
   function savePrediction(participantId, matchId) {
     const key = getPredictionKey(participantId, matchId);
+    const match = state.matches.find((item) => item.id === matchId);
     const currentPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
-    if (hasPrediction(currentPrediction)) return;
+    if (hasPrediction(currentPrediction) || isMatchClosed(match)) return;
 
     const draft = getDraftPrediction(participantId, matchId, currentPrediction);
     // Treat blank input as 0 — user leaving the field empty means "zero gols"
@@ -525,7 +528,8 @@ function App() {
             <SectionHeader title="Participantes" caption="Área administrativa. Usuários comuns devem se auto cadastrar e sempre entram com perfil user." />
             <form className="inline-form participant-form" onSubmit={addParticipant}>
               <input name="name" placeholder="Nome do participante" />
-              <input name="email" type="email" placeholder="E-mail do participante" />
+              <input name="email" type="email" placeholder="E-mail do participante" required />
+              <input name="password" type="password" placeholder="Senha inicial" required />
               <button type="submit">Adicionar</button>
             </form>
             <div className="list">
@@ -607,7 +611,8 @@ function App() {
                   const prediction = getDraftPrediction(activeParticipant.id, match.id, storedPrediction);
                   const isSaved = hasPrediction(storedPrediction);
                   const isRoundLocked = activePredictionRound !== activeRound;
-                  const isLocked = isSaved || isRoundLocked;
+                  const isKickoffLocked = isMatchClosed(match);
+                  const isLocked = isSaved || isRoundLocked || isKickoffLocked;
                   return (
                     <article className={`match-card prediction-card ${isLocked ? "locked" : ""}`} key={match.id}>
                       <div>
@@ -628,6 +633,8 @@ function App() {
                           <span className="round-locked-pill">
                             {activePredictionRound < activeRound ? "Sem palpite" : "Indisponível"}
                           </span>
+                        ) : isKickoffLocked ? (
+                          <span className="round-locked-pill">Prazo encerrado</span>
                         ) : (
                           <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id)}>
                             Salvar palpite
@@ -681,10 +688,12 @@ function App() {
             </div>
             <div className="prediction-toolbar">
               <label className="select-label">
-                Dia dos jogos
-                <select value={activeResultDate} onChange={(event) => setSelectedResultDate(event.target.value)}>
-                  {predictionDates.map((date) => (
-                    <option value={date} key={date}>{formatMatchDayOption(date)}</option>
+                Rodada
+                <select value={activeResultRound} onChange={(event) => setSelectedResultRound(Number(event.target.value))}>
+                  {availableRounds.map((round) => (
+                    <option value={round} key={round}>
+                      {round === activeRound ? `Rodada ${round} â€” em andamento` : `Rodada ${round}`}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -787,9 +796,29 @@ function ScoreInput({ value, onChange, disabled = false }) {
 }
 
 function RankingTable({ ranking, compact = false }) {
+  const paidParticipants = ranking.filter((participant) => participant.predictedMatches > 0).length;
+  const totalPoolValue = paidParticipants * ENTRY_FEE;
+
   return (
     <section className="panel table-panel">
       <SectionHeader title={compact ? "Top 5" : "Ranking"} caption="Critérios: pontos, placares cravados e nome." />
+      {!compact && (
+        <div className="ranking-summary">
+          <div>
+            <span>Valor por participante</span>
+            <strong>{formatCurrency(ENTRY_FEE)}</strong>
+          </div>
+          <div>
+            <span>Participantes com voto</span>
+            <strong>{paidParticipants}</strong>
+          </div>
+          <div>
+            <span>Total arrecadado</span>
+            <strong>{formatCurrency(totalPoolValue)}</strong>
+          </div>
+          <p>ObservaÃ§Ã£o: o valor acumulado sÃ³ serÃ¡ debitado para o ganhador ao final do campeonato.</p>
+        </div>
+      )}
       {!compact && <ScoringExamples />}
       {ranking.length ? (
         <div className="table-wrap">
@@ -977,11 +1006,8 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
 }
 
-function formatMatchDayOption(dateKey) {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const date = new Date(year, month - 1, day, 12);
-  const label = new Intl.DateTimeFormat("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }).format(date);
-  return dateKey === getTodayKey() ? `Hoje - ${label}` : label;
+function formatCurrency(value) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 }
 
 function formatVenue(match) {

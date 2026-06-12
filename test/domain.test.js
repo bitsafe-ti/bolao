@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateRanking, createGroupStageMatches, normalizeUsers, scorePrediction } from "../src/domain.js";
+import { calculateRanking, createGroupStageMatches, normalizeUsers, purgeExpiredPredictions, scorePrediction } from "../src/domain.js";
 import { applyResultUpdates } from "../src/resultsSync.js";
 import { getPublicPoolState, mergePublicPoolState } from "../src/sharedState.js";
 
@@ -43,6 +43,51 @@ test("orders ranking by total, exact scores, then name", () => {
     calculateRanking(participants, matches, predictions).map((participant) => participant.name),
     ["Ana", "Bruno"]
   );
+});
+
+test("counts participants with saved predictions for pool value", () => {
+  const participants = [
+    { id: "a", name: "Ana" },
+    { id: "b", name: "Bruno" },
+    { id: "c", name: "Caio" }
+  ];
+  const matches = [{ id: "m1", homeScore: "", awayScore: "" }];
+  const predictions = {
+    a: { m1: { home: "0", away: "0" } },
+    b: { m1: { home: "", away: "" } }
+  };
+
+  const ranking = calculateRanking(participants, matches, predictions);
+
+  assert.equal(ranking.find((participant) => participant.id === "a").predictedMatches, 1);
+  assert.equal(ranking.find((participant) => participant.id === "b").predictedMatches, 0);
+  assert.equal(ranking.find((participant) => participant.id === "c").predictedMatches, 0);
+});
+
+test("purges predictions saved after match kickoff", () => {
+  const state = {
+    matches: [{ id: "m1", date: "2026-06-11T16:00:00.000Z" }],
+    predictions: {
+      p1: { m1: { home: "2", away: "0", savedAt: "2026-06-11T16:01:00.000Z" } }
+    }
+  };
+
+  const purged = purgeExpiredPredictions(state, new Date("2026-06-12T12:00:00.000Z"));
+
+  assert.deepEqual(purged.predictions.p1, {});
+});
+
+test("keeps predictions saved before match kickoff", () => {
+  const state = {
+    matches: [{ id: "m1", date: "2026-06-11T16:00:00.000Z" }],
+    predictions: {
+      p1: { m1: { home: "2", away: "0", savedAt: "2026-06-11T15:59:00.000Z" } }
+    }
+  };
+
+  const purged = purgeExpiredPredictions(state, new Date("2026-06-12T12:00:00.000Z"));
+
+  assert.equal(purged, state);
 });
 
 test("creates group-stage schedule with dates, times and rounds", () => {
