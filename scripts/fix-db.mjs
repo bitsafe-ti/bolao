@@ -34,23 +34,31 @@ function request(method, path, body) {
 const res = await request("GET", "/rest/v1/bolao_public_state?id=eq.copa-2026&select=data");
 const data = JSON.parse(res.body)[0].data;
 
+const ADMIN_USER_ID = "user-mqaxblsb-754696";
+const ADMIN_PARTICIPANT_ID = "participant-mqaxblsb-i55qvp";
+
+const adminUser = data.users.find(u => u.id === ADMIN_USER_ID);
+const adminParticipant = data.participants.find(p => p.id === ADMIN_PARTICIPANT_ID);
+
 const cleaned = {
-  users: data.users
-    .filter((u) => u.id !== "user-mqb0dx81-6d2sfw")
-    .map((u) => (u.id === "user-mqaxblsb-754696" ? { ...u, role: "admin" } : u)),
-  participants: data.participants.filter((p) => p.id !== "participant-mqb0dx81-qpjnn5"),
-  predictions: data.predictions,
+  users: [{ ...adminUser, role: "admin" }],
+  participants: [adminParticipant],
+  predictions: {
+    [ADMIN_PARTICIPANT_ID]: data.predictions?.[ADMIN_PARTICIPANT_ID] ?? {}
+  },
   matches: data.matches,
   lastResultSyncAt: data.lastResultSyncAt
 };
 
-console.log("Users after cleanup:");
-cleaned.users.forEach((u) => console.log(" ", u.name, u.email, "role=" + u.role));
-console.log("Participants:", cleaned.participants.map((p) => p.name).join(", "));
+console.log("State after reset:");
+console.log("  Users:", cleaned.users.map(u => `${u.name} <${u.email}> role=${u.role}`).join(", "));
+console.log("  Participants:", cleaned.participants.map(p => p.name).join(", "));
+console.log("  Predictions kept for:", Object.keys(cleaned.predictions).join(", ") || "(none)");
+console.log("  Matches:", cleaned.matches?.length ?? 0);
 
 const patch = await request("PATCH", "/rest/v1/bolao_public_state?id=eq.copa-2026", {
   data: cleaned,
   updated_at: new Date().toISOString()
 });
 
-console.log("HTTP", patch.status, patch.body || "→ Saved successfully.");
+console.log("HTTP", patch.status, patch.body || "→ Reset successful.");
