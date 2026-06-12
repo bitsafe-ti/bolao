@@ -2,7 +2,7 @@ import { Client, Databases, Permission, Role } from "appwrite";
 
 const viteEnv = import.meta.env ?? {};
 
-const ENDPOINT    = viteEnv.VITE_APPWRITE_ENDPOINT    || "https://cloud.appwrite.io/v1";
+const ENDPOINT    = viteEnv.VITE_APPWRITE_ENDPOINT    || "https://nyc.cloud.appwrite.io/v1";
 const PROJECT_ID  = viteEnv.VITE_APPWRITE_PROJECT_ID  || "6a2c61c200150745bf42";
 const DATABASE_ID = viteEnv.VITE_APPWRITE_DATABASE_ID || "bolao";
 const COLLECTION_ID = viteEnv.VITE_APPWRITE_COLLECTION_ID || "pool_state";
