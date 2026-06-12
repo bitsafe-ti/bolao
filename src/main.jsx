@@ -1,8 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  APP_VERSION,
-  STORAGE_KEY,
   calculateRanking,
   createInitialState,
   emptyPrediction,
@@ -14,19 +12,36 @@ import {
 import { getFlagUrl, teamsById, worldCupTeams } from "./teams.js";
 import { applyResultUpdates, fetchWorldCupResults } from "./resultsSync.js";
 import {
-  fetchSharedPoolState,
-  isSharedStorageEnabled,
+  fetchPoolState,
   mergePublicPoolState,
-  saveSharedPoolState,
-  SHARED_CONFIG
+  persistPoolState,
+  subscribeToPoolChanges,
+  unsubscribeFromPoolChanges
 } from "./sharedState.js";
 import "./styles.css";
 
+const SESSION_KEY = "bolao-copa-2026:session";
+const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva.rocha@hotmail.com";
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
 const SUPER_ADMIN_EMAILS = normalizeEmailList(
-  `${import.meta.env.VITE_SUPER_ADMIN_EMAILS ?? ""},${import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? ""}`
+  `${import.meta.env.VITE_SUPER_ADMIN_EMAILS ?? ""},${import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? DEFAULT_SUPER_ADMIN_EMAIL}`
 );
+
+function loadSession() {
+  try {
+    const saved = localStorage.getItem(SESSION_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveSession(updates) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ ...loadSession(), ...updates }));
+  } catch {}
+}
 
 const userTabs = [
   { id: "predictions", label: "Palpites" },
@@ -64,75 +79,27 @@ function getTodayKey() {
   return `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
 }
 
-function mergeMatchesWithSchedule(savedMatches, scheduledMatches) {
-  const scheduleById = Object.fromEntries(scheduledMatches.map((match) => [match.id, match]));
-  const savedIds = new Set(savedMatches.map((match) => match.id));
-  const mergedMatches = savedMatches.map((match) => {
-    const scheduled = scheduleById[match.id];
-    if (!scheduled) return match;
-    return {
-      ...match,
-      homeTeamId: scheduled.homeTeamId,
-      awayTeamId: scheduled.awayTeamId,
-      date: scheduled.date,
-      round: scheduled.round,
-      phase: scheduled.phase,
-      ground: scheduled.ground,
-      city: scheduled.city,
-      stadium: scheduled.stadium,
-      country: scheduled.country
-    };
-  });
-
-  return [
-    ...mergedMatches,
-    ...scheduledMatches.filter((match) => !savedIds.has(match.id))
-  ];
-}
-
-function loadState() {
-  const initialState = createInitialState();
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return initialState;
-    const parsed = JSON.parse(saved);
-    const isLegacyState = !parsed.version;
-    const hasTeamMatches = parsed.matches?.some((match) => match.homeTeamId && match.awayTeamId);
-    const matches = hasTeamMatches
-      ? mergeMatchesWithSchedule(parsed.matches, initialState.matches)
-      : initialState.matches;
-    const users = normalizeUsers(parsed.users ?? [], SUPER_ADMIN_EMAILS);
-    return {
-      ...initialState,
-      ...parsed,
-      version: APP_VERSION,
-      users,
-      participants: isLegacyState && !parsed.users ? [] : parsed.participants ?? [],
-      matches,
-      predictions: hasTeamMatches && !isLegacyState ? parsed.predictions ?? {} : {},
-      activeParticipantId: isLegacyState ? "" : parsed.activeParticipantId ?? "",
-      currentUserId: isLegacyState ? "" : parsed.currentUserId ?? ""
-    };
-  } catch {
-    return initialState;
-  }
+function applyRemoteData(current, remoteData, superAdminEmails) {
+  const merged = mergePublicPoolState(current, remoteData, { prefer: "shared" });
+  return {
+    ...merged,
+    users: normalizeUsers(merged.users ?? [], superAdminEmails),
+    currentUserId: current.currentUserId,
+    activeParticipantId: current.activeParticipantId
+  };
 }
 
 function App() {
-  const [state, setState] = useState(loadState);
+  const [state, setState] = useState(createInitialState);
+  const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState("predictions");
   const [authError, setAuthError] = useState("");
   const [syncStatus, setSyncStatus] = useState({ state: "idle", message: "Resultados automáticos ativos." });
+  const [sharedStatus, setSharedStatus] = useState({ state: "idle", message: "Carregando dados do bolão..." });
   const [selectedPredictionDate, setSelectedPredictionDate] = useState("");
   const [selectedOverviewDate, setSelectedOverviewDate] = useState("");
   const [selectedResultDate, setSelectedResultDate] = useState("");
   const [draftPredictions, setDraftPredictions] = useState({});
-  const [sharedStatus, setSharedStatus] = useState({
-    state: isSharedStorageEnabled() ? "idle" : "disabled",
-    message: isSharedStorageEnabled()
-      ? "Palpites compartilhados ativos."
-      : "Modo local: configure o banco compartilhado para ver palpites de outros usuários."
-  });
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAdmin = currentUser?.role === "admin";
@@ -172,50 +139,71 @@ function App() {
     .filter((match) => getMatchDateKey(match) === activeResultDate)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
-  async function publishSharedState(nextState) {
-    if (!isSharedStorageEnabled()) return;
-    try {
-      const shared = await fetchSharedPoolState();
-      const rawMerged = mergePublicPoolState(nextState, shared, { prefer: "current" });
-      const mergedState = { ...rawMerged, users: normalizeUsers(rawMerged.users ?? [], SUPER_ADMIN_EMAILS) };
-      await saveSharedPoolState(mergedState);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedState));
-      setState(mergedState);
-      setSharedStatus({ state: "success", message: "Dados compartilhados sincronizados." });
-    } catch (error) {
-      setSharedStatus({ state: "error", message: error.message });
-    }
-  }
-
-  async function pullSharedState({ publishAfterMerge = false } = {}) {
-    if (!isSharedStorageEnabled()) return;
-    try {
-      const shared = await fetchSharedPoolState();
-      let mergedState;
-      setState((current) => {
-        const rawMerged = mergePublicPoolState(current, shared, { prefer: "shared" });
-        mergedState = { ...rawMerged, users: normalizeUsers(rawMerged.users ?? [], SUPER_ADMIN_EMAILS) };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedState));
-        return mergedState;
-      });
-      setSharedStatus({ state: "success", message: "Palpites de todos os usuários atualizados." });
-      if (publishAfterMerge && mergedState) {
-        await publishSharedState(mergedState);
+  // Initial load from Supabase
+  useEffect(() => {
+    async function init() {
+      try {
+        const remote = await fetchPoolState();
+        const session = loadSession();
+        setState((current) => {
+          const merged = mergePublicPoolState(current, remote, { prefer: "shared" });
+          return {
+            ...merged,
+            users: normalizeUsers(merged.users ?? [], SUPER_ADMIN_EMAILS),
+            currentUserId: session.currentUserId ?? "",
+            activeParticipantId: session.activeParticipantId ?? ""
+          };
+        });
+        setSharedStatus({ state: "success", message: "Dados sincronizados com o banco." });
+      } catch (error) {
+        setSharedStatus({ state: "error", message: `Erro ao carregar dados: ${error.message}` });
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      setSharedStatus({ state: "error", message: error.message });
     }
-  }
+    void init();
+  }, []);
 
-  function updateState(recipe, options = {}) {
-    setState((current) => {
-      const next = typeof recipe === "function" ? recipe(current) : recipe;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      if (options.publishShared) {
-        void publishSharedState(next);
-      }
-      return next;
+  // Real-time subscription
+  useEffect(() => {
+    const channel = subscribeToPoolChanges((remoteData) => {
+      setState((current) => applyRemoteData(current, remoteData, SUPER_ADMIN_EMAILS));
+      setSharedStatus({ state: "success", message: "Atualizado em tempo real." });
     });
+    return () => unsubscribeFromPoolChanges(channel);
+  }, []);
+
+  // Auto-sync results when logged in
+  useEffect(() => {
+    if (!currentUser) return undefined;
+    syncResults("auto");
+    const intervalId = window.setInterval(() => syncResults("auto"), 5 * 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!visibleTabs.some((item) => item.id === tab)) {
+      setTab("predictions");
+    }
+  }, [tab, visibleTabs]);
+
+  // Optimistically update state then persist to Supabase
+  function updateState(recipe) {
+    let nextState;
+    setState((current) => {
+      nextState = typeof recipe === "function" ? recipe(current) : recipe;
+      return nextState;
+    });
+    void persistAndSync(nextState);
+  }
+
+  async function persistAndSync(nextState) {
+    try {
+      const saved = await persistPoolState(nextState);
+      setState((current) => applyRemoteData(current, saved, SUPER_ADMIN_EMAILS));
+    } catch (error) {
+      setSharedStatus({ state: "error", message: `Erro ao salvar: ${error.message}` });
+    }
   }
 
   async function syncResults(mode = "manual") {
@@ -226,12 +214,8 @@ function App() {
       updateState((current) => {
         const update = applyResultUpdates(current.matches, sourceMatches);
         changed = update.changed;
-        return {
-          ...current,
-          matches: update.matches,
-          lastResultSyncAt: new Date().toISOString()
-        };
-      }, { publishShared: true });
+        return { ...current, matches: update.matches, lastResultSyncAt: new Date().toISOString() };
+      });
       setSyncStatus({
         state: "success",
         message:
@@ -240,37 +224,9 @@ function App() {
             : `Sem novos resultados. Última verificação ${formatShortTime(new Date())}.`
       });
     } catch (error) {
-      setSyncStatus({
-        state: "error",
-        message: `Não consegui atualizar agora. ${error.message}`
-      });
+      setSyncStatus({ state: "error", message: `Não consegui atualizar agora. ${error.message}` });
     }
   }
-
-  useEffect(() => {
-    if (!isSharedStorageEnabled()) return;
-    void pullSharedState();
-  }, []);
-
-  useEffect(() => {
-    if (!currentUser) return undefined;
-    syncResults("auto");
-    const intervalId = window.setInterval(() => syncResults("auto"), 5 * 60 * 1000);
-    return () => window.clearInterval(intervalId);
-  }, [currentUser?.id]);
-
-  useEffect(() => {
-    if (!currentUser || !isSharedStorageEnabled()) return undefined;
-    pullSharedState({ publishAfterMerge: true });
-    const intervalId = window.setInterval(() => pullSharedState(), 30 * 1000);
-    return () => window.clearInterval(intervalId);
-  }, [currentUser?.id]);
-
-  useEffect(() => {
-    if (!visibleTabs.some((item) => item.id === tab)) {
-      setTab("predictions");
-    }
-  }, [tab, visibleTabs]);
 
   function registerUser({ name, email, password, favoriteTeamId }) {
     const cleanName = name.trim();
@@ -297,13 +253,14 @@ function App() {
       createdAt: now
     };
 
+    saveSession({ currentUserId: user.id, activeParticipantId: participant.id });
     updateState((current) => ({
       ...current,
       users: [...current.users, user],
       participants: [...current.participants, participant],
       currentUserId: user.id,
       activeParticipantId: participant.id
-    }), { publishShared: true });
+    }));
     setAuthError("");
   }
 
@@ -314,16 +271,15 @@ function App() {
       setAuthError("E-mail ou senha inválidos.");
       return;
     }
-    updateState((current) => ({
-      ...current,
-      currentUserId: user.id,
-      activeParticipantId: user.participantId || current.activeParticipantId
-    }));
+    const session = { currentUserId: user.id, activeParticipantId: user.participantId || "" };
+    saveSession(session);
+    setState((current) => ({ ...current, ...session }));
     setAuthError("");
   }
 
   function logoutUser() {
-    updateState((current) => ({ ...current, currentUserId: "" }));
+    saveSession({ currentUserId: "", activeParticipantId: "" });
+    setState((current) => ({ ...current, currentUserId: "", activeParticipantId: "" }));
   }
 
   function addParticipant(event) {
@@ -338,7 +294,7 @@ function App() {
         participants: [...current.participants, participant],
         activeParticipantId: current.activeParticipantId || participant.id
       };
-    }, { publishShared: true });
+    });
     event.currentTarget.reset();
   }
 
@@ -358,7 +314,7 @@ function App() {
         activeParticipantId:
           current.activeParticipantId === participantId ? participants[0]?.id ?? "" : current.activeParticipantId
       };
-    }, { publishShared: true });
+    });
   }
 
   function addMatch(event) {
@@ -378,7 +334,7 @@ function App() {
       updatedAt: new Date().toISOString()
     };
     if (!match.homeTeamId || !match.awayTeamId || match.homeTeamId === match.awayTeamId) return;
-    updateState((current) => ({ ...current, matches: [...current.matches, match] }), { publishShared: true });
+    updateState((current) => ({ ...current, matches: [...current.matches, match] }));
     event.currentTarget.reset();
   }
 
@@ -388,7 +344,7 @@ function App() {
       matches: current.matches.map((match) =>
         match.id === matchId ? { ...match, [field]: value, updatedAt: new Date().toISOString() } : match
       )
-    }), { publishShared: true });
+    }));
   }
 
   function removeMatch(matchId) {
@@ -400,12 +356,8 @@ function App() {
           return [participantId, nextPredictions];
         })
       );
-      return {
-        ...current,
-        matches: current.matches.filter((match) => match.id !== matchId),
-        predictions
-      };
-    }, { publishShared: true });
+      return { ...current, matches: current.matches.filter((match) => match.id !== matchId), predictions };
+    });
   }
 
   function getPredictionKey(participantId, matchId) {
@@ -420,11 +372,7 @@ function App() {
     const key = getPredictionKey(participantId, matchId);
     setDraftPredictions((current) => ({
       ...current,
-      [key]: {
-        ...emptyPrediction,
-        ...current[key],
-        [field]: value
-      }
+      [key]: { ...emptyPrediction, ...current[key], [field]: value }
     }));
   }
 
@@ -446,16 +394,10 @@ function App() {
         ...current.predictions,
         [participantId]: {
           ...current.predictions[participantId],
-          [matchId]: {
-            ...emptyPrediction,
-            ...current.predictions[participantId]?.[matchId],
-            ...draft,
-            savedAt,
-            updatedAt: savedAt
-          }
+          [matchId]: { ...emptyPrediction, ...current.predictions[participantId]?.[matchId], ...draft, savedAt, updatedAt: savedAt }
         }
       }
-    }), { publishShared: true });
+    }));
     setDraftPredictions((current) => {
       const next = { ...current };
       delete next[key];
@@ -464,8 +406,19 @@ function App() {
   }
 
   function resetData() {
-    if (!confirm("Apagar todos os dados do bolão neste navegador?")) return;
-    updateState(createInitialState(), { publishShared: true });
+    if (!confirm("Apagar todos os dados do bolão? Esta ação não pode ser desfeita.")) return;
+    updateState(createInitialState());
+  }
+
+  if (isLoading) {
+    return (
+      <main className="auth-page loading-page">
+        <div className="loading-block">
+          <img src={WORLD_CUP_LOGO_URL} alt="Copa do Mundo 2026" style={{ width: 200, opacity: 0.8 }} />
+          <p>Carregando dados do bolão...</p>
+        </div>
+      </main>
+    );
   }
 
   if (!currentUser) {
@@ -503,9 +456,9 @@ function App() {
           </div>
           <div className="topbar-actions">
             <div className="user-chip">
-            {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
-            <span>{currentUser.name}</span>
-            {isAdmin && <small>Admin</small>}
+              {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
+              <span>{currentUser.name}</span>
+              {isAdmin && <small>Admin</small>}
             </div>
             {isAdmin && <button type="button" className="secondary" onClick={() => syncResults("manual")}>Atualizar resultados</button>}
             <button type="button" className="ghost" onClick={logoutUser}>Sair</button>
@@ -513,170 +466,166 @@ function App() {
           </div>
         </header>
 
-      {tab === "participants" && isAdmin && (
-        <section className="panel">
-          <SectionHeader title="Participantes" caption="Área administrativa. Usuários comuns devem se auto cadastrar e sempre entram com perfil user." />
-          <form className="inline-form" onSubmit={addParticipant}>
-            <input name="name" placeholder="Nome do participante" />
-            <button type="submit">Adicionar</button>
-          </form>
-          <div className="list">
-            {state.participants.map((participant) => (
-              <div className="list-row" key={participant.id}>
-                <input value={participant.name} onChange={(event) =>
-                  updateState((current) => ({
-                    ...current,
-                    participants: current.participants.map((item) =>
-                      item.id === participant.id ? { ...item, name: event.target.value, updatedAt: new Date().toISOString() } : item
-                    ),
-                    users: current.users.map((user) =>
-                      user.participantId === participant.id ? { ...user, name: event.target.value, updatedAt: new Date().toISOString() } : user
-                    )
-                  }), { publishShared: true })
-                } />
-                <button type="button" className="danger" onClick={() => removeParticipant(participant.id)}>Remover</button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {tab === "matches" && isAdmin && (
-        <section className="panel">
-          <SectionHeader title="Jogos e resultados" caption="A fase de grupos já nasce com as 48 seleções de 2026." />
-          <form className="match-form" onSubmit={addMatch}>
-            <input name="phase" placeholder="Fase" />
-            <RoundSelect name="round" label="Rodada" defaultValue="1" />
-            <input name="date" type="datetime-local" />
-            <TeamSelect name="homeTeamId" label="Seleção 1" />
-            <TeamSelect name="awayTeamId" label="Seleção 2" />
-            <button type="submit">Adicionar jogo</button>
-          </form>
-          <div className="match-list">
-            {state.matches.map((match) => (
-              <article className="match-card" key={match.id}>
-                <div className="match-meta">
-                  <input value={match.phase} onChange={(event) => updateMatch(match.id, "phase", event.target.value)} />
-                  <RoundSelect value={String(getMatchRound(match) ?? "")} onChange={(event) => updateMatch(match.id, "round", Number(event.target.value))} label="Rodada" />
-                  <input type="datetime-local" value={match.date} onChange={(event) => updateMatch(match.id, "date", event.target.value)} />
+        {tab === "participants" && isAdmin && (
+          <section className="panel">
+            <SectionHeader title="Participantes" caption="Área administrativa. Usuários comuns devem se auto cadastrar e sempre entram com perfil user." />
+            <form className="inline-form" onSubmit={addParticipant}>
+              <input name="name" placeholder="Nome do participante" />
+              <button type="submit">Adicionar</button>
+            </form>
+            <div className="list">
+              {state.participants.map((participant) => (
+                <div className="list-row" key={participant.id}>
+                  <input value={participant.name} onChange={(event) =>
+                    updateState((current) => ({
+                      ...current,
+                      participants: current.participants.map((item) =>
+                        item.id === participant.id ? { ...item, name: event.target.value, updatedAt: new Date().toISOString() } : item
+                      ),
+                      users: current.users.map((user) =>
+                        user.participantId === participant.id ? { ...user, name: event.target.value, updatedAt: new Date().toISOString() } : user
+                      )
+                    }))
+                  } />
+                  <button type="button" className="danger" onClick={() => removeParticipant(participant.id)}>Remover</button>
                 </div>
-                <div className="score-line">
-                  <TeamSelect value={match.homeTeamId ?? ""} onChange={(event) => updateMatch(match.id, "homeTeamId", event.target.value)} label="Mandante" />
-                  <ScoreInput value={match.homeScore} onChange={(value) => updateMatch(match.id, "homeScore", value)} />
-                  <span>x</span>
-                  <ScoreInput value={match.awayScore} onChange={(value) => updateMatch(match.id, "awayScore", value)} />
-                  <TeamSelect value={match.awayTeamId ?? ""} onChange={(event) => updateMatch(match.id, "awayTeamId", event.target.value)} label="Visitante" />
-                </div>
-                <button type="button" className="danger subtle" onClick={() => removeMatch(match.id)}>Remover jogo</button>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {tab === "predictions" && (
-        <section className="panel">
-          <SectionHeader title="Palpites" caption="Escolha o dia para ver somente os jogos daquela data." />
-          <div className="prediction-toolbar single">
-            <label className="select-label">
-              Dia dos jogos
-              <select value={activePredictionDate} onChange={(event) => setSelectedPredictionDate(event.target.value)}>
-                {predictionDates.map((date) => (
-                  <option value={date} key={date}>{formatMatchDayOption(date)}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          {activeParticipant ? (
-            <div className="match-list">
-              {predictionMatches.map((match) => {
-                const storedPrediction = state.predictions[activeParticipant.id]?.[match.id] ?? emptyPrediction;
-                const prediction = getDraftPrediction(activeParticipant.id, match.id, storedPrediction);
-                const isSaved = hasPrediction(storedPrediction);
-                return (
-                  <article className={`match-card prediction-card ${isSaved ? "locked" : ""}`} key={match.id}>
-                    <div>
-                      <span className="badge">{match.phase}</span>
-                      <h3 className="teams-versus"><TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span> <TeamName teamId={match.awayTeamId} fallback={match.away} /></h3>
-                      <p>{formatDate(match.date)}</p>
-                      <p className="match-location">{formatVenue(match)}</p>
-                    </div>
-                    <div className="prediction-actions">
-                      <div className="prediction-inputs">
-                        <ScoreInput disabled={isSaved} value={prediction.home} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "home", value)} />
-                        <span>x</span>
-                        <ScoreInput disabled={isSaved} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
-                      </div>
-                      {isSaved ? (
-                        <span className="saved-pill">Palpite salvo</span>
-                      ) : (
-                        <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id)}>
-                          Salvar palpite
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-              {!predictionMatches.length && <EmptyState text="Nenhum jogo cadastrado para este dia." />}
+              ))}
             </div>
-          ) : (
-            <EmptyState text="Seu cadastro entra como participante para registrar palpites." />
-          )}
-        </section>
-      )}
+          </section>
+        )}
 
-      {tab === "dailyPredictions" && (
-        <section className="panel">
-          <SectionHeader title="Palpites do Dia" caption="Veja todos os palpites registrados para os jogos da data selecionada." />
-          <div className="prediction-toolbar">
-            <label className="select-label">
-              Dia dos jogos
-              <select value={activeOverviewDate} onChange={(event) => setSelectedOverviewDate(event.target.value)}>
-                {predictionDates.map((date) => (
-                  <option value={date} key={date}>{formatMatchDayOption(date)}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className={`sync-strip ${sharedStatus.state}`}>
-            <strong>{sharedStatus.message}</strong>
-            <span>
-              {isSharedStorageEnabled()
-                ? "Participantes, palpites, jogos, resultados e ranking ficam sincronizados."
-                : "Sem banco compartilhado, cada navegador vê apenas os próprios dados locais."}
-            </span>
-          </div>
-          <DailyPredictions
-            matches={overviewMatches}
-            participants={state.participants}
-            predictions={state.predictions}
-          />
-        </section>
-      )}
+        {tab === "matches" && isAdmin && (
+          <section className="panel">
+            <SectionHeader title="Jogos e resultados" caption="A fase de grupos já nasce com as 48 seleções de 2026." />
+            <form className="match-form" onSubmit={addMatch}>
+              <input name="phase" placeholder="Fase" />
+              <RoundSelect name="round" label="Rodada" defaultValue="1" />
+              <input name="date" type="datetime-local" />
+              <TeamSelect name="homeTeamId" label="Seleção 1" />
+              <TeamSelect name="awayTeamId" label="Seleção 2" />
+              <button type="submit">Adicionar jogo</button>
+            </form>
+            <div className="match-list">
+              {state.matches.map((match) => (
+                <article className="match-card" key={match.id}>
+                  <div className="match-meta">
+                    <input value={match.phase} onChange={(event) => updateMatch(match.id, "phase", event.target.value)} />
+                    <RoundSelect value={String(getMatchRound(match) ?? "")} onChange={(event) => updateMatch(match.id, "round", Number(event.target.value))} label="Rodada" />
+                    <input type="datetime-local" value={match.date} onChange={(event) => updateMatch(match.id, "date", event.target.value)} />
+                  </div>
+                  <div className="score-line">
+                    <TeamSelect value={match.homeTeamId ?? ""} onChange={(event) => updateMatch(match.id, "homeTeamId", event.target.value)} label="Mandante" />
+                    <ScoreInput value={match.homeScore} onChange={(value) => updateMatch(match.id, "homeScore", value)} />
+                    <span>x</span>
+                    <ScoreInput value={match.awayScore} onChange={(value) => updateMatch(match.id, "awayScore", value)} />
+                    <TeamSelect value={match.awayTeamId ?? ""} onChange={(event) => updateMatch(match.id, "awayTeamId", event.target.value)} label="Visitante" />
+                  </div>
+                  <button type="button" className="danger subtle" onClick={() => removeMatch(match.id)}>Remover jogo</button>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
 
-      {tab === "results" && (
-        <section className="panel">
-          <SectionHeader title="Resultados dos Jogos" caption="Placar oficial sincronizado automaticamente quando a fonte de resultados publicar a partida." />
-          <div className={`sync-strip ${syncStatus.state}`}>
-            <strong>{syncStatus.message}</strong>
-            <span>{state.lastResultSyncAt ? `Última checagem: ${formatDate(state.lastResultSyncAt)}` : "A atualização roda ao entrar e a cada 5 minutos."}</span>
-          </div>
-          <div className="prediction-toolbar">
-            <label className="select-label">
-              Dia dos jogos
-              <select value={activeResultDate} onChange={(event) => setSelectedResultDate(event.target.value)}>
-                {predictionDates.map((date) => (
-                  <option value={date} key={date}>{formatMatchDayOption(date)}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <ResultsList matches={resultMatches} />
-        </section>
-      )}
+        {tab === "predictions" && (
+          <section className="panel">
+            <SectionHeader title="Palpites" caption="Escolha o dia para ver somente os jogos daquela data." />
+            <div className="prediction-toolbar single">
+              <label className="select-label">
+                Dia dos jogos
+                <select value={activePredictionDate} onChange={(event) => setSelectedPredictionDate(event.target.value)}>
+                  {predictionDates.map((date) => (
+                    <option value={date} key={date}>{formatMatchDayOption(date)}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {activeParticipant ? (
+              <div className="match-list">
+                {predictionMatches.map((match) => {
+                  const storedPrediction = state.predictions[activeParticipant.id]?.[match.id] ?? emptyPrediction;
+                  const prediction = getDraftPrediction(activeParticipant.id, match.id, storedPrediction);
+                  const isSaved = hasPrediction(storedPrediction);
+                  return (
+                    <article className={`match-card prediction-card ${isSaved ? "locked" : ""}`} key={match.id}>
+                      <div>
+                        <span className="badge">{match.phase}</span>
+                        <h3 className="teams-versus"><TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span> <TeamName teamId={match.awayTeamId} fallback={match.away} /></h3>
+                        <p>{formatDate(match.date)}</p>
+                        <p className="match-location">{formatVenue(match)}</p>
+                      </div>
+                      <div className="prediction-actions">
+                        <div className="prediction-inputs">
+                          <ScoreInput disabled={isSaved} value={prediction.home} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "home", value)} />
+                          <span>x</span>
+                          <ScoreInput disabled={isSaved} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
+                        </div>
+                        {isSaved ? (
+                          <span className="saved-pill">Palpite salvo</span>
+                        ) : (
+                          <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id)}>
+                            Salvar palpite
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+                {!predictionMatches.length && <EmptyState text="Nenhum jogo cadastrado para este dia." />}
+              </div>
+            ) : (
+              <EmptyState text="Seu cadastro entra como participante para registrar palpites." />
+            )}
+          </section>
+        )}
 
-      {tab === "ranking" && <RankingTable ranking={ranking} />}
+        {tab === "dailyPredictions" && (
+          <section className="panel">
+            <SectionHeader title="Palpites do Dia" caption="Veja todos os palpites registrados para os jogos da data selecionada." />
+            <div className="prediction-toolbar">
+              <label className="select-label">
+                Dia dos jogos
+                <select value={activeOverviewDate} onChange={(event) => setSelectedOverviewDate(event.target.value)}>
+                  {predictionDates.map((date) => (
+                    <option value={date} key={date}>{formatMatchDayOption(date)}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className={`sync-strip ${sharedStatus.state}`}>
+              <strong>{sharedStatus.message}</strong>
+              <span>Participantes, palpites, jogos e resultados são sincronizados em tempo real.</span>
+            </div>
+            <DailyPredictions
+              matches={overviewMatches}
+              participants={state.participants}
+              predictions={state.predictions}
+            />
+          </section>
+        )}
+
+        {tab === "results" && (
+          <section className="panel">
+            <SectionHeader title="Resultados dos Jogos" caption="Placar oficial sincronizado automaticamente quando a fonte de resultados publicar a partida." />
+            <div className={`sync-strip ${syncStatus.state}`}>
+              <strong>{syncStatus.message}</strong>
+              <span>{state.lastResultSyncAt ? `Última checagem: ${formatDate(state.lastResultSyncAt)}` : "A atualização roda ao entrar e a cada 5 minutos."}</span>
+            </div>
+            <div className="prediction-toolbar">
+              <label className="select-label">
+                Dia dos jogos
+                <select value={activeResultDate} onChange={(event) => setSelectedResultDate(event.target.value)}>
+                  {predictionDates.map((date) => (
+                    <option value={date} key={date}>{formatMatchDayOption(date)}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <ResultsList matches={resultMatches} />
+          </section>
+        )}
+
+        {tab === "ranking" && <RankingTable ranking={ranking} />}
       </section>
     </main>
   );
@@ -716,7 +665,7 @@ function AuthScreen({ error, onLogin, onRegister }) {
           {error && <p className="form-error">{error}</p>}
           <button type="submit">{mode === "register" ? "Cadastrar e entrar" : "Entrar"}</button>
         </form>
-        <p className="auth-note">Cadastro sincronizado entre todos os participantes. Você pode entrar de qualquer navegador após se cadastrar.</p>
+        <p className="auth-note">Dados sincronizados entre todos os participantes em tempo real.</p>
       </section>
     </main>
   );
@@ -798,15 +747,10 @@ function RankingTable({ ranking, compact = false }) {
 }
 
 function ResultsList({ matches }) {
-  if (!matches.length) {
-    return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
-  }
-
+  if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
   return (
     <div className="match-list results-list">
-      {matches.map((match) => (
-        <ResultCard key={match.id} match={match} />
-      ))}
+      {matches.map((match) => <ResultCard key={match.id} match={match} />)}
     </div>
   );
 }
@@ -853,15 +797,8 @@ function ResultGoals({ match, hasResult }) {
   const homeGoals = match.homeGoals ?? [];
   const awayGoals = match.awayGoals ?? [];
   const hasGoals = homeGoals.length > 0 || awayGoals.length > 0;
-
-  if (!hasResult) {
-    return null;
-  }
-
-  if (!hasGoals) {
-    return <p className="result-goals-empty">Nenhum gol registrado para esta partida.</p>;
-  }
-
+  if (!hasResult) return null;
+  if (!hasGoals) return <p className="result-goals-empty">Nenhum gol registrado para esta partida.</p>;
   return (
     <div className="result-goals">
       <GoalList title="Gols mandante" teamId={match.homeTeamId} fallback={match.home} goals={homeGoals} />
@@ -873,9 +810,7 @@ function ResultGoals({ match, hasResult }) {
 function GoalList({ teamId, fallback, goals, align = "left" }) {
   return (
     <div className={`goal-list ${align === "right" ? "right" : ""}`}>
-      <div className="goal-list-title">
-        <TeamName teamId={teamId} fallback={fallback} />
-      </div>
+      <div className="goal-list-title"><TeamName teamId={teamId} fallback={fallback} /></div>
       {goals.length ? (
         <ul>
           {goals.map((goal, index) => (
@@ -887,31 +822,18 @@ function GoalList({ teamId, fallback, goals, align = "left" }) {
             </li>
           ))}
         </ul>
-      ) : (
-        <p>Sem gols.</p>
-      )}
+      ) : <p>Sem gols.</p>}
     </div>
   );
 }
 
 function DailyPredictions({ matches, participants, predictions }) {
-  if (!matches.length) {
-    return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
-  }
-
-  if (!participants.length) {
-    return <EmptyState text="Nenhum participante cadastrado ainda." />;
-  }
-
+  if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
+  if (!participants.length) return <EmptyState text="Nenhum participante cadastrado ainda." />;
   return (
     <div className="daily-predictions">
       {matches.map((match) => (
-        <DailyPredictionCard
-          key={match.id}
-          match={match}
-          participants={participants}
-          predictions={predictions}
-        />
+        <DailyPredictionCard key={match.id} match={match} participants={participants} predictions={predictions} />
       ))}
     </div>
   );
@@ -919,10 +841,7 @@ function DailyPredictions({ matches, participants, predictions }) {
 
 function DailyPredictionCard({ match, participants, predictions }) {
   const offeredPredictions = participants
-    .map((participant) => ({
-      participant,
-      prediction: predictions[participant.id]?.[match.id]
-    }))
+    .map((participant) => ({ participant, prediction: predictions[participant.id]?.[match.id] }))
     .filter(({ prediction }) => hasPrediction(prediction));
 
   return (
@@ -939,12 +858,7 @@ function DailyPredictionCard({ match, participants, predictions }) {
       {offeredPredictions.length ? (
         <div className="table-wrap">
           <table className="compact-table">
-            <thead>
-              <tr>
-                <th>Participante</th>
-                <th>Palpite</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Participante</th><th>Palpite</th></tr></thead>
             <tbody>
               {offeredPredictions.map(({ participant, prediction }) => (
                 <tr key={participant.id}>
@@ -979,18 +893,9 @@ function formatGoalMinute(goal) {
 function ScoringExamples() {
   return (
     <div className="scoring-examples">
-      <div>
-        <strong>3 pontos</strong>
-        <span>Cravou o placar: palpite 2 x 1, resultado 2 x 1.</span>
-      </div>
-      <div>
-        <strong>1 ponto</strong>
-        <span>Acertou só o ganhador: palpite 2 x 1, resultado 1 x 0.</span>
-      </div>
-      <div>
-        <strong>0 ponto</strong>
-        <span>Errou o ganhador ou o empate sem cravar: palpite 1 x 1, resultado 0 x 0.</span>
-      </div>
+      <div><strong>3 pontos</strong><span>Cravou o placar: palpite 2 x 1, resultado 2 x 1.</span></div>
+      <div><strong>1 ponto</strong><span>Acertou só o ganhador: palpite 2 x 1, resultado 1 x 0.</span></div>
+      <div><strong>0 ponto</strong><span>Errou o ganhador ou o empate sem cravar: palpite 1 x 1, resultado 0 x 0.</span></div>
     </div>
   );
 }
@@ -1007,11 +912,7 @@ function formatDate(value) {
 function formatMatchDayOption(dateKey) {
   const [year, month, day] = dateKey.split("-").map(Number);
   const date = new Date(year, month - 1, day, 12);
-  const label = new Intl.DateTimeFormat("pt-BR", {
-    weekday: "short",
-    day: "2-digit",
-    month: "2-digit"
-  }).format(date);
+  const label = new Intl.DateTimeFormat("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }).format(date);
   return dateKey === getTodayKey() ? `Hoje - ${label}` : label;
 }
 

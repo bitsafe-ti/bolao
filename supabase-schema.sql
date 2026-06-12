@@ -30,3 +30,7 @@ on public.bolao_public_state
 for update
 using (true)
 with check (true);
+
+-- Enable Realtime so all connected clients receive live updates
+alter table public.bolao_public_state replica identity full;
+alter publication supabase_realtime add table public.bolao_public_state;
