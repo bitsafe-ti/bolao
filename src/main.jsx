@@ -977,7 +977,7 @@ function RankingTable({ ranking, compact = false }) {
             <span>Total arrecadado</span>
             <strong>{formatCurrency(totalPoolValue)}</strong>
           </div>
-          <p>Observação: o valor de R$ 20,00 só entra na contagem quando o usuário salva o primeiro palpite. O valor acumulado será debitado para o ganhador ao final do campeonato.</p>
+          <p>O valor acumulado será debitado para o ganhador ao final do campeonato.</p>
         </div>
       )}
       {!compact && <ScoringExamples />}
