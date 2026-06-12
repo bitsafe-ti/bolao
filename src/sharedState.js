@@ -1,8 +1,11 @@
 const viteEnv = import.meta.env ?? {};
+const DEFAULT_SUPABASE_URL = "https://pxnkhtuxtqfcwgfsespw.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4bmtodHV4dHFmY3dnZnNlc3B3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTkzMjgsImV4cCI6MjA5NjgzNTMyOH0.-MEbuklEnRpa6Ex5NZOAw2rCNoOeSyqVtl3PKir7F64";
 
 export const SHARED_CONFIG = {
-  supabaseUrl: viteEnv.VITE_SUPABASE_URL ?? "",
-  supabaseAnonKey: viteEnv.VITE_SUPABASE_ANON_KEY ?? "",
+  supabaseUrl: viteEnv.VITE_SUPABASE_URL ?? DEFAULT_SUPABASE_URL,
+  supabaseAnonKey: viteEnv.VITE_SUPABASE_ANON_KEY ?? DEFAULT_SUPABASE_ANON_KEY,
   table: viteEnv.VITE_SUPABASE_TABLE ?? "bolao_public_state",
   rowId: viteEnv.VITE_POOL_ID ?? "copa-2026"
 };
