@@ -98,52 +98,6 @@ const adminTabs = [
 
 const defaultRounds = [1, 2, 3];
 
-function getMatchDateKey(match) {
-  return match.date?.slice(0, 10) || "";
-}
-
-function getTodayKey() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date());
-  const getPart = (type) => parts.find((part) => part.type === type)?.value;
-  return `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
-}
-
-function isMatchToday(match) {
-  return getMatchDateKey(match) === getTodayKey();
-}
-
-function isMatchAfterToday(match) {
-  const dateKey = getMatchDateKey(match);
-  return Boolean(dateKey) && dateKey > getTodayKey();
-}
-
-function purgeTodayPredictions(state) {
-  const todayMatchIds = new Set((state.matches ?? []).filter(isMatchToday).map((match) => match.id));
-  if (!todayMatchIds.size) return state;
-
-  let changed = false;
-  const predictions = Object.fromEntries(
-    Object.entries(state.predictions ?? {}).map(([participantId, perMatch]) => {
-      const filtered = Object.fromEntries(
-        Object.entries(perMatch ?? {}).filter(([matchId]) => {
-          const keep = !todayMatchIds.has(matchId);
-          if (!keep) changed = true;
-          return keep;
-        })
-      );
-      return [participantId, filtered];
-    })
-  );
-
-  if (!changed) return state;
-  return { ...state, predictions };
-}
-
 function applyRemoteData(current, remoteData, superAdminEmails) {
   const merged = mergePublicPoolState(current, remoteData, { prefer: "shared" });
   return cleanPoolState({
@@ -155,7 +109,7 @@ function applyRemoteData(current, remoteData, superAdminEmails) {
 }
 
 function cleanPoolState(state) {
-  return purgeTodayPredictions(purgeExpiredPredictions(purgeFutureRoundPredictions(state)));
+  return purgeExpiredPredictions(purgeFutureRoundPredictions(state));
 }
 
 function App() {
@@ -165,6 +119,7 @@ function App() {
   const [authError, setAuthError] = useState("");
   const [syncStatus, setSyncStatus] = useState({ state: "idle", message: "Resultados automáticos ativos." });
   const [sharedStatus, setSharedStatus] = useState({ state: "idle", message: "Carregando dados do bolão..." });
+  const [selectedPredictionRound, setSelectedPredictionRound] = useState(null);
   const [selectedOverviewRound, setSelectedOverviewRound] = useState(null);
   const [selectedResultRound, setSelectedResultRound] = useState(null);
   const [draftPredictions, setDraftPredictions] = useState({});
@@ -183,10 +138,11 @@ function App() {
       state.matches.map((m) => getMatchRound(m)).filter((r) => r !== null && !Number.isNaN(r))
     )].sort((a, b) => a - b);
   }, [state.matches]);
+  const activePredictionRound = selectedPredictionRound ?? activeRound;
   const activeOverviewRound = selectedOverviewRound ?? activeRound;
   const activeResultRound = selectedResultRound ?? activeRound;
   const predictionMatches = state.matches
-    .filter((match) => isMatchAfterToday(match))
+    .filter((match) => getMatchRound(match) === activePredictionRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const overviewMatches = state.matches
     .filter((match) => getMatchRound(match) === activeOverviewRound)
@@ -591,7 +547,7 @@ function App() {
     const key = getPredictionKey(participantId, matchId);
     const match = state.matches.find((item) => item.id === matchId);
     const currentPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
-    if (hasPrediction(currentPrediction) || !isMatchAfterToday(match) || isMatchClosed(match)) return;
+    if (hasPrediction(currentPrediction) || getMatchRound(match) !== activeRound || isMatchClosed(match)) return;
 
     const draft = getDraftPrediction(participantId, matchId, currentPrediction);
     // Treat blank input as 0 — user leaving the field empty means "zero gols"
@@ -735,19 +691,41 @@ function App() {
 
 {tab === "predictions" && (
           <section className="panel">
-            <SectionHeader title="Palpites" caption="Jogos de amanhã em diante ficam disponíveis para votação." />
+            <SectionHeader title="Palpites" caption="Selecione a rodada. Apenas a rodada liberada aceita novos palpites." />
+            <div className="prediction-toolbar single">
+              <label className="select-label">
+                Rodada
+                <select value={activePredictionRound} onChange={(event) => setSelectedPredictionRound(Number(event.target.value))}>
+                  {availableRounds.map((round) => (
+                    <option value={round} key={round}>
+                      {round === activeRound ? `Rodada ${round} - liberada` : `Rodada ${round}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <div className="sync-strip">
               <strong>Regra de votação</strong>
-              <span>Jogos de hoje ficam bloqueados. Para jogos futuros, você pode salvar seu palpite até o horário inicial da partida.</span>
+              <span>A votação fica aberta somente para a rodada liberada. Quando todos os jogos da rodada forem finalizados, a próxima rodada será liberada automaticamente.</span>
             </div>
+            {activePredictionRound !== activeRound && (
+              <div className={`sync-strip ${activePredictionRound < activeRound ? "disabled" : "loading"}`}>
+                <strong>
+                  {activePredictionRound < activeRound
+                    ? "Rodada encerrada - palpites não são mais aceitos."
+                    : `Rodada ${activePredictionRound} ainda não está liberada. Aguarde a conclusão da Rodada ${activeRound}.`}
+                </strong>
+              </div>
+            )}
             {activeParticipant ? (
               <div className="match-list">
                 {predictionMatches.map((match) => {
                   const storedPrediction = state.predictions[activeParticipant.id]?.[match.id] ?? emptyPrediction;
                   const prediction = getDraftPrediction(activeParticipant.id, match.id, storedPrediction);
                   const isSaved = hasPrediction(storedPrediction);
+                  const isRoundLocked = activePredictionRound !== activeRound;
                   const isKickoffLocked = isMatchClosed(match);
-                  const isLocked = isSaved || isKickoffLocked;
+                  const isLocked = isSaved || isRoundLocked || isKickoffLocked;
                   return (
                     <article className={`match-card prediction-card ${isLocked ? "locked" : ""}`} key={match.id}>
                       <div>
@@ -764,6 +742,10 @@ function App() {
                         </div>
                         {isSaved ? (
                           <span className="saved-pill">Palpite salvo</span>
+                        ) : isRoundLocked ? (
+                          <span className="round-locked-pill">
+                            {activePredictionRound < activeRound ? "Sem palpite" : "Indisponível"}
+                          </span>
                         ) : isKickoffLocked ? (
                           <span className="round-locked-pill">Prazo encerrado</span>
                         ) : (
@@ -775,7 +757,7 @@ function App() {
                     </article>
                   );
                 })}
-                {!predictionMatches.length && <EmptyState text="Nenhum jogo futuro disponível para votação." />}
+                {!predictionMatches.length && <EmptyState text="Nenhum jogo cadastrado para esta rodada." />}
               </div>
             ) : (
               <EmptyState text="Seu cadastro entra como participante para registrar palpites." />
