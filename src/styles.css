@@ -1,24 +1,40 @@
-@import url("https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;600;700&family=Poppins:wght@500;600;700;800&family=Roboto:wght@400;500;700;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500&family=Inter:wght@400;500;700&family=Inconsolata:wght@400;600;700&display=swap");
 
 :root {
   color-scheme: light;
-  --primary: #3b82f6;
-  --primary-strong: #2563eb;
-  --secondary: #8b5cf6;
+  /* Brand */
+  --primary: #c96442;
+  --primary-strong: #b5512e;
+  --secondary: #d97757;
+  /* Semantic */
   --success: #16a34a;
   --warning: #d97706;
-  --danger: #dc2626;
-  --surface: #ffffff;
-  --text: #111827;
-  --muted: rgba(17, 24, 39, 0.64);
-  --line: rgba(17, 24, 39, 0.12);
-  --soft: rgba(17, 24, 39, 0.04);
-  --primary-soft: rgba(59, 130, 246, 0.1);
-  --secondary-soft: rgba(139, 92, 246, 0.1);
-  --success-soft: rgba(22, 163, 74, 0.1);
-  font-family: Roboto, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --danger: #b53333;
+  /* Surfaces */
+  --surface: #faf9f5;
+  --bg: #f5f4ed;
+  --dark-bg: #141413;
+  --dark-surface: #30302e;
+  --warm-sand: #e8e6dc;
+  --ivory: #faf9f5;
+  /* Text */
+  --text: #141413;
+  --muted: #5e5d59;
+  --muted-light: #87867f;
+  --charcoal: #4d4c48;
+  --warm-silver: #b0aea5;
+  /* Borders */
+  --line: #f0eee6;
+  --line-warm: #e8e6dc;
+  --line-dark: #30302e;
+  /* Soft fills */
+  --soft: rgba(20, 20, 19, 0.05);
+  --primary-soft: rgba(201, 100, 66, 0.10);
+  --secondary-soft: rgba(217, 119, 87, 0.10);
+  --success-soft: rgba(22, 163, 74, 0.10);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: var(--text);
-  background: var(--surface);
+  background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -31,6 +47,7 @@ body {
   margin: 0;
   min-width: 320px;
   overflow-x: hidden;
+  background: var(--bg);
 }
 
 button,
@@ -43,14 +60,15 @@ button {
   border: 0;
   border-radius: 8px;
   background: var(--primary);
-  color: var(--surface);
+  color: var(--ivory);
   cursor: pointer;
+  font-family: 'Inter', system-ui, sans-serif;
   font-weight: 700;
   min-height: 42px;
   padding: 0 16px;
   transition:
     background 180ms ease,
-    border-color 180ms ease,
+    box-shadow 180ms ease,
     color 180ms ease,
     transform 180ms ease;
 }
@@ -60,23 +78,30 @@ button:hover {
 }
 
 button.secondary {
-  background: var(--secondary);
-  color: var(--surface);
+  background: var(--warm-sand);
+  border: 1px solid var(--line-warm);
+  color: var(--charcoal);
 }
 
 button.secondary:hover {
-  background: var(--secondary);
-  transform: translateY(-1px);
+  background: var(--line-warm);
+  box-shadow: 0 0 0 1px #d1cfc5;
 }
 
 button.ghost {
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--text);
+  background: var(--warm-sand);
+  border: 1px solid #d1cfc5;
+  color: var(--charcoal);
+}
+
+button.ghost:hover {
+  background: var(--line-warm);
+  box-shadow: 0 0 0 1px #c2c0b6;
 }
 
 button.danger {
   background: var(--danger);
+  color: var(--ivory);
 }
 
 button.subtle {
@@ -101,14 +126,14 @@ select {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 3px solid rgba(59, 130, 246, 0.22);
+  outline: 3px solid rgba(56, 152, 236, 0.30);
   outline-offset: 2px;
 }
 
 input:focus,
 select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  border-color: #3898ec;
+  box-shadow: 0 0 0 3px rgba(56, 152, 236, 0.14);
 }
 
 .loading-page {
@@ -254,7 +279,7 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  background: var(--text);
+  background: var(--dark-bg);
   color: var(--surface);
   height: 100vh;
   overflow-y: auto;
@@ -394,20 +419,23 @@ p {
 }
 
 h1 {
-  font-family: Poppins, Roboto, sans-serif;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 500;
   font-size: 2rem;
   line-height: 1.05;
   margin-bottom: 0;
 }
 
 h2 {
-  font-family: Poppins, Roboto, sans-serif;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 500;
   font-size: 1.5rem;
   margin-bottom: 8px;
 }
 
 h3 {
-  font-family: Poppins, Roboto, sans-serif;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 500;
   font-size: 1.25rem;
   margin-bottom: 4px;
 }
@@ -444,7 +472,8 @@ h3 {
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: rgba(0, 0, 0, 0.05) 0px 4px 24px;
   padding: 20px;
 }
 
@@ -698,7 +727,8 @@ h3 {
   display: grid;
   gap: 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: rgba(0, 0, 0, 0.05) 0px 4px 24px;
   padding: 16px;
 }
 
@@ -1171,7 +1201,7 @@ h3 {
 .ranking-summary strong {
   margin-top: 6px;
   color: var(--primary);
-  font-family: Poppins, var(--font-family, sans-serif);
+  font-family: 'Playfair Display', Georgia, serif;
   font-size: 1.35rem;
 }
 
