@@ -713,7 +713,9 @@ function App() {
               onChange={updateParticipantRow}
               onResetPassword={resetPassword}
               onRemove={removeParticipantRow}
-              canRemove={false}
+              canRemove
+              removeLabel="Remover admin"
+              protectedUserId={currentUser.id}
             />
             <ParticipantGrid
               title="Usuários"
@@ -920,7 +922,7 @@ function ScoreInput({ value, onChange, disabled = false }) {
   return <input className="score-input" disabled={disabled} min="0" inputMode="numeric" type="number" value={value} onChange={(event) => onChange(event.target.value)} placeholder="0" />;
 }
 
-function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, onRemove, canRemove = true }) {
+function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, onRemove, canRemove = true, removeLabel = "Remover", protectedUserId = "" }) {
   return (
     <section className="participant-section">
       <div className="participant-section-title">
@@ -945,8 +947,10 @@ function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, on
                     if (nova?.trim()) onResetPassword(row.userId, nova.trim());
                   }}>Resetar senha</button>
                 )}
-                {canRemove && (
-                  <button type="button" className="danger subtle" onClick={() => onRemove(row)}>Remover</button>
+                {row.userId && row.userId === protectedUserId ? (
+                  <span className="current-user-pill">Usuário atual</span>
+                ) : canRemove && (
+                  <button type="button" className="danger subtle" onClick={() => onRemove(row)}>{removeLabel}</button>
                 )}
               </div>
             </div>
