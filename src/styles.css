@@ -846,12 +846,16 @@ h3 {
 .compact-table td {
   overflow-wrap: break-word;
   word-break: break-word;
+  vertical-align: middle;
+  padding: 10px 12px;
 }
 
+.compact-table th:last-child,
 .compact-table td:last-child {
   font-weight: 800;
-  width: 80px;
+  width: 90px;
   text-align: center;
+  white-space: nowrap;
 }
 
 .prediction-pill {
