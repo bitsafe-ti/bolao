@@ -22,7 +22,7 @@ import "./styles.css";
 
 const SESSION_KEY = "bolao-copa-2026:session";
 const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
-const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva.rocha@hotmail.com";
+const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva25@gmail.com,guilhermesaraiva.rocha@hotmail.com";
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
 const SUPER_ADMIN_EMAILS = normalizeEmailList(
