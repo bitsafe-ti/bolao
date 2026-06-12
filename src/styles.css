@@ -286,6 +286,70 @@ select:focus {
   display: contents;
 }
 
+.user-menu {
+  position: relative;
+}
+
+.user-chevron {
+  font-size: 0.7rem;
+  margin-left: 2px;
+  opacity: 0.7;
+}
+
+.user-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 210px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.13);
+  z-index: 100;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.user-menu-dropdown button {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-height: 48px;
+  padding: 0 16px;
+  text-align: left;
+  width: 100%;
+}
+
+.user-menu-dropdown button:last-child {
+  border-bottom: none;
+}
+
+.user-menu-dropdown button:hover {
+  background: var(--soft);
+}
+
+.user-menu-dropdown button.danger-item {
+  color: var(--danger);
+}
+
+.user-menu-dropdown button.danger-item:hover {
+  background: rgba(220, 38, 38, 0.06);
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -349,6 +413,14 @@ h3 {
   font-weight: 800;
   min-height: 42px;
   padding: 6px 12px;
+  cursor: pointer;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.user-chip:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background: var(--surface);
 }
 
 .user-chip small {
@@ -1152,15 +1224,6 @@ tr:last-child td {
     align-items: center;
     gap: 10px;
     flex: 1;
-  }
-
-  .topbar-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: flex-start;
-    width: 100%;
-    min-width: 0;
   }
 
   .workspace {

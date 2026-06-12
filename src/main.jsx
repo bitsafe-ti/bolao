@@ -102,6 +102,7 @@ function App() {
   const [selectedResultDate, setSelectedResultDate] = useState("");
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAdmin = currentUser?.role === "admin";
@@ -497,14 +498,28 @@ function App() {
             </div>
           </div>
           <div className="topbar-actions">
-            <div className="user-chip">
-              {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
-              <span>{currentUser.name}</span>
-              {isAdmin && <small>Admin</small>}
+            <div className="user-menu">
+              <button type="button" className="user-chip" onClick={() => setUserMenuOpen(v => !v)}>
+                {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
+                <span>{currentUser.name}</span>
+                {isAdmin && <small>Admin</small>}
+                <span className="user-chevron" aria-hidden="true">▾</span>
+              </button>
+              {userMenuOpen && (
+                <>
+                  <div className="user-menu-backdrop" onClick={() => setUserMenuOpen(false)} />
+                  <div className="user-menu-dropdown">
+                    {isAdmin && (
+                      <button type="button" onClick={() => { syncResults("manual"); setUserMenuOpen(false); }}>Atualizar resultados</button>
+                    )}
+                    <button type="button" onClick={logoutUser}>Sair</button>
+                    {isAdmin && (
+                      <button type="button" className="danger-item" onClick={() => { resetData(); setUserMenuOpen(false); }}>Reiniciar dados</button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
-            {isAdmin && <button type="button" className="secondary" onClick={() => syncResults("manual")}>Atualizar resultados</button>}
-            <button type="button" className="ghost" onClick={logoutUser}>Sair</button>
-            {isAdmin && <button type="button" className="ghost" onClick={resetData}>Reiniciar</button>}
           </div>
         </header>
 
