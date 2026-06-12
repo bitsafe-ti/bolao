@@ -935,6 +935,13 @@ h3 {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+  overflow: hidden;
+}
+
+.teams-versus .team-name {
+  min-width: 0;
+  flex-shrink: 1;
+  overflow-wrap: break-word;
 }
 
 .table-panel {
@@ -1072,11 +1079,16 @@ tr:last-child td {
 
   .topbar {
     display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
     margin-bottom: 12px;
     padding-bottom: 12px;
+  }
+
+  .topbar-actions {
+    flex-wrap: wrap;
+    min-width: 0;
   }
 
   .workspace {
