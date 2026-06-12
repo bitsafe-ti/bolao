@@ -94,7 +94,7 @@ function App() {
   const [authError, setAuthError] = useState("");
   const [syncStatus, setSyncStatus] = useState({ state: "idle", message: "Resultados automáticos ativos." });
   const [sharedStatus, setSharedStatus] = useState({ state: "idle", message: "Carregando dados do bolão..." });
-  const [selectedPredictionDate, setSelectedPredictionDate] = useState("");
+  const [selectedPredictionRound, setSelectedPredictionRound] = useState(null);
   const [selectedOverviewDate, setSelectedOverviewDate] = useState("");
   const [selectedResultDate, setSelectedResultDate] = useState("");
   const [draftPredictions, setDraftPredictions] = useState({});
@@ -111,17 +111,12 @@ function App() {
   const predictionDates = useMemo(() => {
     return [...new Set(state.matches.map(getMatchDateKey).filter(Boolean))].sort();
   }, [state.matches]);
-  const activeRoundDates = useMemo(() => {
+  const availableRounds = useMemo(() => {
     return [...new Set(
-      state.matches.filter((m) => getMatchRound(m) === activeRound).map(getMatchDateKey).filter(Boolean)
-    )].sort();
-  }, [state.matches, activeRound]);
-  const activePredictionDate = useMemo(() => {
-    if (activeRoundDates.includes(selectedPredictionDate)) return selectedPredictionDate;
-    const today = getTodayKey();
-    if (activeRoundDates.includes(today)) return today;
-    return activeRoundDates.find((date) => date >= today) ?? activeRoundDates[0] ?? "";
-  }, [activeRoundDates, selectedPredictionDate]);
+      state.matches.map((m) => getMatchRound(m)).filter((r) => r !== null && !Number.isNaN(r))
+    )].sort((a, b) => a - b);
+  }, [state.matches]);
+  const activePredictionRound = selectedPredictionRound ?? activeRound;
   const activeOverviewDate = useMemo(() => {
     if (predictionDates.includes(selectedOverviewDate)) return selectedOverviewDate;
     const today = getTodayKey();
@@ -135,7 +130,7 @@ function App() {
     return predictionDates.find((date) => date >= today) ?? predictionDates[0] ?? "";
   }, [predictionDates, selectedResultDate]);
   const predictionMatches = state.matches
-    .filter((match) => getMatchDateKey(match) === activePredictionDate)
+    .filter((match) => getMatchRound(match) === activePredictionRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const overviewMatches = state.matches
     .filter((match) => getMatchDateKey(match) === activeOverviewDate)
@@ -583,28 +578,38 @@ function App() {
 
         {tab === "predictions" && (
           <section className="panel">
-            <SectionHeader
-              title={`Palpites — Rodada ${activeRound}`}
-              caption="Somente a rodada em andamento está aberta. A próxima rodada é liberada após todos os jogos da atual serem concluídos."
-            />
+            <SectionHeader title="Palpites" caption="Selecione a rodada. Apenas a rodada em andamento aceita novos palpites." />
             <div className="prediction-toolbar single">
               <label className="select-label">
-                Dia dos jogos
-                <select value={activePredictionDate} onChange={(event) => setSelectedPredictionDate(event.target.value)}>
-                  {activeRoundDates.map((date) => (
-                    <option value={date} key={date}>{formatMatchDayOption(date)}</option>
+                Rodada
+                <select value={activePredictionRound} onChange={(event) => setSelectedPredictionRound(Number(event.target.value))}>
+                  {availableRounds.map((round) => (
+                    <option value={round} key={round}>
+                      {round === activeRound ? `Rodada ${round} — em andamento` : `Rodada ${round}`}
+                    </option>
                   ))}
                 </select>
               </label>
             </div>
+            {activePredictionRound !== activeRound && (
+              <div className={`sync-strip ${activePredictionRound < activeRound ? "disabled" : "loading"}`}>
+                <strong>
+                  {activePredictionRound < activeRound
+                    ? "Rodada encerrada — palpites não são mais aceitos."
+                    : `Rodada ${activePredictionRound} ainda não está disponível. Aguarde a conclusão da Rodada ${activeRound}.`}
+                </strong>
+              </div>
+            )}
             {activeParticipant ? (
               <div className="match-list">
                 {predictionMatches.map((match) => {
                   const storedPrediction = state.predictions[activeParticipant.id]?.[match.id] ?? emptyPrediction;
                   const prediction = getDraftPrediction(activeParticipant.id, match.id, storedPrediction);
                   const isSaved = hasPrediction(storedPrediction);
+                  const isRoundLocked = activePredictionRound !== activeRound;
+                  const isLocked = isSaved || isRoundLocked;
                   return (
-                    <article className={`match-card prediction-card ${isSaved ? "locked" : ""}`} key={match.id}>
+                    <article className={`match-card prediction-card ${isLocked ? "locked" : ""}`} key={match.id}>
                       <div>
                         <span className="badge">{match.phase}</span>
                         <h3 className="teams-versus"><TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span> <TeamName teamId={match.awayTeamId} fallback={match.away} /></h3>
@@ -613,12 +618,16 @@ function App() {
                       </div>
                       <div className="prediction-actions">
                         <div className="prediction-inputs">
-                          <ScoreInput disabled={isSaved} value={prediction.home} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "home", value)} />
+                          <ScoreInput disabled={isLocked} value={prediction.home} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "home", value)} />
                           <span>x</span>
-                          <ScoreInput disabled={isSaved} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
+                          <ScoreInput disabled={isLocked} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
                         </div>
                         {isSaved ? (
                           <span className="saved-pill">Palpite salvo</span>
+                        ) : isRoundLocked ? (
+                          <span className="round-locked-pill">
+                            {activePredictionRound < activeRound ? "Sem palpite" : "Indisponível"}
+                          </span>
                         ) : (
                           <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id)}>
                             Salvar palpite
@@ -628,7 +637,7 @@ function App() {
                     </article>
                   );
                 })}
-                {!predictionMatches.length && <EmptyState text="Nenhum jogo cadastrado para este dia." />}
+                {!predictionMatches.length && <EmptyState text="Nenhum jogo cadastrado para esta rodada." />}
               </div>
             ) : (
               <EmptyState text="Seu cadastro entra como participante para registrar palpites." />

@@ -944,6 +944,15 @@ h3 {
   padding: 6px 10px;
 }
 
+.round-locked-pill {
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  padding: 6px 10px;
+}
+
 .badge {
   display: inline-flex;
   border-radius: 999px;
