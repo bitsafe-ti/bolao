@@ -26,7 +26,9 @@ import {
 import "./styles.css";
 
 const SESSION_KEY = "bolao-copa-2026:session";
+const CACHE_KEY = "bolao-copa-2026:cache";
 const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
+const DATA_LOAD_TIMEOUT_MS = 7000;
 const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva25@gmail.com,guilhermesaraiva.rocha@hotmail.com";
 const ENTRY_FEE = 20;
 const WORLD_CUP_LOGO_URL =
@@ -48,6 +50,36 @@ function saveSession(updates) {
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify({ ...loadSession(), ...updates }));
   } catch {}
+}
+
+function loadCachedPoolState() {
+  try {
+    const saved = localStorage.getItem(CACHE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveCachedPoolState(state) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      users: state.users ?? [],
+      participants: state.participants ?? [],
+      predictions: state.predictions ?? {},
+      matches: state.matches ?? [],
+      lastResultSyncAt: state.lastResultSyncAt ?? ""
+    }));
+  } catch {}
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
 }
 
 const userTabs = [
@@ -83,9 +115,36 @@ function isMatchToday(match) {
   return getMatchDateKey(match) === getTodayKey();
 }
 
+function isMatchAfterToday(match) {
+  const dateKey = getMatchDateKey(match);
+  return Boolean(dateKey) && dateKey > getTodayKey();
+}
+
+function purgeTodayPredictions(state) {
+  const todayMatchIds = new Set((state.matches ?? []).filter(isMatchToday).map((match) => match.id));
+  if (!todayMatchIds.size) return state;
+
+  let changed = false;
+  const predictions = Object.fromEntries(
+    Object.entries(state.predictions ?? {}).map(([participantId, perMatch]) => {
+      const filtered = Object.fromEntries(
+        Object.entries(perMatch ?? {}).filter(([matchId]) => {
+          const keep = !todayMatchIds.has(matchId);
+          if (!keep) changed = true;
+          return keep;
+        })
+      );
+      return [participantId, filtered];
+    })
+  );
+
+  if (!changed) return state;
+  return { ...state, predictions };
+}
+
 function applyRemoteData(current, remoteData, superAdminEmails) {
   const merged = mergePublicPoolState(current, remoteData, { prefer: "shared" });
-  return purgeExpiredPredictions({
+  return cleanPoolState({
     ...merged,
     users: normalizeUsers(merged.users ?? [], superAdminEmails),
     currentUserId: current.currentUserId,
@@ -94,7 +153,7 @@ function applyRemoteData(current, remoteData, superAdminEmails) {
 }
 
 function cleanPoolState(state) {
-  return purgeExpiredPredictions(purgeFutureRoundPredictions(state));
+  return purgeTodayPredictions(purgeExpiredPredictions(purgeFutureRoundPredictions(state)));
 }
 
 function App() {
@@ -125,7 +184,7 @@ function App() {
   const activeOverviewRound = selectedOverviewRound ?? activeRound;
   const activeResultRound = selectedResultRound ?? activeRound;
   const predictionMatches = state.matches
-    .filter((match) => isMatchToday(match))
+    .filter((match) => isMatchAfterToday(match))
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const overviewMatches = state.matches
     .filter((match) => getMatchRound(match) === activeOverviewRound)
@@ -171,9 +230,29 @@ function App() {
   // Initial load from Supabase (with one-time migration from legacy localStorage)
   useEffect(() => {
     async function init() {
+      const session = loadSession();
+      const cached = loadCachedPoolState();
+
+      if (cached) {
+        setState((current) => {
+          const merged = mergePublicPoolState(current, cached, { prefer: "shared" });
+          return cleanPoolState({
+            ...merged,
+            users: normalizeUsers(merged.users ?? [], SUPER_ADMIN_EMAILS),
+            currentUserId: session.currentUserId ?? "",
+            activeParticipantId: session.activeParticipantId ?? ""
+          });
+        });
+        setIsLoading(false);
+        setSharedStatus({ state: "loading", message: "Atualizando dados do banco..." });
+      }
+
       try {
-        const remote = await fetchPoolState();
-        const session = loadSession();
+        const remote = await withTimeout(
+          fetchPoolState(),
+          DATA_LOAD_TIMEOUT_MS,
+          "Tempo excedido ao carregar dados do banco."
+        );
 
         // Migrate any data saved by the old local-first architecture
         let legacyData = null;
@@ -189,6 +268,7 @@ function App() {
           ? mergePublicPoolState(remote, legacyData, { prefer: "current" })
           : remote;
         const cleanedBase = cleanPoolState(base);
+        saveCachedPoolState(cleanedBase);
         setState((current) => {
           // If legacy data exists, merge it so we don't lose local-only registrations
           const merged = mergePublicPoolState(current, cleanedBase, { prefer: "shared" });
@@ -220,6 +300,7 @@ function App() {
   useEffect(() => {
     const channel = subscribeToPoolChanges((remoteData) => {
       const cleanedRemote = cleanPoolState(remoteData);
+      saveCachedPoolState(cleanedRemote);
       setState((current) => applyRemoteData(current, cleanedRemote, SUPER_ADMIN_EMAILS));
       if (cleanedRemote !== remoteData) void persistPoolState(cleanedRemote);
       setSharedStatus({ state: "success", message: "Atualizado em tempo real." });
@@ -231,8 +312,13 @@ function App() {
   useEffect(() => {
     const intervalId = window.setInterval(async () => {
       try {
-        const remote = await fetchPoolState();
+        const remote = await withTimeout(
+          fetchPoolState(),
+          DATA_LOAD_TIMEOUT_MS,
+          "Tempo excedido ao atualizar dados do banco."
+        );
         const cleanedRemote = cleanPoolState(remote);
+        saveCachedPoolState(cleanedRemote);
         setState((current) => applyRemoteData(current, cleanedRemote, SUPER_ADMIN_EMAILS));
         if (cleanedRemote !== remote) void persistPoolState(cleanedRemote);
       } catch {}
@@ -267,7 +353,9 @@ function App() {
   async function persistAndSync(nextState) {
     try {
       const saved = await persistPoolState(nextState);
-      setState((current) => applyRemoteData(current, saved, SUPER_ADMIN_EMAILS));
+      const cleanedSaved = cleanPoolState(saved);
+      saveCachedPoolState(cleanedSaved);
+      setState((current) => applyRemoteData(current, cleanedSaved, SUPER_ADMIN_EMAILS));
     } catch (error) {
       setSharedStatus({ state: "error", message: `Erro ao salvar: ${error.message}` });
     }
@@ -499,7 +587,7 @@ function App() {
     const key = getPredictionKey(participantId, matchId);
     const match = state.matches.find((item) => item.id === matchId);
     const currentPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
-    if (hasPrediction(currentPrediction) || !isMatchToday(match) || isMatchClosed(match)) return;
+    if (hasPrediction(currentPrediction) || !isMatchAfterToday(match) || isMatchClosed(match)) return;
 
     const draft = getDraftPrediction(participantId, matchId, currentPrediction);
     // Treat blank input as 0 — user leaving the field empty means "zero gols"
@@ -542,7 +630,7 @@ function App() {
 
   if (isLoading) {
     return (
-      <main className="auth-page loading-page">
+      <main className="loading-page">
         <div className="loading-block">
           <img src={WORLD_CUP_LOGO_URL} alt="Copa do Mundo 2026" style={{ width: 200, opacity: 0.8 }} />
           <p>Carregando dados do bolão...</p>
@@ -641,10 +729,10 @@ function App() {
 
 {tab === "predictions" && (
           <section className="panel">
-            <SectionHeader title="Palpites" caption="Somente os jogos de hoje ficam disponíveis para votação." />
+            <SectionHeader title="Palpites" caption="Jogos de amanhã em diante ficam disponíveis para votação." />
             <div className="sync-strip">
               <strong>Regra de votação</strong>
-              <span>Você pode salvar seu palpite até o horário inicial do jogo. Depois que a partida começar, a votação daquele jogo fica bloqueada.</span>
+              <span>Jogos de hoje ficam bloqueados. Para jogos futuros, você pode salvar seu palpite até o horário inicial da partida.</span>
             </div>
             {activeParticipant ? (
               <div className="match-list">
@@ -681,7 +769,7 @@ function App() {
                     </article>
                   );
                 })}
-                {!predictionMatches.length && <EmptyState text="Nenhum jogo cadastrado para hoje." />}
+                {!predictionMatches.length && <EmptyState text="Nenhum jogo futuro disponível para votação." />}
               </div>
             ) : (
               <EmptyState text="Seu cadastro entra como participante para registrar palpites." />
