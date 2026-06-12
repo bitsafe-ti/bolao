@@ -1,15 +1,25 @@
-import { createClient } from "@supabase/supabase-js";
+import { Client, Databases, Permission, Role } from "appwrite";
 
 const viteEnv = import.meta.env ?? {};
 
-const SUPABASE_URL = viteEnv.VITE_SUPABASE_URL || "https://pxnkhtuxtqfcwgfsespw.supabase.co";
-const SUPABASE_ANON_KEY =
-  viteEnv.VITE_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4bmtodHV4dHFmY3dnZnNlc3B3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTkzMjgsImV4cCI6MjA5NjgzNTMyOH0.-MEbuklEnRpa6Ex5NZOAw2rCNoOeSyqVtl3PKir7F64";
-const TABLE = viteEnv.VITE_SUPABASE_TABLE || "bolao_public_state";
-const ROW_ID = viteEnv.VITE_POOL_ID || "copa-2026";
+const ENDPOINT    = viteEnv.VITE_APPWRITE_ENDPOINT    || "https://cloud.appwrite.io/v1";
+const PROJECT_ID  = viteEnv.VITE_APPWRITE_PROJECT_ID  || "6a2c61c200150745bf42";
+const DATABASE_ID = viteEnv.VITE_APPWRITE_DATABASE_ID || "bolao";
+const COLLECTION_ID = viteEnv.VITE_APPWRITE_COLLECTION_ID || "pool_state";
+const DOCUMENT_ID = viteEnv.VITE_POOL_ID              || "copa-2026";
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const client = new Client().setEndpoint(ENDPOINT).setProject(PROJECT_ID);
+const databases = new Databases(client);
+
+const EMPTY_STATE = {
+  users: [],
+  participants: [],
+  predictions: {},
+  matches: [],
+  lastResultSyncAt: "",
+  deletedUserIds: [],
+  deletedParticipantIds: []
+};
 
 export function getPublicPoolState(state) {
   return {
@@ -71,11 +81,10 @@ function filterDeleted(state) {
   const predictions = Object.fromEntries(
     Object.entries(state.predictions ?? {}).filter(([participantId]) => !deletedParticipantIds.has(participantId))
   );
-
   return {
     ...state,
-    users: (state.users ?? []).filter((user) =>
-      !deletedUserIds.has(user.id) && !deletedParticipantIds.has(user.participantId)
+    users: (state.users ?? []).filter(
+      (user) => !deletedUserIds.has(user.id) && !deletedParticipantIds.has(user.participantId)
     ),
     participants: (state.participants ?? []).filter((participant) => !deletedParticipantIds.has(participant.id)),
     predictions,
@@ -114,28 +123,19 @@ export function mergePublicPoolState(current, shared = {}, options = {}) {
 }
 
 export async function fetchPoolState() {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select("data")
-    .eq("id", ROW_ID)
-    .maybeSingle();
-
-  if (error) throw new Error(`Banco indisponível: ${error.message}`);
-  return data?.data ?? {
-    users: [],
-    participants: [],
-    predictions: {},
-    matches: [],
-    lastResultSyncAt: "",
-    deletedUserIds: [],
-    deletedParticipantIds: []
-  };
+  try {
+    const doc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, DOCUMENT_ID);
+    const parsed = JSON.parse(doc.data || "{}");
+    return { ...EMPTY_STATE, ...parsed };
+  } catch (error) {
+    if (error.code === 404) return { ...EMPTY_STATE };
+    throw new Error(`Banco indisponível: ${error.message}`);
+  }
 }
 
 export async function persistPoolState(nextState) {
   const remote = await fetchPoolState();
 
-  // Union deleted-ID lists from both sources so deletions from either side survive
   const deletedUserIds = [
     ...new Set([...(nextState.deletedUserIds ?? []), ...(remote.deletedUserIds ?? [])])
   ];
@@ -143,10 +143,8 @@ export async function persistPoolState(nextState) {
     ...new Set([...(nextState.deletedParticipantIds ?? []), ...(remote.deletedParticipantIds ?? [])])
   ];
   const effectiveNext = { ...nextState, deletedUserIds, deletedParticipantIds };
-
   const merged = mergePublicPoolState(effectiveNext, remote, { prefer: "current" });
 
-  // Hard filter: entities whose IDs are in the union deleted lists must never resurface
   const deletedUserSet = new Set(deletedUserIds);
   const deletedParticipantSet = new Set(deletedParticipantIds);
   const payload = getPublicPoolState({
@@ -162,28 +160,37 @@ export async function persistPoolState(nextState) {
     deletedParticipantIds,
   });
 
-  const { error } = await supabase
-    .from(TABLE)
-    .upsert({ id: ROW_ID, data: payload, updated_at: new Date().toISOString() }, { onConflict: "id" });
+  const docData = { data: JSON.stringify(payload) };
+  const permissions = [
+    Permission.read(Role.any()),
+    Permission.update(Role.any()),
+    Permission.delete(Role.any()),
+  ];
 
-  if (error) throw new Error(`Erro ao salvar: ${error.message}`);
+  try {
+    await databases.updateDocument(DATABASE_ID, COLLECTION_ID, DOCUMENT_ID, docData);
+  } catch (error) {
+    if (error.code === 404) {
+      await databases.createDocument(DATABASE_ID, COLLECTION_ID, DOCUMENT_ID, docData, permissions);
+    } else {
+      throw new Error(`Erro ao salvar: ${error.message}`);
+    }
+  }
+
   return payload;
 }
 
 export function subscribeToPoolChanges(onUpdate) {
-  return supabase
-    .channel("bolao-pool-updates")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: TABLE, filter: `id=eq.${ROW_ID}` },
-      (payload) => {
-        const data = payload.new?.data;
-        if (data) onUpdate(data);
-      }
-    )
-    .subscribe();
+  const channel = `databases.${DATABASE_ID}.collections.${COLLECTION_ID}.documents.${DOCUMENT_ID}`;
+  return client.subscribe(channel, (response) => {
+    const rawData = response.payload?.data;
+    if (!rawData) return;
+    try {
+      onUpdate(JSON.parse(rawData));
+    } catch {}
+  });
 }
 
-export function unsubscribeFromPoolChanges(channel) {
-  if (channel) supabase.removeChannel(channel);
+export function unsubscribeFromPoolChanges(unsubscribeFn) {
+  if (typeof unsubscribeFn === "function") unsubscribeFn();
 }
