@@ -6,7 +6,9 @@ import {
   calculateRanking,
   createInitialState,
   emptyPrediction,
+  isSuperAdminEmail,
   makeId,
+  normalizeEmailList,
   normalizeUsers
 } from "./domain.js";
 import { getFlagUrl, teamsById, worldCupTeams } from "./teams.js";
@@ -15,6 +17,9 @@ import "./styles.css";
 
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
+const SUPER_ADMIN_EMAILS = normalizeEmailList(
+  `${import.meta.env.VITE_SUPER_ADMIN_EMAILS ?? ""},${import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? ""}`
+);
 
 const userTabs = [
   { id: "predictions", label: "Palpites" },
@@ -89,7 +94,7 @@ function loadState() {
     const matches = hasTeamMatches
       ? mergeMatchesWithSchedule(parsed.matches, initialState.matches)
       : initialState.matches;
-    const users = normalizeUsers(parsed.users ?? []);
+    const users = normalizeUsers(parsed.users ?? [], SUPER_ADMIN_EMAILS);
     return {
       ...initialState,
       ...parsed,
@@ -221,7 +226,7 @@ function App() {
       name: cleanName,
       email: cleanEmail,
       password,
-      role: state.users.some((item) => item.role === "admin") ? "user" : "admin",
+      role: isSuperAdminEmail(cleanEmail, SUPER_ADMIN_EMAILS) ? "admin" : "user",
       favoriteTeamId,
       participantId: participant.id
     };

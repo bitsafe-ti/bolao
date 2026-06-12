@@ -67,15 +67,21 @@ export function calculateRanking(participants, matches, predictions) {
     .sort((a, b) => b.total - a.total || b.exactScores - a.exactScores || a.name.localeCompare(b.name));
 }
 
-export function normalizeUsers(users) {
-  let adminAssigned = false;
-  const hasAdmin = users.some((user) => user.role === "admin");
+export function normalizeEmailList(value = "") {
+  const rawValue = Array.isArray(value) ? value.join(",") : value;
+  return String(rawValue)
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+}
 
-  return users.map((user, index) => {
-    const shouldBeAdmin = user.role === "admin" && !adminAssigned;
-    const needsFallbackAdmin = !hasAdmin && index === 0;
-    const role = shouldBeAdmin || needsFallbackAdmin ? "admin" : "user";
-    if (role === "admin") adminAssigned = true;
+export function isSuperAdminEmail(email, superAdminEmails = []) {
+  return normalizeEmailList(superAdminEmails).includes(String(email ?? "").trim().toLowerCase());
+}
+
+export function normalizeUsers(users, superAdminEmails = []) {
+  return users.map((user) => {
+    const role = isSuperAdminEmail(user.email, superAdminEmails) ? "admin" : "user";
     return { ...user, role };
   });
 }

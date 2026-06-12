@@ -31,6 +31,8 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          VITE_SUPER_ADMIN_EMAILS: ${{ vars.VITE_SUPER_ADMIN_EMAILS }}
         run: npm run build
 
       - name: Upload artifact

@@ -55,16 +55,28 @@ test("creates group-stage schedule with dates, times and rounds", () => {
   assert.ok(matches.every((match) => match.city && match.stadium && match.country));
 });
 
-test("normalizes users to a single admin and user role for everyone else", () => {
+test("normalizes only configured super admin email as admin", () => {
   const users = normalizeUsers([
-    { id: "1", role: "admin" },
-    { id: "2", role: "admin" },
-    { id: "3", role: "participant" }
-  ]);
+    { id: "1", email: "dono@bolao.com", role: "user" },
+    { id: "2", email: "outro@bolao.com", role: "admin" },
+    { id: "3", email: "participante@bolao.com", role: "participant" }
+  ], ["dono@bolao.com"]);
 
   assert.deepEqual(
     users.map((user) => user.role),
     ["admin", "user", "user"]
+  );
+});
+
+test("normalizes everyone as user when no super admin email is configured", () => {
+  const users = normalizeUsers([
+    { id: "1", email: "primeiro@bolao.com", role: "admin" },
+    { id: "2", email: "segundo@bolao.com", role: "user" }
+  ]);
+
+  assert.deepEqual(
+    users.map((user) => user.role),
+    ["user", "user"]
   );
 });
 
