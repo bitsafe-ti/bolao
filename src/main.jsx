@@ -68,7 +68,9 @@ function saveCachedPoolState(state) {
       participants: state.participants ?? [],
       predictions: state.predictions ?? {},
       matches: state.matches ?? [],
-      lastResultSyncAt: state.lastResultSyncAt ?? ""
+      lastResultSyncAt: state.lastResultSyncAt ?? "",
+      deletedUserIds: state.deletedUserIds ?? [],
+      deletedParticipantIds: state.deletedParticipantIds ?? []
     }));
   } catch {}
 }
@@ -517,6 +519,8 @@ function App() {
         users,
         participants,
         predictions,
+        deletedUserIds: [...new Set([...(current.deletedUserIds ?? []), ...userIdsToRemove])],
+        deletedParticipantIds: [...new Set([...(current.deletedParticipantIds ?? []), ...participantIdsToRemove])],
         activeParticipantId: participantIdsToRemove.has(current.activeParticipantId)
           ? participants[0]?.id ?? ""
           : current.activeParticipantId

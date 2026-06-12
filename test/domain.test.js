@@ -164,7 +164,9 @@ test("public shared state includes predictions, participants and match results",
     predictions: { p1: { m1: { home: "2", away: "1" } } },
     matches: [{ id: "m1", homeScore: "2", awayScore: "1" }],
     lastResultSyncAt: "2026-06-12T12:00:00.000Z",
-    users: [{ id: "u1", password: "secret" }]
+    users: [{ id: "u1", password: "secret" }],
+    deletedUserIds: ["u9"],
+    deletedParticipantIds: ["p9"]
   };
 
   assert.deepEqual(getPublicPoolState(state), {
@@ -172,7 +174,9 @@ test("public shared state includes predictions, participants and match results",
     participants: state.participants,
     predictions: state.predictions,
     matches: state.matches,
-    lastResultSyncAt: state.lastResultSyncAt
+    lastResultSyncAt: state.lastResultSyncAt,
+    deletedUserIds: state.deletedUserIds,
+    deletedParticipantIds: state.deletedParticipantIds
   });
 });
 
@@ -219,4 +223,29 @@ test("shared state merge preserves other users while publishing current user's l
   assert.equal(merged.participants.length, 2);
   assert.deepEqual(merged.predictions.p1.m1.home, "2");
   assert.deepEqual(merged.predictions.p2.m1.home, "0");
+});
+
+test("shared state merge never resurrects deleted users or participants", () => {
+  const merged = mergePublicPoolState(
+    {
+      users: [],
+      participants: [],
+      predictions: {},
+      matches: [],
+      deletedUserIds: ["u1"],
+      deletedParticipantIds: ["p1"]
+    },
+    {
+      users: [{ id: "u1", name: "Removido", participantId: "p1" }],
+      participants: [{ id: "p1", name: "Removido" }],
+      predictions: { p1: { m1: { home: "1", away: "0" } } },
+      matches: []
+    }
+  );
+
+  assert.deepEqual(merged.users, []);
+  assert.deepEqual(merged.participants, []);
+  assert.deepEqual(merged.predictions, {});
+  assert.deepEqual(merged.deletedUserIds, ["u1"]);
+  assert.deepEqual(merged.deletedParticipantIds, ["p1"]);
 });

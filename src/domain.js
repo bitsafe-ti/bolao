@@ -219,6 +219,8 @@ export function createInitialState() {
     participants: [],
     matches: createGroupStageMatches(),
     predictions: {},
+    deletedUserIds: [],
+    deletedParticipantIds: [],
     activeParticipantId: "",
     lastResultSyncAt: "",
     totalTeams: worldCupTeams.length

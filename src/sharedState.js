@@ -17,7 +17,9 @@ export function getPublicPoolState(state) {
     participants: state.participants ?? [],
     predictions: state.predictions ?? {},
     matches: state.matches ?? [],
-    lastResultSyncAt: state.lastResultSyncAt ?? ""
+    lastResultSyncAt: state.lastResultSyncAt ?? "",
+    deletedUserIds: state.deletedUserIds ?? [],
+    deletedParticipantIds: state.deletedParticipantIds ?? []
   };
 }
 
@@ -59,8 +61,33 @@ function mergePredictionMaps(currentPredictions = {}, sharedPredictions = {}, pr
   return merged;
 }
 
+function mergeDeletedIds(currentIds = [], sharedIds = []) {
+  return [...new Set([...(currentIds ?? []), ...(sharedIds ?? [])].filter(Boolean))];
+}
+
+function filterDeleted(state) {
+  const deletedUserIds = new Set(state.deletedUserIds ?? []);
+  const deletedParticipantIds = new Set(state.deletedParticipantIds ?? []);
+  const predictions = Object.fromEntries(
+    Object.entries(state.predictions ?? {}).filter(([participantId]) => !deletedParticipantIds.has(participantId))
+  );
+
+  return {
+    ...state,
+    users: (state.users ?? []).filter((user) =>
+      !deletedUserIds.has(user.id) && !deletedParticipantIds.has(user.participantId)
+    ),
+    participants: (state.participants ?? []).filter((participant) => !deletedParticipantIds.has(participant.id)),
+    predictions,
+    deletedUserIds: [...deletedUserIds],
+    deletedParticipantIds: [...deletedParticipantIds]
+  };
+}
+
 export function mergePublicPoolState(current, shared = {}, options = {}) {
   const prefer = options.prefer ?? "shared";
+  const deletedUserIds = mergeDeletedIds(current.deletedUserIds, shared.deletedUserIds);
+  const deletedParticipantIds = mergeDeletedIds(current.deletedParticipantIds, shared.deletedParticipantIds);
 
   const matchesById = new Map();
   for (const match of mergeById(current.matches ?? [], shared.matches ?? [], prefer)) {
@@ -71,8 +98,10 @@ export function mergePublicPoolState(current, shared = {}, options = {}) {
   const currentSyncTime = Date.parse(current.lastResultSyncAt || "");
   const sharedSyncTime = Date.parse(shared.lastResultSyncAt || "");
 
-  return {
+  return filterDeleted({
     ...current,
+    deletedUserIds,
+    deletedParticipantIds,
     users: mergeById(current.users ?? [], shared.users ?? [], prefer),
     participants: mergeById(current.participants ?? [], shared.participants ?? [], prefer),
     predictions: mergePredictionMaps(current.predictions ?? {}, shared.predictions ?? {}, prefer),
@@ -81,7 +110,7 @@ export function mergePublicPoolState(current, shared = {}, options = {}) {
       (Number.isNaN(sharedSyncTime) ? 0 : sharedSyncTime) > (Number.isNaN(currentSyncTime) ? 0 : currentSyncTime)
         ? shared.lastResultSyncAt
         : current.lastResultSyncAt
-  };
+  });
 }
 
 export async function fetchPoolState() {
@@ -92,23 +121,21 @@ export async function fetchPoolState() {
     .maybeSingle();
 
   if (error) throw new Error(`Banco indisponível: ${error.message}`);
-  return data?.data ?? { users: [], participants: [], predictions: {}, matches: [], lastResultSyncAt: "" };
+  return data?.data ?? {
+    users: [],
+    participants: [],
+    predictions: {},
+    matches: [],
+    lastResultSyncAt: "",
+    deletedUserIds: [],
+    deletedParticipantIds: []
+  };
 }
 
 export async function persistPoolState(nextState) {
   const remote = await fetchPoolState();
   const merged = mergePublicPoolState(nextState, remote, { prefer: "current" });
-
-  // Respect intentional deletions: mergeById unions IDs from both sides, so items
-  // removed from nextState would come back from remote. Filter by nextState's IDs.
-  const keepParticipantIds = new Set((nextState.participants ?? []).map((p) => p.id));
-  const keepUserIds = new Set((nextState.users ?? []).map((u) => u.id));
-
-  const payload = getPublicPoolState({
-    ...merged,
-    participants: (merged.participants ?? []).filter((p) => keepParticipantIds.has(p.id)),
-    users: (merged.users ?? []).filter((u) => keepUserIds.has(u.id)),
-  });
+  const payload = getPublicPoolState(filterDeleted(merged));
 
   const { error } = await supabase
     .from(TABLE)
