@@ -102,7 +102,6 @@ function App() {
   const [selectedResultDate, setSelectedResultDate] = useState("");
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAdmin = currentUser?.role === "admin";
@@ -486,6 +485,24 @@ function App() {
             </button>
           ))}
         </nav>
+        <div className="sidebar-footer">
+          <div className="sidebar-user">
+            {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
+            <div className="sidebar-user-info">
+              <strong>{currentUser.name}</strong>
+              {isAdmin && <small>Admin</small>}
+            </div>
+          </div>
+          <div className="sidebar-actions">
+            {isAdmin && (
+              <button type="button" onClick={() => { syncResults("manual"); setMobileMenuOpen(false); }}>Atualizar resultados</button>
+            )}
+            <button type="button" onClick={logoutUser}>Sair</button>
+            {isAdmin && (
+              <button type="button" className="danger" onClick={() => { resetData(); setMobileMenuOpen(false); }}>Reiniciar dados</button>
+            )}
+          </div>
+        </div>
       </aside>
 
       <section className="workspace">
@@ -495,30 +512,6 @@ function App() {
             <div>
               <p className="eyebrow">Copa do Mundo 2026</p>
               <h1>{visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
-            </div>
-          </div>
-          <div className="topbar-actions">
-            <div className="user-menu">
-              <button type="button" className="user-chip" onClick={() => setUserMenuOpen(v => !v)}>
-                {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
-                <span>{currentUser.name}</span>
-                {isAdmin && <small>Admin</small>}
-                <span className="user-chevron" aria-hidden="true">▾</span>
-              </button>
-              {userMenuOpen && (
-                <>
-                  <div className="user-menu-backdrop" onClick={() => setUserMenuOpen(false)} />
-                  <div className="user-menu-dropdown">
-                    {isAdmin && (
-                      <button type="button" onClick={() => { syncResults("manual"); setUserMenuOpen(false); }}>Atualizar resultados</button>
-                    )}
-                    <button type="button" onClick={logoutUser}>Sair</button>
-                    {isAdmin && (
-                      <button type="button" className="danger-item" onClick={() => { resetData(); setUserMenuOpen(false); }}>Reiniciar dados</button>
-                    )}
-                  </div>
-                </>
-              )}
             </div>
           </div>
         </header>
