@@ -101,6 +101,7 @@ function App() {
   const [selectedOverviewDate, setSelectedOverviewDate] = useState("");
   const [selectedResultDate, setSelectedResultDate] = useState("");
   const [draftPredictions, setDraftPredictions] = useState({});
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAdmin = currentUser?.role === "admin";
@@ -471,13 +472,15 @@ function App() {
 
   return (
     <main className="app-shell">
-      <aside className="sidebar">
+      {mobileMenuOpen && <div className="menu-overlay" onClick={() => setMobileMenuOpen(false)} />}
+      <aside className={`sidebar${mobileMenuOpen ? " open" : ""}`}>
         <div className="brand-block">
           <img src={WORLD_CUP_LOGO_URL} alt="Logo da Copa do Mundo 2026" />
+          <button type="button" className="menu-close" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>✕</button>
         </div>
         <nav className="tabs" aria-label="Seções do bolão">
           {visibleTabs.map((item) => (
-            <button type="button" className={tab === item.id ? "active" : ""} key={item.id} onClick={() => setTab(item.id)}>
+            <button type="button" className={tab === item.id ? "active" : ""} key={item.id} onClick={() => { setTab(item.id); setMobileMenuOpen(false); }}>
               {item.label}
             </button>
           ))}
@@ -486,9 +489,12 @@ function App() {
 
       <section className="workspace">
         <header className="topbar">
-          <div>
-            <p className="eyebrow">Copa do Mundo 2026</p>
-            <h1>{visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
+          <div className="topbar-left">
+            <button type="button" className="hamburger" aria-label="Abrir menu" onClick={() => setMobileMenuOpen(true)}>☰</button>
+            <div>
+              <p className="eyebrow">Copa do Mundo 2026</p>
+              <h1>{visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
+            </div>
           </div>
           <div className="topbar-actions">
             <div className="user-chip">
