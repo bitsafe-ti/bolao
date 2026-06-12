@@ -150,3 +150,27 @@ test("shared state merge lets remote predictions and results update local view",
   assert.deepEqual(merged.predictions.p1.m1, { home: "2", away: "0" });
   assert.equal(merged.matches[0].homeScore, "2");
 });
+
+test("shared state merge preserves other users while publishing current user's latest prediction", () => {
+  const merged = mergePublicPoolState(
+    {
+      participants: [{ id: "p1", name: "Ana", updatedAt: "2026-06-12T12:01:00.000Z" }],
+      predictions: {
+        p1: { m1: { home: "2", away: "1", updatedAt: "2026-06-12T12:01:00.000Z" } }
+      },
+      matches: []
+    },
+    {
+      participants: [{ id: "p2", name: "Bruno", updatedAt: "2026-06-12T12:00:00.000Z" }],
+      predictions: {
+        p2: { m1: { home: "0", away: "0", updatedAt: "2026-06-12T12:00:00.000Z" } }
+      },
+      matches: []
+    },
+    { prefer: "current" }
+  );
+
+  assert.equal(merged.participants.length, 2);
+  assert.deepEqual(merged.predictions.p1.m1.home, "2");
+  assert.deepEqual(merged.predictions.p2.m1.home, "0");
+});

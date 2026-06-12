@@ -606,6 +606,10 @@ h3 {
   border-left: 4px solid var(--primary);
 }
 
+.prediction-card.locked {
+  border-left-color: var(--success);
+}
+
 .prediction-card p {
   color: var(--muted);
   margin-bottom: 0;
@@ -615,6 +619,12 @@ h3 {
   color: var(--text);
   font-weight: 700;
   margin-top: 4px;
+}
+
+.prediction-actions {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
 }
 
 .daily-predictions {
@@ -828,6 +838,22 @@ h3 {
   border-radius: 8px;
   background: var(--soft);
   padding: 10px;
+}
+
+.score-input:disabled {
+  background: var(--success-soft);
+  color: var(--success);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.saved-pill {
+  border-radius: 999px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 0.78rem;
+  font-weight: 900;
+  padding: 6px 10px;
 }
 
 .badge {
@@ -1111,8 +1137,13 @@ tr:last-child td {
     display: none;
   }
 
-  .prediction-inputs {
+  .prediction-inputs,
+  .prediction-actions {
     justify-self: start;
+  }
+
+  .prediction-actions {
+    justify-items: start;
   }
 }
 

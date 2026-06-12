@@ -126,6 +126,7 @@ function App() {
   const [selectedPredictionDate, setSelectedPredictionDate] = useState("");
   const [selectedOverviewDate, setSelectedOverviewDate] = useState("");
   const [selectedResultDate, setSelectedResultDate] = useState("");
+  const [draftPredictions, setDraftPredictions] = useState({});
   const [sharedStatus, setSharedStatus] = useState({
     state: isSharedStorageEnabled() ? "idle" : "disabled",
     message: isSharedStorageEnabled()
@@ -174,8 +175,12 @@ function App() {
   async function publishSharedState(nextState) {
     if (!isSharedStorageEnabled()) return;
     try {
-      await saveSharedPoolState(nextState);
-      setSharedStatus({ state: "success", message: "Palpites compartilhados sincronizados." });
+      const shared = await fetchSharedPoolState();
+      const mergedState = mergePublicPoolState(nextState, shared, { prefer: "current" });
+      await saveSharedPoolState(mergedState);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedState));
+      setState(mergedState);
+      setSharedStatus({ state: "success", message: "Dados compartilhados sincronizados." });
     } catch (error) {
       setSharedStatus({ state: "error", message: error.message });
     }
@@ -187,7 +192,7 @@ function App() {
       const shared = await fetchSharedPoolState();
       let mergedState;
       setState((current) => {
-        mergedState = mergePublicPoolState(current, shared);
+        mergedState = mergePublicPoolState(current, shared, { prefer: "shared" });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedState));
         return mergedState;
       });
@@ -272,7 +277,7 @@ function App() {
       return;
     }
 
-    const participant = { id: makeId("participant"), name: cleanName };
+    const participant = { id: makeId("participant"), name: cleanName, updatedAt: new Date().toISOString() };
     const user = {
       id: makeId("user"),
       name: cleanName,
@@ -318,7 +323,7 @@ function App() {
     const name = form.get("name").trim();
     if (!name) return;
     updateState((current) => {
-      const participant = { id: makeId("participant"), name };
+      const participant = { id: makeId("participant"), name, updatedAt: new Date().toISOString() };
       return {
         ...current,
         participants: [...current.participants, participant],
@@ -360,7 +365,8 @@ function App() {
       homeScore: "",
       awayScore: "",
       homeGoals: [],
-      awayGoals: []
+      awayGoals: [],
+      updatedAt: new Date().toISOString()
     };
     if (!match.homeTeamId || !match.awayTeamId || match.homeTeamId === match.awayTeamId) return;
     updateState((current) => ({ ...current, matches: [...current.matches, match] }), { publishShared: true });
@@ -370,7 +376,9 @@ function App() {
   function updateMatch(matchId, field, value) {
     updateState((current) => ({
       ...current,
-      matches: current.matches.map((match) => (match.id === matchId ? { ...match, [field]: value } : match))
+      matches: current.matches.map((match) =>
+        match.id === matchId ? { ...match, [field]: value, updatedAt: new Date().toISOString() } : match
+      )
     }), { publishShared: true });
   }
 
@@ -391,7 +399,38 @@ function App() {
     }, { publishShared: true });
   }
 
-  function updatePrediction(participantId, matchId, field, value) {
+  function getPredictionKey(participantId, matchId) {
+    return `${participantId}__${matchId}`;
+  }
+
+  function getDraftPrediction(participantId, matchId, storedPrediction = emptyPrediction) {
+    return draftPredictions[getPredictionKey(participantId, matchId)] ?? storedPrediction;
+  }
+
+  function updateDraftPrediction(participantId, matchId, field, value) {
+    const key = getPredictionKey(participantId, matchId);
+    setDraftPredictions((current) => ({
+      ...current,
+      [key]: {
+        ...emptyPrediction,
+        ...current[key],
+        [field]: value
+      }
+    }));
+  }
+
+  function savePrediction(participantId, matchId) {
+    const key = getPredictionKey(participantId, matchId);
+    const currentPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
+    if (hasPrediction(currentPrediction)) return;
+
+    const draft = getDraftPrediction(participantId, matchId, currentPrediction);
+    if (!hasPrediction(draft)) {
+      setSharedStatus({ state: "error", message: "Informe os dois placares antes de salvar o palpite." });
+      return;
+    }
+
+    const savedAt = new Date().toISOString();
     updateState((current) => ({
       ...current,
       predictions: {
@@ -401,11 +440,18 @@ function App() {
           [matchId]: {
             ...emptyPrediction,
             ...current.predictions[participantId]?.[matchId],
-            [field]: value
+            ...draft,
+            savedAt,
+            updatedAt: savedAt
           }
         }
       }
     }), { publishShared: true });
+    setDraftPredictions((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
   }
 
   function resetData() {
@@ -472,7 +518,7 @@ function App() {
                   updateState((current) => ({
                     ...current,
                     participants: current.participants.map((item) =>
-                      item.id === participant.id ? { ...item, name: event.target.value } : item
+                      item.id === participant.id ? { ...item, name: event.target.value, updatedAt: new Date().toISOString() } : item
                     ),
                     users: current.users.map((user) =>
                       user.participantId === participant.id ? { ...user, name: event.target.value } : user
@@ -535,19 +581,30 @@ function App() {
           {activeParticipant ? (
             <div className="match-list">
               {predictionMatches.map((match) => {
-                const prediction = state.predictions[activeParticipant.id]?.[match.id] ?? emptyPrediction;
+                const storedPrediction = state.predictions[activeParticipant.id]?.[match.id] ?? emptyPrediction;
+                const prediction = getDraftPrediction(activeParticipant.id, match.id, storedPrediction);
+                const isSaved = hasPrediction(storedPrediction);
                 return (
-                  <article className="match-card prediction-card" key={match.id}>
+                  <article className={`match-card prediction-card ${isSaved ? "locked" : ""}`} key={match.id}>
                     <div>
                       <span className="badge">{match.phase}</span>
                       <h3 className="teams-versus"><TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span> <TeamName teamId={match.awayTeamId} fallback={match.away} /></h3>
                       <p>{formatDate(match.date)}</p>
                       <p className="match-location">{formatVenue(match)}</p>
                     </div>
-                    <div className="prediction-inputs">
-                      <ScoreInput value={prediction.home} onChange={(value) => updatePrediction(activeParticipant.id, match.id, "home", value)} />
-                      <span>x</span>
-                      <ScoreInput value={prediction.away} onChange={(value) => updatePrediction(activeParticipant.id, match.id, "away", value)} />
+                    <div className="prediction-actions">
+                      <div className="prediction-inputs">
+                        <ScoreInput disabled={isSaved} value={prediction.home} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "home", value)} />
+                        <span>x</span>
+                        <ScoreInput disabled={isSaved} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
+                      </div>
+                      {isSaved ? (
+                        <span className="saved-pill">Palpite salvo</span>
+                      ) : (
+                        <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id)}>
+                          Salvar palpite
+                        </button>
+                      )}
                     </div>
                   </article>
                 );
@@ -699,8 +756,8 @@ function SectionHeader({ title, caption }) {
   return <header className="section-header"><h2>{title}</h2><p>{caption}</p></header>;
 }
 
-function ScoreInput({ value, onChange }) {
-  return <input className="score-input" min="0" inputMode="numeric" type="number" value={value} onChange={(event) => onChange(event.target.value)} placeholder="0" />;
+function ScoreInput({ value, onChange, disabled = false }) {
+  return <input className="score-input" disabled={disabled} min="0" inputMode="numeric" type="number" value={value} onChange={(event) => onChange(event.target.value)} placeholder="0" />;
 }
 
 function RankingTable({ ranking, compact = false }) {

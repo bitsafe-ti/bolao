@@ -34,35 +34,75 @@ export function getPublicPoolState(state) {
   };
 }
 
-export function mergePublicPoolState(current, shared = {}) {
-  const participantsById = new Map();
-  for (const participant of current.participants ?? []) {
-    participantsById.set(participant.id, participant);
-  }
-  for (const participant of shared.participants ?? []) {
-    participantsById.set(participant.id, participant);
+function getTimestamp(item = {}) {
+  const value = item.updatedAt || item.resultUpdatedAt || item.createdAt || "";
+  const time = Date.parse(value);
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function pickNewest(currentItem, sharedItem, prefer = "shared") {
+  if (!currentItem) return sharedItem;
+  if (!sharedItem) return currentItem;
+
+  const currentTime = getTimestamp(currentItem);
+  const sharedTime = getTimestamp(sharedItem);
+  if (currentTime > sharedTime) return currentItem;
+  if (sharedTime > currentTime) return sharedItem;
+  return prefer === "current" ? currentItem : sharedItem;
+}
+
+function mergeById(currentItems = [], sharedItems = [], prefer = "shared") {
+  const ids = new Set([...currentItems.map((item) => item.id), ...sharedItems.map((item) => item.id)]);
+  const currentById = Object.fromEntries(currentItems.map((item) => [item.id, item]));
+  const sharedById = Object.fromEntries(sharedItems.map((item) => [item.id, item]));
+
+  return [...ids]
+    .map((id) => pickNewest(currentById[id], sharedById[id], prefer))
+    .filter(Boolean);
+}
+
+function mergePredictionMaps(currentPredictions = {}, sharedPredictions = {}, prefer = "shared") {
+  const participantIds = new Set([...Object.keys(currentPredictions), ...Object.keys(sharedPredictions)]);
+  const merged = {};
+
+  for (const participantId of participantIds) {
+    const currentMatches = currentPredictions[participantId] ?? {};
+    const sharedMatches = sharedPredictions[participantId] ?? {};
+    const matchIds = new Set([...Object.keys(currentMatches), ...Object.keys(sharedMatches)]);
+    merged[participantId] = {};
+
+    for (const matchId of matchIds) {
+      merged[participantId][matchId] = pickNewest(currentMatches[matchId], sharedMatches[matchId], prefer);
+    }
   }
 
+  return merged;
+}
+
+export function mergePublicPoolState(current, shared = {}, options = {}) {
+  const prefer = options.prefer ?? "shared";
+
   const matchesById = new Map();
-  for (const match of current.matches ?? []) {
-    matchesById.set(match.id, match);
-  }
-  for (const match of shared.matches ?? []) {
+  for (const match of mergeById(current.matches ?? [], shared.matches ?? [], prefer)) {
+    const baseMatch = (current.matches ?? []).find((item) => item.id === match.id) ?? {};
     matchesById.set(match.id, {
-      ...matchesById.get(match.id),
+      ...baseMatch,
       ...match
     });
   }
 
+  const currentSyncTime = Date.parse(current.lastResultSyncAt || "");
+  const sharedSyncTime = Date.parse(shared.lastResultSyncAt || "");
+
   return {
     ...current,
-    participants: [...participantsById.values()],
-    predictions: {
-      ...(current.predictions ?? {}),
-      ...(shared.predictions ?? {})
-    },
+    participants: mergeById(current.participants ?? [], shared.participants ?? [], prefer),
+    predictions: mergePredictionMaps(current.predictions ?? {}, shared.predictions ?? {}, prefer),
     matches: [...matchesById.values()],
-    lastResultSyncAt: shared.lastResultSyncAt || current.lastResultSyncAt
+    lastResultSyncAt:
+      (Number.isNaN(sharedSyncTime) ? 0 : sharedSyncTime) > (Number.isNaN(currentSyncTime) ? 0 : currentSyncTime)
+        ? shared.lastResultSyncAt
+        : current.lastResultSyncAt
   };
 }
 
