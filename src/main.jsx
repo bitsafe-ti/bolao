@@ -271,7 +271,7 @@ function App() {
     }
 
     const now = new Date().toISOString();
-    const participant = { id: makeId("participant"), name: cleanName, updatedAt: now };
+    const participant = { id: makeId("participant"), name: cleanName, email: cleanEmail, updatedAt: now };
     const user = {
       id: makeId("user"),
       name: cleanName,
@@ -316,9 +316,10 @@ function App() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const name = form.get("name").trim();
+    const email = (form.get("email") || "").trim().toLowerCase();
     if (!name) return;
     updateState((current) => {
-      const participant = { id: makeId("participant"), name, updatedAt: new Date().toISOString() };
+      const participant = { id: makeId("participant"), name, email, updatedAt: new Date().toISOString() };
       return {
         ...current,
         participants: [...current.participants, participant],
@@ -522,15 +523,16 @@ function App() {
         {tab === "participants" && isAdmin && (
           <section className="panel">
             <SectionHeader title="Participantes" caption="Área administrativa. Usuários comuns devem se auto cadastrar e sempre entram com perfil user." />
-            <form className="inline-form" onSubmit={addParticipant}>
+            <form className="inline-form participant-form" onSubmit={addParticipant}>
               <input name="name" placeholder="Nome do participante" />
+              <input name="email" type="email" placeholder="E-mail do participante" />
               <button type="submit">Adicionar</button>
             </form>
             <div className="list">
               {state.participants.map((participant) => {
                 const linkedUser = state.users.find((u) => u.participantId === participant.id);
                 return (
-                  <div className="list-row" key={participant.id}>
+                  <div className="list-row participant-row" key={participant.id}>
                     <input value={participant.name} onChange={(event) =>
                       updateState((current) => ({
                         ...current,
@@ -542,6 +544,22 @@ function App() {
                         )
                       }))
                     } />
+                    <input
+                      type="email"
+                      value={participant.email || linkedUser?.email || ""}
+                      placeholder="Sem e-mail vinculado"
+                      onChange={(event) =>
+                        updateState((current) => ({
+                          ...current,
+                          participants: current.participants.map((item) =>
+                            item.id === participant.id ? { ...item, email: event.target.value.trim().toLowerCase(), updatedAt: new Date().toISOString() } : item
+                          ),
+                          users: current.users.map((user) =>
+                            user.participantId === participant.id ? { ...user, email: event.target.value.trim().toLowerCase(), updatedAt: new Date().toISOString() } : user
+                          )
+                        }))
+                      }
+                    />
                     <div className="list-row-actions">
                       {linkedUser && (
                         <button type="button" className="ghost subtle" onClick={() => {
@@ -775,7 +793,7 @@ function RankingTable({ ranking, compact = false }) {
       {!compact && <ScoringExamples />}
       {ranking.length ? (
         <div className="table-wrap">
-          <table>
+          <table className="ranking-table">
             <thead><tr><th>#</th><th>Participante</th><th>Pontos</th><th>Cravados</th><th>Ganhador</th><th>Jogos pontuados</th></tr></thead>
             <tbody>
               {ranking.map((participant, index) => (
