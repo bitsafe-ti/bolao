@@ -957,7 +957,7 @@ function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, on
 }
 
 function RankingTable({ ranking, compact = false }) {
-  const paidParticipants = ranking.filter((participant) => participant.predictedMatches > 0).length;
+  const paidParticipants = ranking.length;
   const totalPoolValue = paidParticipants * ENTRY_FEE;
 
   return (
