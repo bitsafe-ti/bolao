@@ -13,6 +13,13 @@ import {
 } from "./domain.js";
 import { getFlagUrl, teamsById, worldCupTeams } from "./teams.js";
 import { applyResultUpdates, fetchWorldCupResults } from "./resultsSync.js";
+import {
+  fetchSharedPoolState,
+  isSharedStorageEnabled,
+  mergePublicPoolState,
+  saveSharedPoolState,
+  SHARED_CONFIG
+} from "./sharedState.js";
 import "./styles.css";
 
 const WORLD_CUP_LOGO_URL =
@@ -119,6 +126,12 @@ function App() {
   const [selectedPredictionDate, setSelectedPredictionDate] = useState("");
   const [selectedOverviewDate, setSelectedOverviewDate] = useState("");
   const [selectedResultDate, setSelectedResultDate] = useState("");
+  const [sharedStatus, setSharedStatus] = useState({
+    state: isSharedStorageEnabled() ? "idle" : "disabled",
+    message: isSharedStorageEnabled()
+      ? "Palpites compartilhados ativos."
+      : "Modo local: configure o banco compartilhado para ver palpites de outros usuários."
+  });
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAdmin = currentUser?.role === "admin";
@@ -158,10 +171,42 @@ function App() {
     .filter((match) => getMatchDateKey(match) === activeResultDate)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
-  function updateState(recipe) {
+  async function publishSharedState(nextState) {
+    if (!isSharedStorageEnabled()) return;
+    try {
+      await saveSharedPoolState(nextState);
+      setSharedStatus({ state: "success", message: "Palpites compartilhados sincronizados." });
+    } catch (error) {
+      setSharedStatus({ state: "error", message: error.message });
+    }
+  }
+
+  async function pullSharedState({ publishAfterMerge = false } = {}) {
+    if (!isSharedStorageEnabled()) return;
+    try {
+      const shared = await fetchSharedPoolState();
+      let mergedState;
+      setState((current) => {
+        mergedState = mergePublicPoolState(current, shared);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedState));
+        return mergedState;
+      });
+      setSharedStatus({ state: "success", message: "Palpites de todos os usuários atualizados." });
+      if (publishAfterMerge && mergedState) {
+        await publishSharedState(mergedState);
+      }
+    } catch (error) {
+      setSharedStatus({ state: "error", message: error.message });
+    }
+  }
+
+  function updateState(recipe, options = {}) {
     setState((current) => {
       const next = typeof recipe === "function" ? recipe(current) : recipe;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      if (options.publishShared) {
+        void publishSharedState(next);
+      }
       return next;
     });
   }
@@ -179,7 +224,7 @@ function App() {
           matches: update.matches,
           lastResultSyncAt: new Date().toISOString()
         };
-      });
+      }, { publishShared: true });
       setSyncStatus({
         state: "success",
         message:
@@ -199,6 +244,13 @@ function App() {
     if (!currentUser) return undefined;
     syncResults("auto");
     const intervalId = window.setInterval(() => syncResults("auto"), 5 * 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser || !isSharedStorageEnabled()) return undefined;
+    pullSharedState({ publishAfterMerge: true });
+    const intervalId = window.setInterval(() => pullSharedState(), 30 * 1000);
     return () => window.clearInterval(intervalId);
   }, [currentUser?.id]);
 
@@ -237,7 +289,7 @@ function App() {
       participants: [...current.participants, participant],
       currentUserId: user.id,
       activeParticipantId: participant.id
-    }));
+    }), { publishShared: true });
     setAuthError("");
   }
 
@@ -272,7 +324,7 @@ function App() {
         participants: [...current.participants, participant],
         activeParticipantId: current.activeParticipantId || participant.id
       };
-    });
+    }, { publishShared: true });
     event.currentTarget.reset();
   }
 
@@ -292,7 +344,7 @@ function App() {
         activeParticipantId:
           current.activeParticipantId === participantId ? participants[0]?.id ?? "" : current.activeParticipantId
       };
-    });
+    }, { publishShared: true });
   }
 
   function addMatch(event) {
@@ -311,7 +363,7 @@ function App() {
       awayGoals: []
     };
     if (!match.homeTeamId || !match.awayTeamId || match.homeTeamId === match.awayTeamId) return;
-    updateState((current) => ({ ...current, matches: [...current.matches, match] }));
+    updateState((current) => ({ ...current, matches: [...current.matches, match] }), { publishShared: true });
     event.currentTarget.reset();
   }
 
@@ -319,7 +371,7 @@ function App() {
     updateState((current) => ({
       ...current,
       matches: current.matches.map((match) => (match.id === matchId ? { ...match, [field]: value } : match))
-    }));
+    }), { publishShared: true });
   }
 
   function removeMatch(matchId) {
@@ -336,7 +388,7 @@ function App() {
         matches: current.matches.filter((match) => match.id !== matchId),
         predictions
       };
-    });
+    }, { publishShared: true });
   }
 
   function updatePrediction(participantId, matchId, field, value) {
@@ -353,12 +405,12 @@ function App() {
           }
         }
       }
-    }));
+    }), { publishShared: true });
   }
 
   function resetData() {
     if (!confirm("Apagar todos os dados do bolão neste navegador?")) return;
-    updateState(createInitialState());
+    updateState(createInitialState(), { publishShared: true });
   }
 
   if (!currentUser) {
@@ -425,7 +477,7 @@ function App() {
                     users: current.users.map((user) =>
                       user.participantId === participant.id ? { ...user, name: event.target.value } : user
                     )
-                  }))
+                  }), { publishShared: true })
                 } />
                 <button type="button" className="danger" onClick={() => removeParticipant(participant.id)}>Remover</button>
               </div>
@@ -520,6 +572,14 @@ function App() {
                 ))}
               </select>
             </label>
+          </div>
+          <div className={`sync-strip ${sharedStatus.state}`}>
+            <strong>{sharedStatus.message}</strong>
+            <span>
+              {isSharedStorageEnabled()
+                ? "Participantes, palpites, jogos, resultados e ranking ficam sincronizados."
+                : "Sem banco compartilhado, cada navegador vê apenas os próprios dados locais."}
+            </span>
           </div>
           <DailyPredictions
             matches={overviewMatches}

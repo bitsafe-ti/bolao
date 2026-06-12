@@ -33,6 +33,10 @@ jobs:
       - name: Build
         env:
           VITE_SUPER_ADMIN_EMAILS: ${{ vars.VITE_SUPER_ADMIN_EMAILS }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_TABLE: ${{ vars.VITE_SUPABASE_TABLE }}
+          VITE_POOL_ID: ${{ vars.VITE_POOL_ID }}
         run: npm run build
 
       - name: Upload artifact

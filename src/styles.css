@@ -476,6 +476,10 @@ h3 {
   border-left-color: var(--danger);
 }
 
+.sync-strip.disabled {
+  border-left-color: var(--muted);
+}
+
 .inline-form,
 .match-form {
   display: grid;

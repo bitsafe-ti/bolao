@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateRanking, createGroupStageMatches, normalizeUsers, scorePrediction } from "../src/domain.js";
 import { applyResultUpdates } from "../src/resultsSync.js";
+import { getPublicPoolState, mergePublicPoolState } from "../src/sharedState.js";
 
 test("scores exact score with three points", () => {
   assert.equal(scorePrediction({ home: 2, away: 1 }, { homeScore: 2, awayScore: 1 }), 3);
@@ -110,4 +111,42 @@ test("syncs result goals with minute and scorer name", () => {
   assert.deepEqual(update.matches[0].homeGoals, [
     { name: "Raul Jimenez", minute: 90, offset: 2, penalty: true, ownGoal: false }
   ]);
+});
+
+test("public shared state includes predictions, participants and match results", () => {
+  const state = {
+    participants: [{ id: "p1", name: "Ana" }],
+    predictions: { p1: { m1: { home: "2", away: "1" } } },
+    matches: [{ id: "m1", homeScore: "2", awayScore: "1" }],
+    lastResultSyncAt: "2026-06-12T12:00:00.000Z",
+    users: [{ id: "u1", password: "secret" }]
+  };
+
+  assert.deepEqual(getPublicPoolState(state), {
+    participants: state.participants,
+    predictions: state.predictions,
+    matches: state.matches,
+    lastResultSyncAt: state.lastResultSyncAt
+  });
+});
+
+test("shared state merge lets remote predictions and results update local view", () => {
+  const merged = mergePublicPoolState(
+    {
+      participants: [{ id: "p1", name: "Ana Local" }],
+      predictions: { p1: { m1: { home: "1", away: "0" } } },
+      matches: [{ id: "m1", homeScore: "", awayScore: "" }]
+    },
+    {
+      participants: [{ id: "p1", name: "Ana" }, { id: "p2", name: "Bruno" }],
+      predictions: { p1: { m1: { home: "2", away: "0" } }, p2: { m1: { home: "0", away: "0" } } },
+      matches: [{ id: "m1", homeScore: "2", awayScore: "0" }],
+      lastResultSyncAt: "2026-06-12T12:00:00.000Z"
+    }
+  );
+
+  assert.equal(merged.participants.length, 2);
+  assert.equal(merged.participants.find((participant) => participant.id === "p1").name, "Ana");
+  assert.deepEqual(merged.predictions.p1.m1, { home: "2", away: "0" });
+  assert.equal(merged.matches[0].homeScore, "2");
 });
