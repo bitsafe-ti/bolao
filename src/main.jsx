@@ -225,11 +225,11 @@ function App() {
 
   // Optimistically update state then persist to Supabase
   function updateState(recipe) {
-    let nextState;
-    setState((current) => {
-      nextState = typeof recipe === "function" ? recipe(current) : recipe;
-      return nextState;
-    });
+    // Compute nextState using the current closure value of `state` so it is
+    // available synchronously — React 19 batches setState callbacks lazily
+    // and the updater may not run before persistAndSync needs the value.
+    const nextState = typeof recipe === "function" ? recipe(state) : recipe;
+    setState(nextState);
     void persistAndSync(nextState);
   }
 
