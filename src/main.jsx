@@ -56,7 +56,6 @@ const userTabs = [
 
 const adminTabs = [
   { id: "participants", label: "Participantes" },
-  { id: "matches", label: "Jogos" },
   ...userTabs
 ];
 
@@ -543,40 +542,7 @@ function App() {
           </section>
         )}
 
-        {tab === "matches" && isAdmin && (
-          <section className="panel">
-            <SectionHeader title="Jogos e resultados" caption="A fase de grupos já nasce com as 48 seleções de 2026." />
-            <form className="match-form" onSubmit={addMatch}>
-              <input name="phase" placeholder="Fase" />
-              <RoundSelect name="round" label="Rodada" defaultValue="1" />
-              <input name="date" type="datetime-local" />
-              <TeamSelect name="homeTeamId" label="Seleção 1" />
-              <TeamSelect name="awayTeamId" label="Seleção 2" />
-              <button type="submit">Adicionar jogo</button>
-            </form>
-            <div className="match-list">
-              {state.matches.map((match) => (
-                <article className="match-card" key={match.id}>
-                  <div className="match-meta">
-                    <input value={match.phase} onChange={(event) => updateMatch(match.id, "phase", event.target.value)} />
-                    <RoundSelect value={String(getMatchRound(match) ?? "")} onChange={(event) => updateMatch(match.id, "round", Number(event.target.value))} label="Rodada" />
-                    <input type="datetime-local" value={match.date} onChange={(event) => updateMatch(match.id, "date", event.target.value)} />
-                  </div>
-                  <div className="score-line">
-                    <TeamSelect value={match.homeTeamId ?? ""} onChange={(event) => updateMatch(match.id, "homeTeamId", event.target.value)} label="Mandante" />
-                    <ScoreInput value={match.homeScore} onChange={(value) => updateMatch(match.id, "homeScore", value)} />
-                    <span>x</span>
-                    <ScoreInput value={match.awayScore} onChange={(value) => updateMatch(match.id, "awayScore", value)} />
-                    <TeamSelect value={match.awayTeamId ?? ""} onChange={(event) => updateMatch(match.id, "awayTeamId", event.target.value)} label="Visitante" />
-                  </div>
-                  <button type="button" className="danger subtle" onClick={() => removeMatch(match.id)}>Remover jogo</button>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {tab === "predictions" && (
+{tab === "predictions" && (
           <section className="panel">
             <SectionHeader title="Palpites" caption="Selecione a rodada. Apenas a rodada em andamento aceita novos palpites." />
             <div className="prediction-toolbar single">
