@@ -2,12 +2,12 @@ import { createClient } from "@supabase/supabase-js";
 
 const viteEnv = import.meta.env ?? {};
 
-const SUPABASE_URL = viteEnv.VITE_SUPABASE_URL ?? "https://pxnkhtuxtqfcwgfsespw.supabase.co";
+const SUPABASE_URL = viteEnv.VITE_SUPABASE_URL || "https://pxnkhtuxtqfcwgfsespw.supabase.co";
 const SUPABASE_ANON_KEY =
-  viteEnv.VITE_SUPABASE_ANON_KEY ??
+  viteEnv.VITE_SUPABASE_ANON_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4bmtodHV4dHFmY3dnZnNlc3B3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTkzMjgsImV4cCI6MjA5NjgzNTMyOH0.-MEbuklEnRpa6Ex5NZOAw2rCNoOeSyqVtl3PKir7F64";
-const TABLE = viteEnv.VITE_SUPABASE_TABLE ?? "bolao_public_state";
-const ROW_ID = viteEnv.VITE_POOL_ID ?? "copa-2026";
+const TABLE = viteEnv.VITE_SUPABASE_TABLE || "bolao_public_state";
+const ROW_ID = viteEnv.VITE_POOL_ID || "copa-2026";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
