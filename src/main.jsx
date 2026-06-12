@@ -198,6 +198,17 @@ function App() {
     return () => unsubscribeFromPoolChanges(channel);
   }, []);
 
+  // Polling fallback every 30s in case Realtime misses an update
+  useEffect(() => {
+    const intervalId = window.setInterval(async () => {
+      try {
+        const remote = await fetchPoolState();
+        setState((current) => applyRemoteData(current, remote, SUPER_ADMIN_EMAILS));
+      } catch {}
+    }, 30_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   // Auto-sync results when logged in
   useEffect(() => {
     if (!currentUser) return undefined;
