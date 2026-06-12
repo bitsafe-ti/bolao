@@ -75,6 +75,81 @@ function mergeDeletedIds(currentIds = [], sharedIds = []) {
   return [...new Set([...(currentIds ?? []), ...(sharedIds ?? [])].filter(Boolean))];
 }
 
+// Collapse duplicate users/participants that share the same email.
+// Keeps the oldest registration; migrates predictions from removed participant IDs
+// to the canonical one so no score data is lost.
+function deduplicateEmails(users, participants, predictions) {
+  // 1. Deduplicate users by email — keep oldest (lowest createdAt)
+  const sortedUsers = [...users].sort((a, b) => {
+    const ta = Date.parse(a.createdAt || a.updatedAt || "");
+    const tb = Date.parse(b.createdAt || b.updatedAt || "");
+    return (Number.isNaN(ta) ? Infinity : ta) - (Number.isNaN(tb) ? Infinity : tb);
+  });
+  const usersByEmail = new Map();
+  for (const user of sortedUsers) {
+    const key = (user.email || "").toLowerCase();
+    if (key && !usersByEmail.has(key)) usersByEmail.set(key, user);
+  }
+  const cleanUsers = [...usersByEmail.values()];
+
+  // 2. Determine canonical participantId per email (what the kept user points to)
+  const canonicalParticipantIdByEmail = new Map();
+  for (const user of cleanUsers) {
+    if (user.participantId && user.email) {
+      canonicalParticipantIdByEmail.set(user.email.toLowerCase(), user.participantId);
+    }
+  }
+
+  // 3. Deduplicate participants by email — prefer the one linked to the kept user
+  const participantsByEmail = new Map();
+  for (const p of participants) {
+    const key = (p.email || "").toLowerCase();
+    if (!key) continue;
+    if (!participantsByEmail.has(key)) participantsByEmail.set(key, []);
+    participantsByEmail.get(key).push(p);
+  }
+
+  const cleanParticipants = [];
+  const participantIdRemap = new Map(); // discarded id → canonical id
+
+  for (const [email, group] of participantsByEmail) {
+    const canonicalId = canonicalParticipantIdByEmail.get(email);
+    let canonical = group.find((p) => p.id === canonicalId);
+    if (!canonical) {
+      // No user link — keep oldest
+      canonical = [...group].sort((a, b) => {
+        const ta = Date.parse(a.createdAt || a.updatedAt || "");
+        const tb = Date.parse(b.createdAt || b.updatedAt || "");
+        return (Number.isNaN(ta) ? Infinity : ta) - (Number.isNaN(tb) ? Infinity : tb);
+      })[0];
+    }
+    cleanParticipants.push(canonical);
+    for (const p of group) {
+      if (p.id !== canonical.id) participantIdRemap.set(p.id, canonical.id);
+    }
+  }
+  // Keep participants without an email as-is (no dedup possible)
+  for (const p of participants) {
+    if (!(p.email || "").toLowerCase()) cleanParticipants.push(p);
+  }
+
+  if (participantIdRemap.size === 0) {
+    return { users: cleanUsers, participants: cleanParticipants, predictions };
+  }
+
+  // 4. Migrate predictions from discarded participant IDs to canonical IDs
+  const newPredictions = {};
+  for (const [participantId, perMatch] of Object.entries(predictions ?? {})) {
+    const canonicalId = participantIdRemap.get(participantId) ?? participantId;
+    if (!newPredictions[canonicalId]) newPredictions[canonicalId] = {};
+    for (const [matchId, pred] of Object.entries(perMatch ?? {})) {
+      newPredictions[canonicalId][matchId] = pickNewest(newPredictions[canonicalId][matchId], pred);
+    }
+  }
+
+  return { users: cleanUsers, participants: cleanParticipants, predictions: newPredictions };
+}
+
 function filterDeleted(state) {
   const deletedUserIds = new Set(state.deletedUserIds ?? []);
   const deletedParticipantIds = new Set(state.deletedParticipantIds ?? []);
@@ -107,13 +182,19 @@ export function mergePublicPoolState(current, shared = {}, options = {}) {
   const currentSyncTime = Date.parse(current.lastResultSyncAt || "");
   const sharedSyncTime = Date.parse(shared.lastResultSyncAt || "");
 
+  const { users, participants, predictions } = deduplicateEmails(
+    mergeById(current.users ?? [], shared.users ?? [], prefer),
+    mergeById(current.participants ?? [], shared.participants ?? [], prefer),
+    mergePredictionMaps(current.predictions ?? {}, shared.predictions ?? {}, prefer)
+  );
+
   return filterDeleted({
     ...current,
     deletedUserIds,
     deletedParticipantIds,
-    users: mergeById(current.users ?? [], shared.users ?? [], prefer),
-    participants: mergeById(current.participants ?? [], shared.participants ?? [], prefer),
-    predictions: mergePredictionMaps(current.predictions ?? {}, shared.predictions ?? {}, prefer),
+    users,
+    participants,
+    predictions,
     matches: [...matchesById.values()],
     lastResultSyncAt:
       (Number.isNaN(sharedSyncTime) ? 0 : sharedSyncTime) > (Number.isNaN(currentSyncTime) ? 0 : currentSyncTime)
