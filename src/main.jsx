@@ -440,6 +440,15 @@ function App() {
     });
   }
 
+  function resetPassword(userId, newPassword) {
+    updateState((current) => ({
+      ...current,
+      users: current.users.map((user) =>
+        user.id === userId ? { ...user, password: newPassword, updatedAt: new Date().toISOString() } : user
+      )
+    }));
+  }
+
   function resetData() {
     if (!confirm("Apagar todos os dados do bolão? Esta ação não pode ser desfeita.")) return;
     updateState(createInitialState());
@@ -522,22 +531,33 @@ function App() {
               <button type="submit">Adicionar</button>
             </form>
             <div className="list">
-              {state.participants.map((participant) => (
-                <div className="list-row" key={participant.id}>
-                  <input value={participant.name} onChange={(event) =>
-                    updateState((current) => ({
-                      ...current,
-                      participants: current.participants.map((item) =>
-                        item.id === participant.id ? { ...item, name: event.target.value, updatedAt: new Date().toISOString() } : item
-                      ),
-                      users: current.users.map((user) =>
-                        user.participantId === participant.id ? { ...user, name: event.target.value, updatedAt: new Date().toISOString() } : user
-                      )
-                    }))
-                  } />
-                  <button type="button" className="danger" onClick={() => removeParticipant(participant.id)}>Remover</button>
-                </div>
-              ))}
+              {state.participants.map((participant) => {
+                const linkedUser = state.users.find((u) => u.participantId === participant.id);
+                return (
+                  <div className="list-row" key={participant.id}>
+                    <input value={participant.name} onChange={(event) =>
+                      updateState((current) => ({
+                        ...current,
+                        participants: current.participants.map((item) =>
+                          item.id === participant.id ? { ...item, name: event.target.value, updatedAt: new Date().toISOString() } : item
+                        ),
+                        users: current.users.map((user) =>
+                          user.participantId === participant.id ? { ...user, name: event.target.value, updatedAt: new Date().toISOString() } : user
+                        )
+                      }))
+                    } />
+                    <div className="list-row-actions">
+                      {linkedUser && (
+                        <button type="button" className="ghost subtle" onClick={() => {
+                          const nova = prompt(`Nova senha para ${linkedUser.name}:`);
+                          if (nova?.trim()) resetPassword(linkedUser.id, nova.trim());
+                        }}>Resetar senha</button>
+                      )}
+                      <button type="button" className="danger subtle" onClick={() => removeParticipant(participant.id)}>Remover</button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}

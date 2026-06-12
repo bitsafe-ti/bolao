@@ -98,7 +98,17 @@ export async function fetchPoolState() {
 export async function persistPoolState(nextState) {
   const remote = await fetchPoolState();
   const merged = mergePublicPoolState(nextState, remote, { prefer: "current" });
-  const payload = getPublicPoolState(merged);
+
+  // Respect intentional deletions: mergeById unions IDs from both sides, so items
+  // removed from nextState would come back from remote. Filter by nextState's IDs.
+  const keepParticipantIds = new Set((nextState.participants ?? []).map((p) => p.id));
+  const keepUserIds = new Set((nextState.users ?? []).map((u) => u.id));
+
+  const payload = getPublicPoolState({
+    ...merged,
+    participants: (merged.participants ?? []).filter((p) => keepParticipantIds.has(p.id)),
+    users: (merged.users ?? []).filter((u) => keepUserIds.has(u.id)),
+  });
 
   const { error } = await supabase
     .from(TABLE)

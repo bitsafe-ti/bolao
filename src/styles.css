@@ -582,6 +582,12 @@ h3 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
+  align-items: center;
+}
+
+.list-row-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .match-card {
