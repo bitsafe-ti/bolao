@@ -59,6 +59,7 @@ function getMatchKickoffTime(match) {
 }
 
 export function isMatchClosed(match, now = new Date()) {
+  if (match?.locked) return true;
   const kickoffTime = getMatchKickoffTime(match);
   if (kickoffTime === null) return false;
   return kickoffTime <= now.getTime();
