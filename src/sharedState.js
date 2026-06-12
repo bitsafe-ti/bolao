@@ -134,8 +134,33 @@ export async function fetchPoolState() {
 
 export async function persistPoolState(nextState) {
   const remote = await fetchPoolState();
-  const merged = mergePublicPoolState(nextState, remote, { prefer: "current" });
-  const payload = getPublicPoolState(filterDeleted(merged));
+
+  // Union deleted-ID lists from both sources so deletions from either side survive
+  const deletedUserIds = [
+    ...new Set([...(nextState.deletedUserIds ?? []), ...(remote.deletedUserIds ?? [])])
+  ];
+  const deletedParticipantIds = [
+    ...new Set([...(nextState.deletedParticipantIds ?? []), ...(remote.deletedParticipantIds ?? [])])
+  ];
+  const effectiveNext = { ...nextState, deletedUserIds, deletedParticipantIds };
+
+  const merged = mergePublicPoolState(effectiveNext, remote, { prefer: "current" });
+
+  // Hard filter: entities whose IDs are in the union deleted lists must never resurface
+  const deletedUserSet = new Set(deletedUserIds);
+  const deletedParticipantSet = new Set(deletedParticipantIds);
+  const payload = getPublicPoolState({
+    ...merged,
+    users: (merged.users ?? []).filter(
+      (u) => !deletedUserSet.has(u.id) && !deletedParticipantSet.has(u.participantId)
+    ),
+    participants: (merged.participants ?? []).filter((p) => !deletedParticipantSet.has(p.id)),
+    predictions: Object.fromEntries(
+      Object.entries(merged.predictions ?? {}).filter(([pid]) => !deletedParticipantSet.has(pid))
+    ),
+    deletedUserIds,
+    deletedParticipantIds,
+  });
 
   const { error } = await supabase
     .from(TABLE)
