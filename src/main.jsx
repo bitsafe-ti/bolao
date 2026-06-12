@@ -64,6 +64,25 @@ const adminTabs = [
 
 const defaultRounds = [1, 2, 3];
 
+function getMatchDateKey(match) {
+  return match.date?.slice(0, 10) || "";
+}
+
+function getTodayKey() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const getPart = (type) => parts.find((part) => part.type === type)?.value;
+  return `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
+}
+
+function isMatchToday(match) {
+  return getMatchDateKey(match) === getTodayKey();
+}
+
 function applyRemoteData(current, remoteData, superAdminEmails) {
   const merged = mergePublicPoolState(current, remoteData, { prefer: "shared" });
   return purgeExpiredPredictions({
@@ -85,7 +104,6 @@ function App() {
   const [authError, setAuthError] = useState("");
   const [syncStatus, setSyncStatus] = useState({ state: "idle", message: "Resultados automáticos ativos." });
   const [sharedStatus, setSharedStatus] = useState({ state: "idle", message: "Carregando dados do bolão..." });
-  const [selectedPredictionRound, setSelectedPredictionRound] = useState(null);
   const [selectedOverviewRound, setSelectedOverviewRound] = useState(null);
   const [selectedResultRound, setSelectedResultRound] = useState(null);
   const [draftPredictions, setDraftPredictions] = useState({});
@@ -104,11 +122,10 @@ function App() {
       state.matches.map((m) => getMatchRound(m)).filter((r) => r !== null && !Number.isNaN(r))
     )].sort((a, b) => a - b);
   }, [state.matches]);
-  const activePredictionRound = selectedPredictionRound ?? activeRound;
   const activeOverviewRound = selectedOverviewRound ?? activeRound;
   const activeResultRound = selectedResultRound ?? activeRound;
   const predictionMatches = state.matches
-    .filter((match) => getMatchRound(match) === activePredictionRound)
+    .filter((match) => isMatchToday(match))
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const overviewMatches = state.matches
     .filter((match) => getMatchRound(match) === activeOverviewRound)
@@ -116,6 +133,40 @@ function App() {
   const resultMatches = state.matches
     .filter((match) => getMatchRound(match) === activeResultRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const userRows = useMemo(() => {
+    const participantById = new Map(state.participants.map((participant) => [participant.id, participant]));
+    const linkedParticipantIds = new Set(state.users.map((user) => user.participantId).filter(Boolean));
+    const fromUsers = state.users.map((user) => {
+      const participant = participantById.get(user.participantId);
+      return {
+        id: user.id,
+        userId: user.id,
+        participantId: user.participantId || participant?.id || "",
+        name: user.name || participant?.name || "",
+        email: user.email || participant?.email || "",
+        role: user.role,
+        linkedUser: user,
+        participant
+      };
+    });
+    const orphanParticipants = state.participants
+      .filter((participant) => !linkedParticipantIds.has(participant.id))
+      .map((participant) => ({
+        id: participant.id,
+        userId: "",
+        participantId: participant.id,
+        name: participant.name || "",
+        email: participant.email || "",
+        role: "user",
+        linkedUser: null,
+        participant,
+        orphan: true
+      }));
+
+    return [...fromUsers, ...orphanParticipants].sort((a, b) => a.name.localeCompare(b.name));
+  }, [state.participants, state.users]);
+  const adminParticipantRows = userRows.filter((row) => row.role === "admin");
+  const regularParticipantRows = userRows.filter((row) => row.role !== "admin");
 
   // Initial load from Supabase (with one-time migration from legacy localStorage)
   useEffect(() => {
@@ -306,7 +357,7 @@ function App() {
     const password = (form.get("password") || "").trim();
     if (!name || !email || !password) return;
     if (state.users.some((user) => user.email === email)) {
-      setSharedStatus({ state: "error", message: "Este e-mail jÃ¡ estÃ¡ cadastrado." });
+      setSharedStatus({ state: "error", message: "Este e-mail já está cadastrado." });
       return;
     }
     updateState((current) => {
@@ -333,19 +384,54 @@ function App() {
     event.currentTarget.reset();
   }
 
-  function removeParticipant(participantId) {
+  function updateParticipantRow(row, field, value) {
+    const nextValue = field === "email" ? value.trim().toLowerCase() : value;
+    updateState((current) => ({
+      ...current,
+      participants: current.participants.map((participant) =>
+        participant.id === row.participantId
+          ? { ...participant, [field]: nextValue, updatedAt: new Date().toISOString() }
+          : participant
+      ),
+      users: current.users.map((user) =>
+        user.id === row.userId
+          ? { ...user, [field]: nextValue, updatedAt: new Date().toISOString() }
+          : user
+      )
+    }));
+  }
+
+  function removeParticipantRow(row) {
     updateState((current) => {
+      const userIdsToRemove = new Set(row.userId ? [row.userId] : []);
+      const participantIdsToRemove = new Set(row.participantId ? [row.participantId] : []);
+
+      for (const user of current.users) {
+        if (participantIdsToRemove.has(user.participantId)) userIdsToRemove.add(user.id);
+      }
+
+      for (const user of current.users) {
+        if (userIdsToRemove.has(user.id) && user.participantId) {
+          participantIdsToRemove.add(user.participantId);
+        }
+      }
+
       const predictions = { ...current.predictions };
-      delete predictions[participantId];
-      const participants = current.participants.filter((participant) => participant.id !== participantId);
-      const users = current.users.filter((user) => user.participantId !== participantId);
+      for (const participantId of participantIdsToRemove) {
+        delete predictions[participantId];
+      }
+
+      const users = current.users.filter((user) => !userIdsToRemove.has(user.id));
+      const participants = current.participants.filter((participant) => !participantIdsToRemove.has(participant.id));
+
       return {
         ...current,
         users,
         participants,
         predictions,
-        activeParticipantId:
-          current.activeParticipantId === participantId ? participants[0]?.id ?? "" : current.activeParticipantId
+        activeParticipantId: participantIdsToRemove.has(current.activeParticipantId)
+          ? participants[0]?.id ?? ""
+          : current.activeParticipantId
       };
     });
   }
@@ -413,7 +499,7 @@ function App() {
     const key = getPredictionKey(participantId, matchId);
     const match = state.matches.find((item) => item.id === matchId);
     const currentPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
-    if (hasPrediction(currentPrediction) || isMatchClosed(match)) return;
+    if (hasPrediction(currentPrediction) || !isMatchToday(match) || isMatchClosed(match)) return;
 
     const draft = getDraftPrediction(participantId, matchId, currentPrediction);
     // Treat blank input as 0 — user leaving the field empty means "zero gols"
@@ -532,87 +618,42 @@ function App() {
               <input name="password" type="password" placeholder="Senha inicial" required />
               <button type="submit">Adicionar</button>
             </form>
-            <div className="list">
-              {state.participants.map((participant) => {
-                const linkedUser = state.users.find((u) => u.participantId === participant.id);
-                return (
-                  <div className="list-row participant-row" key={participant.id}>
-                    <input value={participant.name} onChange={(event) =>
-                      updateState((current) => ({
-                        ...current,
-                        participants: current.participants.map((item) =>
-                          item.id === participant.id ? { ...item, name: event.target.value, updatedAt: new Date().toISOString() } : item
-                        ),
-                        users: current.users.map((user) =>
-                          user.participantId === participant.id ? { ...user, name: event.target.value, updatedAt: new Date().toISOString() } : user
-                        )
-                      }))
-                    } />
-                    <input
-                      type="email"
-                      value={participant.email || linkedUser?.email || ""}
-                      placeholder="Sem e-mail vinculado"
-                      onChange={(event) =>
-                        updateState((current) => ({
-                          ...current,
-                          participants: current.participants.map((item) =>
-                            item.id === participant.id ? { ...item, email: event.target.value.trim().toLowerCase(), updatedAt: new Date().toISOString() } : item
-                          ),
-                          users: current.users.map((user) =>
-                            user.participantId === participant.id ? { ...user, email: event.target.value.trim().toLowerCase(), updatedAt: new Date().toISOString() } : user
-                          )
-                        }))
-                      }
-                    />
-                    <div className="list-row-actions">
-                      {linkedUser && (
-                        <button type="button" className="ghost subtle" onClick={() => {
-                          const nova = prompt(`Nova senha para ${linkedUser.name}:`);
-                          if (nova?.trim()) resetPassword(linkedUser.id, nova.trim());
-                        }}>Resetar senha</button>
-                      )}
-                      <button type="button" className="danger subtle" onClick={() => removeParticipant(participant.id)}>Remover</button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <ParticipantGrid
+              title="Administrador"
+              rows={adminParticipantRows}
+              emptyText="Nenhum administrador encontrado."
+              onChange={updateParticipantRow}
+              onResetPassword={resetPassword}
+              onRemove={removeParticipantRow}
+              canRemove={false}
+            />
+            <ParticipantGrid
+              title="Usuários"
+              rows={regularParticipantRows}
+              emptyText="Nenhum usuário comum cadastrado."
+              onChange={updateParticipantRow}
+              onResetPassword={resetPassword}
+              onRemove={removeParticipantRow}
+              canRemove
+            />
           </section>
         )}
 
 {tab === "predictions" && (
           <section className="panel">
-            <SectionHeader title="Palpites" caption="Selecione a rodada. Apenas a rodada em andamento aceita novos palpites." />
-            <div className="prediction-toolbar single">
-              <label className="select-label">
-                Rodada
-                <select value={activePredictionRound} onChange={(event) => setSelectedPredictionRound(Number(event.target.value))}>
-                  {availableRounds.map((round) => (
-                    <option value={round} key={round}>
-                      {round === activeRound ? `Rodada ${round} — em andamento` : `Rodada ${round}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <SectionHeader title="Palpites" caption="Somente os jogos de hoje ficam disponíveis para votação." />
+            <div className="sync-strip">
+              <strong>Regra de votação</strong>
+              <span>Você pode salvar seu palpite até o horário inicial do jogo. Depois que a partida começar, a votação daquele jogo fica bloqueada.</span>
             </div>
-            {activePredictionRound !== activeRound && (
-              <div className={`sync-strip ${activePredictionRound < activeRound ? "disabled" : "loading"}`}>
-                <strong>
-                  {activePredictionRound < activeRound
-                    ? "Rodada encerrada — palpites não são mais aceitos."
-                    : `Rodada ${activePredictionRound} ainda não está disponível. Aguarde a conclusão da Rodada ${activeRound}.`}
-                </strong>
-              </div>
-            )}
             {activeParticipant ? (
               <div className="match-list">
                 {predictionMatches.map((match) => {
                   const storedPrediction = state.predictions[activeParticipant.id]?.[match.id] ?? emptyPrediction;
                   const prediction = getDraftPrediction(activeParticipant.id, match.id, storedPrediction);
                   const isSaved = hasPrediction(storedPrediction);
-                  const isRoundLocked = activePredictionRound !== activeRound;
                   const isKickoffLocked = isMatchClosed(match);
-                  const isLocked = isSaved || isRoundLocked || isKickoffLocked;
+                  const isLocked = isSaved || isKickoffLocked;
                   return (
                     <article className={`match-card prediction-card ${isLocked ? "locked" : ""}`} key={match.id}>
                       <div>
@@ -629,10 +670,6 @@ function App() {
                         </div>
                         {isSaved ? (
                           <span className="saved-pill">Palpite salvo</span>
-                        ) : isRoundLocked ? (
-                          <span className="round-locked-pill">
-                            {activePredictionRound < activeRound ? "Sem palpite" : "Indisponível"}
-                          </span>
                         ) : isKickoffLocked ? (
                           <span className="round-locked-pill">Prazo encerrado</span>
                         ) : (
@@ -644,7 +681,7 @@ function App() {
                     </article>
                   );
                 })}
-                {!predictionMatches.length && <EmptyState text="Nenhum jogo cadastrado para esta rodada." />}
+                {!predictionMatches.length && <EmptyState text="Nenhum jogo cadastrado para hoje." />}
               </div>
             ) : (
               <EmptyState text="Seu cadastro entra como participante para registrar palpites." />
@@ -692,7 +729,7 @@ function App() {
                 <select value={activeResultRound} onChange={(event) => setSelectedResultRound(Number(event.target.value))}>
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
-                      {round === activeRound ? `Rodada ${round} â€” em andamento` : `Rodada ${round}`}
+                      {round === activeRound ? `Rodada ${round} - em andamento` : `Rodada ${round}`}
                     </option>
                   ))}
                 </select>
@@ -795,6 +832,45 @@ function ScoreInput({ value, onChange, disabled = false }) {
   return <input className="score-input" disabled={disabled} min="0" inputMode="numeric" type="number" value={value} onChange={(event) => onChange(event.target.value)} placeholder="0" />;
 }
 
+function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, onRemove, canRemove = true }) {
+  return (
+    <section className="participant-section">
+      <div className="participant-section-title">
+        <h3>{title}</h3>
+        <span>{rows.length} registro{rows.length === 1 ? "" : "s"}</span>
+      </div>
+      {rows.length ? (
+        <div className="participant-grid">
+          <div className="participant-grid-header">
+            <span>Nome</span>
+            <span>E-mail</span>
+            <span>Ações</span>
+          </div>
+          {rows.map((row) => (
+            <div className={`participant-grid-row${row.orphan ? " orphan" : ""}`} key={`${row.userId || "orphan"}-${row.participantId || row.id}`}>
+              <input value={row.name} placeholder="Nome" onChange={(event) => onChange(row, "name", event.target.value)} />
+              <input type="email" value={row.email} placeholder="Sem e-mail vinculado" onChange={(event) => onChange(row, "email", event.target.value)} />
+              <div className="list-row-actions">
+                {row.linkedUser && (
+                  <button type="button" className="ghost subtle" onClick={() => {
+                    const nova = prompt(`Nova senha para ${row.name}:`);
+                    if (nova?.trim()) onResetPassword(row.userId, nova.trim());
+                  }}>Resetar senha</button>
+                )}
+                {canRemove && (
+                  <button type="button" className="danger subtle" onClick={() => onRemove(row)}>Remover</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState text={emptyText} />
+      )}
+    </section>
+  );
+}
+
 function RankingTable({ ranking, compact = false }) {
   const paidParticipants = ranking.filter((participant) => participant.predictedMatches > 0).length;
   const totalPoolValue = paidParticipants * ENTRY_FEE;
@@ -816,7 +892,7 @@ function RankingTable({ ranking, compact = false }) {
             <span>Total arrecadado</span>
             <strong>{formatCurrency(totalPoolValue)}</strong>
           </div>
-          <p>ObservaÃ§Ã£o: o valor acumulado sÃ³ serÃ¡ debitado para o ganhador ao final do campeonato.</p>
+          <p>Observação: o valor acumulado só será debitado para o ganhador ao final do campeonato.</p>
         </div>
       )}
       {!compact && <ScoringExamples />}

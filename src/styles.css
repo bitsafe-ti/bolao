@@ -593,6 +593,60 @@ h3 {
   grid-template-columns: minmax(0, 1fr) minmax(220px, 0.85fr) auto;
 }
 
+.participant-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.participant-section-title {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.participant-section-title h3 {
+  margin: 0;
+}
+
+.participant-section-title span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.participant-grid {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.participant-grid-header,
+.participant-grid-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.85fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+}
+
+.participant-grid-header {
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.participant-grid-row {
+  border-top: 1px solid var(--line);
+}
+
+.participant-grid-row.orphan {
+  background: rgba(220, 38, 38, 0.04);
+}
+
 .list-row-actions {
   display: flex;
   gap: 8px;
@@ -1473,7 +1527,13 @@ tr:last-child td {
   .inline-form,
   .inline-form.participant-form,
   .participant-row,
+  .participant-grid-header,
+  .participant-grid-row,
   .list-row {
     grid-template-columns: 1fr;
+  }
+
+  .participant-grid-header {
+    display: none;
   }
 }
