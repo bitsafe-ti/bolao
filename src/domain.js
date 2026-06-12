@@ -177,3 +177,56 @@ export function createInitialState() {
     totalTeams: worldCupTeams.length
   };
 }
+
+export function getMatchRound(match) {
+  if (match.round) return Number(match.round);
+  const m = match.phase?.match(/Rodada\s+(\d+)/i);
+  return m ? Number(m[1]) : null;
+}
+
+export function getActiveRound(matches) {
+  const rounds = [
+    ...new Set(
+      (matches ?? []).map((m) => getMatchRound(m)).filter((r) => r !== null && !Number.isNaN(r))
+    )
+  ].sort((a, b) => a - b);
+
+  for (const round of rounds) {
+    const roundMatches = matches.filter((m) => getMatchRound(m) === round);
+    const allComplete =
+      roundMatches.length > 0 &&
+      roundMatches.every(
+        (m) =>
+          m.homeScore !== "" && m.homeScore !== null && m.homeScore !== undefined &&
+          m.awayScore !== "" && m.awayScore !== null && m.awayScore !== undefined
+      );
+    if (!allComplete) return round;
+  }
+
+  return rounds[rounds.length - 1] ?? 1;
+}
+
+export function purgeFutureRoundPredictions(state) {
+  const activeRound = getActiveRound(state.matches ?? []);
+  const matchRoundById = Object.fromEntries(
+    (state.matches ?? []).map((m) => [m.id, getMatchRound(m)])
+  );
+
+  let changed = false;
+  const cleanedPredictions = Object.fromEntries(
+    Object.entries(state.predictions ?? {}).map(([participantId, perMatch]) => {
+      const filtered = Object.fromEntries(
+        Object.entries(perMatch ?? {}).filter(([matchId]) => {
+          const round = matchRoundById[matchId];
+          const keep = round === null || round <= activeRound;
+          if (!keep) changed = true;
+          return keep;
+        })
+      );
+      return [participantId, filtered];
+    })
+  );
+
+  if (!changed) return state;
+  return { ...state, predictions: cleanedPredictions };
+}

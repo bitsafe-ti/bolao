@@ -4,10 +4,13 @@ import {
   calculateRanking,
   createInitialState,
   emptyPrediction,
+  getActiveRound,
+  getMatchRound,
   isSuperAdminEmail,
   makeId,
   normalizeEmailList,
-  normalizeUsers
+  normalizeUsers,
+  purgeFutureRoundPredictions
 } from "./domain.js";
 import { getFlagUrl, teamsById, worldCupTeams } from "./teams.js";
 import { applyResultUpdates, fetchWorldCupResults } from "./resultsSync.js";
@@ -59,12 +62,6 @@ const adminTabs = [
 
 const defaultRounds = [1, 2, 3];
 
-function getMatchRound(match) {
-  if (match.round) return Number(match.round);
-  const matchRound = match.phase?.match(/Rodada\s+(\d+)/i);
-  return matchRound ? Number(matchRound[1]) : null;
-}
-
 function getMatchDateKey(match) {
   return match.date?.slice(0, 10) || "";
 }
@@ -110,15 +107,21 @@ function App() {
     () => calculateRanking(state.participants, state.matches, state.predictions),
     [state.matches, state.participants, state.predictions]
   );
+  const activeRound = useMemo(() => getActiveRound(state.matches), [state.matches]);
   const predictionDates = useMemo(() => {
     return [...new Set(state.matches.map(getMatchDateKey).filter(Boolean))].sort();
   }, [state.matches]);
+  const activeRoundDates = useMemo(() => {
+    return [...new Set(
+      state.matches.filter((m) => getMatchRound(m) === activeRound).map(getMatchDateKey).filter(Boolean)
+    )].sort();
+  }, [state.matches, activeRound]);
   const activePredictionDate = useMemo(() => {
-    if (predictionDates.includes(selectedPredictionDate)) return selectedPredictionDate;
+    if (activeRoundDates.includes(selectedPredictionDate)) return selectedPredictionDate;
     const today = getTodayKey();
-    if (predictionDates.includes(today)) return today;
-    return predictionDates.find((date) => date >= today) ?? predictionDates[0] ?? "";
-  }, [predictionDates, selectedPredictionDate]);
+    if (activeRoundDates.includes(today)) return today;
+    return activeRoundDates.find((date) => date >= today) ?? activeRoundDates[0] ?? "";
+  }, [activeRoundDates, selectedPredictionDate]);
   const activeOverviewDate = useMemo(() => {
     if (predictionDates.includes(selectedOverviewDate)) return selectedOverviewDate;
     const today = getTodayKey();
@@ -158,7 +161,7 @@ function App() {
           }
         } catch {}
 
-        let migratedState = null;
+        let stateToSync = null;
         setState((current) => {
           // If legacy data exists, merge it so we don't lose local-only registrations
           const base = legacyData
@@ -171,13 +174,14 @@ function App() {
             currentUserId: session.currentUserId ?? "",
             activeParticipantId: session.activeParticipantId ?? ""
           };
-          if (legacyData) migratedState = next;
-          return next;
+          const purged = purgeFutureRoundPredictions(next);
+          if (legacyData || purged !== next) stateToSync = purged;
+          return purged;
         });
 
-        // If legacy data was found, persist the merged state back to Supabase
-        if (migratedState) {
-          try { await persistPoolState(migratedState); } catch {}
+        // Persist if data was migrated from localStorage or future-round predictions were purged
+        if (stateToSync) {
+          try { await persistPoolState(stateToSync); } catch {}
         }
 
         setSharedStatus({ state: "success", message: "Dados sincronizados com o banco." });
@@ -579,12 +583,15 @@ function App() {
 
         {tab === "predictions" && (
           <section className="panel">
-            <SectionHeader title="Palpites" caption="Escolha o dia para ver somente os jogos daquela data." />
+            <SectionHeader
+              title={`Palpites — Rodada ${activeRound}`}
+              caption="Somente a rodada em andamento está aberta. A próxima rodada é liberada após todos os jogos da atual serem concluídos."
+            />
             <div className="prediction-toolbar single">
               <label className="select-label">
                 Dia dos jogos
                 <select value={activePredictionDate} onChange={(event) => setSelectedPredictionDate(event.target.value)}>
-                  {predictionDates.map((date) => (
+                  {activeRoundDates.map((date) => (
                     <option value={date} key={date}>{formatMatchDayOption(date)}</option>
                   ))}
                 </select>
