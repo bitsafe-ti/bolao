@@ -21,6 +21,7 @@ import {
 import "./styles.css";
 
 const SESSION_KEY = "bolao-copa-2026:session";
+const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
 const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva.rocha@hotmail.com";
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
@@ -139,21 +140,45 @@ function App() {
     .filter((match) => getMatchDateKey(match) === activeResultDate)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
-  // Initial load from Supabase
+  // Initial load from Supabase (with one-time migration from legacy localStorage)
   useEffect(() => {
     async function init() {
       try {
         const remote = await fetchPoolState();
         const session = loadSession();
+
+        // Migrate any data saved by the old local-first architecture
+        let legacyData = null;
+        try {
+          const raw = localStorage.getItem(LEGACY_DATA_KEY);
+          if (raw) {
+            legacyData = JSON.parse(raw);
+            localStorage.removeItem(LEGACY_DATA_KEY);
+          }
+        } catch {}
+
+        let migratedState = null;
         setState((current) => {
-          const merged = mergePublicPoolState(current, remote, { prefer: "shared" });
-          return {
+          // If legacy data exists, merge it so we don't lose local-only registrations
+          const base = legacyData
+            ? mergePublicPoolState(remote, legacyData, { prefer: "current" })
+            : remote;
+          const merged = mergePublicPoolState(current, base, { prefer: "shared" });
+          const next = {
             ...merged,
             users: normalizeUsers(merged.users ?? [], SUPER_ADMIN_EMAILS),
             currentUserId: session.currentUserId ?? "",
             activeParticipantId: session.activeParticipantId ?? ""
           };
+          if (legacyData) migratedState = next;
+          return next;
         });
+
+        // If legacy data was found, persist the merged state back to Supabase
+        if (migratedState) {
+          try { await persistPoolState(migratedState); } catch {}
+        }
+
         setSharedStatus({ state: "success", message: "Dados sincronizados com o banco." });
       } catch (error) {
         setSharedStatus({ state: "error", message: `Erro ao carregar dados: ${error.message}` });
