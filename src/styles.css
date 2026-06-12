@@ -1058,13 +1058,29 @@ tr:last-child td {
 @media (max-width: 860px) {
   .auth-page,
   .app-shell,
-  .topbar,
   .section-header {
     display: grid;
   }
 
   .app-shell {
     grid-template-columns: 1fr;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+  }
+
+  .topbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+  }
+
+  .workspace {
+    padding: 14px;
   }
 
   .sidebar {
@@ -1110,6 +1126,7 @@ tr:last-child td {
     padding: 6px 12px;
     font-size: 0.82rem;
     white-space: nowrap;
+    min-height: 36px;
   }
 
   .auth-page,
