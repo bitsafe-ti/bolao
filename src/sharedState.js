@@ -30,6 +30,7 @@ function getHeaders(config = SHARED_CONFIG, extras = {}) {
 
 export function getPublicPoolState(state) {
   return {
+    users: state.users ?? [],
     participants: state.participants ?? [],
     predictions: state.predictions ?? {},
     matches: state.matches ?? [],
@@ -99,6 +100,7 @@ export function mergePublicPoolState(current, shared = {}, options = {}) {
 
   return {
     ...current,
+    users: mergeById(current.users ?? [], shared.users ?? [], prefer),
     participants: mergeById(current.participants ?? [], shared.participants ?? [], prefer),
     predictions: mergePredictionMaps(current.predictions ?? {}, shared.predictions ?? {}, prefer),
     matches: [...matchesById.values()],

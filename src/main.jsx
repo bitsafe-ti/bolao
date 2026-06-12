@@ -176,7 +176,8 @@ function App() {
     if (!isSharedStorageEnabled()) return;
     try {
       const shared = await fetchSharedPoolState();
-      const mergedState = mergePublicPoolState(nextState, shared, { prefer: "current" });
+      const rawMerged = mergePublicPoolState(nextState, shared, { prefer: "current" });
+      const mergedState = { ...rawMerged, users: normalizeUsers(rawMerged.users ?? [], SUPER_ADMIN_EMAILS) };
       await saveSharedPoolState(mergedState);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedState));
       setState(mergedState);
@@ -192,7 +193,8 @@ function App() {
       const shared = await fetchSharedPoolState();
       let mergedState;
       setState((current) => {
-        mergedState = mergePublicPoolState(current, shared, { prefer: "shared" });
+        const rawMerged = mergePublicPoolState(current, shared, { prefer: "shared" });
+        mergedState = { ...rawMerged, users: normalizeUsers(rawMerged.users ?? [], SUPER_ADMIN_EMAILS) };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedState));
         return mergedState;
       });
@@ -246,6 +248,11 @@ function App() {
   }
 
   useEffect(() => {
+    if (!isSharedStorageEnabled()) return;
+    void pullSharedState();
+  }, []);
+
+  useEffect(() => {
     if (!currentUser) return undefined;
     syncResults("auto");
     const intervalId = window.setInterval(() => syncResults("auto"), 5 * 60 * 1000);
@@ -277,7 +284,8 @@ function App() {
       return;
     }
 
-    const participant = { id: makeId("participant"), name: cleanName, updatedAt: new Date().toISOString() };
+    const now = new Date().toISOString();
+    const participant = { id: makeId("participant"), name: cleanName, updatedAt: now };
     const user = {
       id: makeId("user"),
       name: cleanName,
@@ -285,7 +293,8 @@ function App() {
       password,
       role: isSuperAdminEmail(cleanEmail, SUPER_ADMIN_EMAILS) ? "admin" : "user",
       favoriteTeamId,
-      participantId: participant.id
+      participantId: participant.id,
+      createdAt: now
     };
 
     updateState((current) => ({
@@ -339,7 +348,7 @@ function App() {
       delete predictions[participantId];
       const participants = current.participants.filter((participant) => participant.id !== participantId);
       const users = current.users.map((user) =>
-        user.participantId === participantId ? { ...user, participantId: "" } : user
+        user.participantId === participantId ? { ...user, participantId: "", updatedAt: new Date().toISOString() } : user
       );
       return {
         ...current,
@@ -521,7 +530,7 @@ function App() {
                       item.id === participant.id ? { ...item, name: event.target.value, updatedAt: new Date().toISOString() } : item
                     ),
                     users: current.users.map((user) =>
-                      user.participantId === participant.id ? { ...user, name: event.target.value } : user
+                      user.participantId === participant.id ? { ...user, name: event.target.value, updatedAt: new Date().toISOString() } : user
                     )
                   }), { publishShared: true })
                 } />
@@ -707,7 +716,7 @@ function AuthScreen({ error, onLogin, onRegister }) {
           {error && <p className="form-error">{error}</p>}
           <button type="submit">{mode === "register" ? "Cadastrar e entrar" : "Entrar"}</button>
         </form>
-        <p className="auth-note">Cadastro local neste navegador. O backend real pode entrar na próxima etapa.</p>
+        <p className="auth-note">Cadastro sincronizado entre todos os participantes. Você pode entrar de qualquer navegador após se cadastrar.</p>
       </section>
     </main>
   );

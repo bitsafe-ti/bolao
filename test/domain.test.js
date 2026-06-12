@@ -123,6 +123,7 @@ test("public shared state includes predictions, participants and match results",
   };
 
   assert.deepEqual(getPublicPoolState(state), {
+    users: state.users,
     participants: state.participants,
     predictions: state.predictions,
     matches: state.matches,
