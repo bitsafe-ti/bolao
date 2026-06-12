@@ -30,6 +30,7 @@
 body {
   margin: 0;
   min-width: 320px;
+  overflow-x: hidden;
 }
 
 button,
@@ -836,7 +837,8 @@ h3 {
 }
 
 .compact-table {
-  min-width: 360px;
+  min-width: 100%;
+  width: max-content;
 }
 
 .compact-table td:last-child {
@@ -955,6 +957,7 @@ h3 {
 
 .table-panel {
   overflow: hidden;
+  overflow-x: visible;
 }
 
 .scoring-examples {
@@ -1274,13 +1277,37 @@ tr:last-child td {
   .prediction-actions {
     justify-items: start;
   }
+
+  /* prevent any panel/card from creating horizontal overflow */
+  .panel,
+  .match-card {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  /* prediction inputs: collapse to single column on very narrow */
+  .prediction-inputs {
+    grid-template-columns: 70px auto 70px;
+    gap: 6px;
+  }
+
+  /* section header caption wraps */
+  .section-header p {
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  /* ranking table: allow scroll within wrapper, not full page */
+  .table-panel {
+    overflow: visible;
+  }
 }
 
 @media (max-width: 520px) {
   .workspace {
-    width: min(100% - 20px, 1180px);
-    margin: 0 auto;
-    padding-top: 10px;
+    width: 100%;
+    padding: 12px;
+    margin: 0;
   }
 
   .auth-hero,
