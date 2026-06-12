@@ -94,7 +94,7 @@ function App() {
   const [syncStatus, setSyncStatus] = useState({ state: "idle", message: "Resultados automáticos ativos." });
   const [sharedStatus, setSharedStatus] = useState({ state: "idle", message: "Carregando dados do bolão..." });
   const [selectedPredictionRound, setSelectedPredictionRound] = useState(null);
-  const [selectedOverviewDate, setSelectedOverviewDate] = useState("");
+  const [selectedOverviewRound, setSelectedOverviewRound] = useState(null);
   const [selectedResultDate, setSelectedResultDate] = useState("");
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -116,12 +116,7 @@ function App() {
     )].sort((a, b) => a - b);
   }, [state.matches]);
   const activePredictionRound = selectedPredictionRound ?? activeRound;
-  const activeOverviewDate = useMemo(() => {
-    if (predictionDates.includes(selectedOverviewDate)) return selectedOverviewDate;
-    const today = getTodayKey();
-    if (predictionDates.includes(today)) return today;
-    return predictionDates.find((date) => date >= today) ?? predictionDates[0] ?? "";
-  }, [predictionDates, selectedOverviewDate]);
+  const activeOverviewRound = selectedOverviewRound ?? activeRound;
   const activeResultDate = useMemo(() => {
     if (predictionDates.includes(selectedResultDate)) return selectedResultDate;
     const today = getTodayKey();
@@ -132,7 +127,7 @@ function App() {
     .filter((match) => getMatchRound(match) === activePredictionRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const overviewMatches = state.matches
-    .filter((match) => getMatchDateKey(match) === activeOverviewDate)
+    .filter((match) => getMatchRound(match) === activeOverviewRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const resultMatches = state.matches
     .filter((match) => getMatchDateKey(match) === activeResultDate)
@@ -417,10 +412,11 @@ function App() {
     if (hasPrediction(currentPrediction)) return;
 
     const draft = getDraftPrediction(participantId, matchId, currentPrediction);
-    if (!hasPrediction(draft)) {
-      setSharedStatus({ state: "error", message: "Informe os dois placares antes de salvar o palpite." });
-      return;
-    }
+    // Treat blank input as 0 — user leaving the field empty means "zero gols"
+    const normalizedDraft = {
+      home: draft.home !== "" ? draft.home : "0",
+      away: draft.away !== "" ? draft.away : "0",
+    };
 
     const savedAt = new Date().toISOString();
     updateState((current) => ({
@@ -429,7 +425,7 @@ function App() {
         ...current.predictions,
         [participantId]: {
           ...current.predictions[participantId],
-          [matchId]: { ...emptyPrediction, ...current.predictions[participantId]?.[matchId], ...draft, savedAt, updatedAt: savedAt }
+          [matchId]: { ...emptyPrediction, ...current.predictions[participantId]?.[matchId], ...normalizedDraft, savedAt, updatedAt: savedAt }
         }
       }
     }));
@@ -633,13 +629,15 @@ function App() {
 
         {tab === "dailyPredictions" && (
           <section className="panel">
-            <SectionHeader title="Palpites do Dia" caption="Veja todos os palpites registrados para os jogos da data selecionada." />
-            <div className="prediction-toolbar">
+            <SectionHeader title="Palpites do Dia" caption="Veja todos os palpites registrados para os jogos da rodada selecionada." />
+            <div className="prediction-toolbar single">
               <label className="select-label">
-                Dia dos jogos
-                <select value={activeOverviewDate} onChange={(event) => setSelectedOverviewDate(event.target.value)}>
-                  {predictionDates.map((date) => (
-                    <option value={date} key={date}>{formatMatchDayOption(date)}</option>
+                Rodada
+                <select value={activeOverviewRound} onChange={(event) => setSelectedOverviewRound(Number(event.target.value))}>
+                  {availableRounds.map((round) => (
+                    <option value={round} key={round}>
+                      {round === activeRound ? `Rodada ${round} — em andamento` : `Rodada ${round}`}
+                    </option>
                   ))}
                 </select>
               </label>
