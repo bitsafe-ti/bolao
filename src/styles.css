@@ -157,7 +157,7 @@ select:focus {
 
 .auth-page {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr);
+  grid-template-columns: minmax(0, 60%) minmax(360px, 40%);
   gap: 0;
   width: 100%;
   height: 100vh;

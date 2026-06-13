@@ -15,7 +15,7 @@ import {
   purgeExpiredPredictions,
   purgeFutureRoundPredictions
 } from "./domain.js";
-import { getFlagUrl, teamsById, worldCupTeams } from "./teams.js";
+import { getFlagUrl, teamsById } from "./teams.js";
 import { applyResultUpdates, fetchWorldCupResults } from "./resultsSync.js";
 import {
   fetchPoolState,
@@ -376,7 +376,7 @@ function App() {
     }
   }
 
-  function registerUser({ name, email, password, favoriteTeamId }) {
+  function registerUser({ name, email, password }) {
     const cleanName = name.trim();
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanName || !cleanEmail || !password) {
@@ -399,7 +399,7 @@ function App() {
       email: cleanEmail,
       password,
       role: isSuperAdminEmail(cleanEmail, SUPER_ADMIN_EMAILS) ? "admin" : "user",
-      favoriteTeamId,
+      favoriteTeamId: "",
       participantId: participant.id,
       createdAt: now
     };
@@ -913,28 +913,12 @@ function AuthScreen({ error, onLogin, onRegister }) {
           {mode === "register" && <input name="name" placeholder="Seu nome" autoComplete="name" />}
           <input name="email" type="email" placeholder="E-mail" autoComplete="email" />
           <input name="password" type="password" placeholder="Senha" autoComplete="current-password" />
-          {mode === "register" && <TeamSelect name="favoriteTeamId" label="Seleção favorita" defaultValue="brazil" />}
           {error && <p className="form-error">{error}</p>}
           <button type="submit">{mode === "register" ? "Cadastrar e entrar" : "Entrar"}</button>
         </form>
         <p className="auth-note">Dados sincronizados entre todos os participantes em tempo real.</p>
       </section>
     </main>
-  );
-}
-
-function TeamSelect({ name, value, defaultValue = "", onChange, label }) {
-  const selectProps = value === undefined ? { defaultValue } : { value, onChange };
-  return (
-    <label className="select-shell">
-      <span>{label}</span>
-      <select name={name} {...selectProps}>
-        <option value="">Selecione</option>
-        {worldCupTeams.map((team) => (
-          <option value={team.id} key={team.id}>Grupo {team.group} - {team.name}</option>
-        ))}
-      </select>
-    </label>
   );
 }
 
