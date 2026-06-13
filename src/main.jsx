@@ -16,6 +16,7 @@ import {
   purgeFutureRoundPredictions
 } from "./domain.js";
 import { getFlagUrl, teamsById } from "./teams.js";
+import { attachPasswordCredential, hasLegacyPassword, verifyPassword } from "./passwords.js";
 import { applyResultUpdates, fetchWorldCupResults } from "./resultsSync.js";
 import {
   fetchPoolState,
@@ -376,7 +377,7 @@ function App() {
     }
   }
 
-  function registerUser({ name, email, password }) {
+  async function registerUser({ name, email, password }) {
     const cleanName = name.trim();
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanName || !cleanEmail || !password) {
@@ -393,16 +394,21 @@ function App() {
 
     const now = new Date().toISOString();
     const participant = { id: makeId("participant"), name: cleanName, email: cleanEmail, updatedAt: now };
-    const user = {
-      id: makeId("user"),
-      name: cleanName,
-      email: cleanEmail,
-      password,
-      role: isSuperAdminEmail(cleanEmail, SUPER_ADMIN_EMAILS) ? "admin" : "user",
-      favoriteTeamId: "",
-      participantId: participant.id,
-      createdAt: now
-    };
+    let user;
+    try {
+      user = await attachPasswordCredential({
+        id: makeId("user"),
+        name: cleanName,
+        email: cleanEmail,
+        role: isSuperAdminEmail(cleanEmail, SUPER_ADMIN_EMAILS) ? "admin" : "user",
+        favoriteTeamId: "",
+        participantId: participant.id,
+        createdAt: now
+      }, password);
+    } catch (error) {
+      setAuthError(error.message);
+      return;
+    }
 
     saveSession({ currentUserId: user.id, activeParticipantId: participant.id });
     updateState((current) => ({
@@ -415,16 +421,32 @@ function App() {
     setAuthError("");
   }
 
-  function loginUser({ email, password }) {
+  async function loginUser({ email, password }) {
     const cleanEmail = email.trim().toLowerCase();
-    const user = state.users.find((item) => item.email === cleanEmail && item.password === password);
-    if (!user) {
+    const user = state.users.find((item) => item.email === cleanEmail);
+    const validPassword = user ? await verifyPassword(user, password) : false;
+    if (!user || !validPassword) {
       setAuthError("E-mail ou senha inválidos.");
       return;
     }
     const session = { currentUserId: user.id, activeParticipantId: user.participantId || "" };
     saveSession(session);
-    setState((current) => ({ ...current, ...session }));
+    if (hasLegacyPassword(user)) {
+      let migratedUser;
+      try {
+        migratedUser = await attachPasswordCredential(user, password);
+      } catch (error) {
+        setAuthError(error.message);
+        return;
+      }
+      updateState((current) => ({
+        ...current,
+        ...session,
+        users: current.users.map((item) => (item.id === user.id ? migratedUser : item))
+      }));
+    } else {
+      setState((current) => ({ ...current, ...session }));
+    }
     setAuthError("");
   }
 
@@ -433,7 +455,7 @@ function App() {
     setState((current) => ({ ...current, currentUserId: "", activeParticipantId: "" }));
   }
 
-  function addParticipant(event) {
+  async function addParticipant(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const name = form.get("name").trim();
@@ -447,20 +469,25 @@ function App() {
       setSharedStatus({ state: "error", message: "Este e-mail já está cadastrado." });
       return;
     }
-    updateState((current) => {
-      const now = new Date().toISOString();
-      const participant = { id: makeId("participant"), name, email, updatedAt: now };
-      const user = {
+    const now = new Date().toISOString();
+    const participant = { id: makeId("participant"), name, email, updatedAt: now };
+    let user;
+    try {
+      user = await attachPasswordCredential({
         id: makeId("user"),
         name,
         email,
-        password,
         role: "user",
         favoriteTeamId: "",
         participantId: participant.id,
         createdAt: now,
         updatedAt: now
-      };
+      }, password);
+    } catch (error) {
+      setSharedStatus({ state: "error", message: error.message });
+      return;
+    }
+    updateState((current) => {
       return {
         ...current,
         users: [...current.users, user],
@@ -616,11 +643,20 @@ function App() {
     });
   }
 
-  function resetPassword(userId, newPassword) {
+  async function resetPassword(userId, newPassword) {
+    const user = state.users.find((item) => item.id === userId);
+    if (!user) return;
+    let updatedUser;
+    try {
+      updatedUser = await attachPasswordCredential({ ...user, updatedAt: new Date().toISOString() }, newPassword);
+    } catch (error) {
+      setSharedStatus({ state: "error", message: error.message });
+      return;
+    }
     updateState((current) => ({
       ...current,
       users: current.users.map((user) =>
-        user.id === userId ? { ...user, password: newPassword, updatedAt: new Date().toISOString() } : user
+        user.id === userId ? updatedUser : user
       )
     }));
   }
@@ -885,10 +921,10 @@ function App() {
 
 function AuthScreen({ error, onLogin, onRegister }) {
   const [mode, setMode] = useState("register");
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
-    mode === "register" ? onRegister(payload) : onLogin(payload);
+    await (mode === "register" ? onRegister(payload) : onLogin(payload));
   }
   return (
     <main className="auth-page">

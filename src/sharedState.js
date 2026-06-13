@@ -245,7 +245,6 @@ export async function persistPoolState(nextState) {
   const permissions = [
     Permission.read(Role.any()),
     Permission.update(Role.any()),
-    Permission.delete(Role.any()),
   ];
 
   try {
