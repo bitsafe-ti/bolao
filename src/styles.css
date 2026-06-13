@@ -175,7 +175,7 @@ select:focus {
   height: 100vh;
   min-height: 100vh;
   isolation: isolate;
-  background: var(--surface);
+  background: var(--bg);
 }
 
 .auth-visual img {
@@ -185,6 +185,7 @@ select:focus {
   object-fit: contain;
   object-position: center;
   display: block;
+  mix-blend-mode: multiply;
 }
 
 .auth-card {
@@ -1499,7 +1500,8 @@ tr:last-child td {
 
   .auth-page {
     height: auto;
-    padding: 24px 0;
+    min-height: 100vh;
+    padding: 0;
     overflow: visible;
   }
 
@@ -1508,12 +1510,7 @@ tr:last-child td {
   }
 
   .auth-visual {
-    height: 440px;
-    min-height: 440px;
-  }
-
-  .auth-visual img {
-    min-height: 440px;
+    display: none;
   }
 
   .two-columns,
@@ -1607,15 +1604,6 @@ tr:last-child td {
   .auth-card,
   .panel {
     padding: 16px;
-  }
-
-  .auth-visual {
-    height: 380px;
-    min-height: 380px;
-  }
-
-  .auth-visual img {
-    min-height: 380px;
   }
 
   .ranking-summary,
