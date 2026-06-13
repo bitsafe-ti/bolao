@@ -32,6 +32,7 @@ const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
 const DATA_LOAD_TIMEOUT_MS = 7000;
 const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva25@gmail.com,guilhermesaraiva.rocha@hotmail.com";
 const ENTRY_FEE = 20;
+const SIDEMENU_LOGO_URL = `${import.meta.env.BASE_URL}sidemenu-logo.png`;
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
 const SUPER_ADMIN_EMAILS = normalizeEmailList(
@@ -646,7 +647,7 @@ function App() {
       {mobileMenuOpen && <div className="menu-overlay" onClick={() => setMobileMenuOpen(false)} />}
       <aside className={`sidebar${mobileMenuOpen ? " open" : ""}`}>
         <div className="brand-block">
-          <img src={WORLD_CUP_LOGO_URL} alt="Logo da Copa do Mundo 2026" />
+          <img src={SIDEMENU_LOGO_URL} alt="Logo FIFA World Cup 2026" />
           <button type="button" className="menu-close" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>✕</button>
         </div>
         <nav className="tabs" aria-label="Seções do bolão">
