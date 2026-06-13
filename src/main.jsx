@@ -126,6 +126,7 @@ function App() {
   const [selectedResultRound, setSelectedResultRound] = useState(null);
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [participantModalOpen, setParticipantModalOpen] = useState(false);
   const [clockNow, setClockNow] = useState(() => new Date());
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
@@ -208,6 +209,15 @@ function App() {
     setState(cleaned);
     saveCachedPoolState(cleaned);
   }, [state]);
+
+  useEffect(() => {
+    if (!participantModalOpen) return undefined;
+    function handleKeyDown(event) {
+      if (event.key === "Escape") setParticipantModalOpen(false);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [participantModalOpen]);
 
   // Initial load from Supabase (with one-time migration from legacy localStorage)
   useEffect(() => {
@@ -459,6 +469,7 @@ function App() {
       };
     });
     event.currentTarget.reset();
+    setParticipantModalOpen(false);
   }
 
   function updateParticipantRow(row, field, value) {
@@ -691,12 +702,9 @@ function App() {
         {tab === "participants" && isAdmin && (
           <section className="panel">
             <SectionHeader title="Participantes" caption="Área administrativa. Usuários comuns devem se auto cadastrar e sempre entram com perfil user." />
-            <form className="inline-form participant-form" onSubmit={addParticipant}>
-              <input name="name" placeholder="Nome do participante" />
-              <input name="email" type="email" placeholder="E-mail do participante" required />
-              <input name="password" type="password" placeholder="Senha inicial" required />
-              <button type="submit">Adicionar</button>
-            </form>
+            <div className="panel-actions">
+              <button type="button" onClick={() => setParticipantModalOpen(true)}>Novo contato</button>
+            </div>
             <ParticipantGrid
               title="Administrador"
               rows={adminParticipantRows}
@@ -717,6 +725,28 @@ function App() {
               onRemove={removeParticipantRow}
               canRemove
             />
+            {participantModalOpen && (
+              <div className="modal-backdrop" role="presentation" onMouseDown={() => setParticipantModalOpen(false)}>
+                <section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="participant-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+                  <div className="modal-header">
+                    <div>
+                      <p className="eyebrow">Participantes</p>
+                      <h2 id="participant-modal-title">Novo contato</h2>
+                    </div>
+                    <button type="button" className="modal-close" aria-label="Fechar modal" onClick={() => setParticipantModalOpen(false)}>✕</button>
+                  </div>
+                  <form className="modal-form participant-form" onSubmit={addParticipant}>
+                    <input name="name" placeholder="Nome do participante" autoFocus />
+                    <input name="email" type="email" placeholder="E-mail do participante" required />
+                    <input name="password" type="password" placeholder="Senha inicial" required />
+                    <div className="modal-actions">
+                      <button type="button" className="ghost" onClick={() => setParticipantModalOpen(false)}>Cancelar</button>
+                      <button type="submit">Adicionar</button>
+                    </div>
+                  </form>
+                </section>
+              </div>
+            )}
           </section>
         )}
 

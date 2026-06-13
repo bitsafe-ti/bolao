@@ -590,6 +590,12 @@ h3 {
   border-left-color: var(--muted);
 }
 
+.panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 18px 0 22px;
+}
+
 .inline-form,
 .match-form {
   display: grid;
@@ -613,6 +619,59 @@ h3 {
 
 .inline-form.participant-form button {
   width: 100%;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 20, 19, 0.58);
+  padding: 20px;
+}
+
+.modal-card {
+  width: min(100%, 520px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 24px 80px rgba(20, 20, 19, 0.28);
+  padding: 22px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.modal-header h2 {
+  margin: 2px 0 0;
+}
+
+.modal-close {
+  flex: 0 0 auto;
+  min-height: 34px;
+  width: 34px;
+  padding: 0;
+}
+
+.modal-form {
+  display: grid;
+  gap: 12px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 .match-form {
@@ -1585,6 +1644,14 @@ tr:last-child td {
   .section-header p {
     overflow-wrap: break-word;
     word-break: break-word;
+  }
+
+  .modal-actions {
+    display: grid;
+  }
+
+  .panel-actions button {
+    width: 100%;
   }
 
   /* ranking table: allow scroll within wrapper, not full page */
