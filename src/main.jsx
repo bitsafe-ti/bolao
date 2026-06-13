@@ -124,6 +124,7 @@ function App() {
   const [selectedResultRound, setSelectedResultRound] = useState(null);
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [clockNow, setClockNow] = useState(() => new Date());
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAdmin = currentUser?.role === "admin";
@@ -184,6 +185,20 @@ function App() {
   }, [state.participants, state.users]);
   const adminParticipantRows = userRows.filter((row) => row.role === "admin");
   const regularParticipantRows = userRows.filter((row) => row.role !== "admin");
+
+  useEffect(() => {
+    const now = Date.now();
+    const nextKickoffTime = state.matches
+      .map((match) => Date.parse(match.date || ""))
+      .filter((time) => !Number.isNaN(time) && time > now)
+      .sort((a, b) => a - b)[0];
+
+    if (!nextKickoffTime) return undefined;
+
+    const delay = Math.min(nextKickoffTime - now + 1000, 2_147_483_647);
+    const timeoutId = window.setTimeout(() => setClockNow(new Date()), delay);
+    return () => window.clearTimeout(timeoutId);
+  }, [clockNow, state.matches]);
 
   // Initial load from Supabase (with one-time migration from legacy localStorage)
   useEffect(() => {
@@ -554,7 +569,7 @@ function App() {
     const key = getPredictionKey(participantId, matchId);
     const match = state.matches.find((item) => item.id === matchId);
     const currentPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
-    if (hasPrediction(currentPrediction) || getMatchRound(match) !== activeRound || isMatchClosed(match)) return;
+    if (getMatchRound(match) !== activeRound || isMatchClosed(match)) return;
 
     const draft = getDraftPrediction(participantId, matchId, currentPrediction);
     // Treat blank input as 0 — user leaving the field empty means "zero gols"
@@ -698,7 +713,7 @@ function App() {
 
 {tab === "predictions" && (
           <section className="panel">
-            <SectionHeader title="Palpites" caption="Selecione a rodada. Apenas a rodada liberada aceita novos palpites." />
+            <SectionHeader title="Palpites" caption="Selecione a rodada. Palpites podem ser editados até o horário de cada jogo." />
             <div className="prediction-toolbar single">
               <label className="select-label">
                 Rodada
@@ -713,7 +728,7 @@ function App() {
             </div>
             <div className="sync-strip">
               <strong>Regra de votação</strong>
-              <span>A votação fica aberta somente para a rodada liberada. Quando todos os jogos da rodada forem finalizados, a próxima rodada será liberada automaticamente.</span>
+              <span>A votação fica aberta para a rodada liberada, e cada palpite pode ser alterado até o início do jogo. Quando todos os jogos da rodada forem finalizados, a próxima rodada será liberada automaticamente.</span>
             </div>
             {activePredictionRound !== activeRound && (
               <div className={`sync-strip ${activePredictionRound < activeRound ? "disabled" : "loading"}`}>
@@ -731,8 +746,8 @@ function App() {
                   const prediction = getDraftPrediction(activeParticipant.id, match.id, storedPrediction);
                   const isSaved = hasPrediction(storedPrediction);
                   const isRoundLocked = activePredictionRound !== activeRound;
-                  const isKickoffLocked = isMatchClosed(match);
-                  const isLocked = isSaved || isRoundLocked || isKickoffLocked;
+                  const isKickoffLocked = isMatchClosed(match, clockNow);
+                  const isLocked = isRoundLocked || isKickoffLocked;
                   return (
                     <article className={`match-card prediction-card ${isLocked ? "locked" : ""}`} key={match.id}>
                       <div>
@@ -747,9 +762,7 @@ function App() {
                           <span>x</span>
                           <ScoreInput disabled={isLocked} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
                         </div>
-                        {isSaved ? (
-                          <span className="saved-pill">Palpite salvo</span>
-                        ) : isRoundLocked ? (
+                        {isRoundLocked ? (
                           <span className="round-locked-pill">
                             {activePredictionRound < activeRound ? "Sem palpite" : "Indisponível"}
                           </span>
@@ -757,9 +770,10 @@ function App() {
                           <span className="round-locked-pill">Prazo encerrado</span>
                         ) : (
                           <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id)}>
-                            Salvar palpite
+                            {isSaved ? "Atualizar palpite" : "Salvar palpite"}
                           </button>
                         )}
+                        {isSaved && !isLocked && <span className="saved-pill">Palpite salvo</span>}
                       </div>
                     </article>
                   );
