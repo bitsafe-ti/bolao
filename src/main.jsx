@@ -11,6 +11,7 @@ import {
   makeId,
   normalizeEmailList,
   normalizeUsers,
+  purgeClearedOpeningPredictions,
   purgeExpiredPredictions,
   purgeFutureRoundPredictions
 } from "./domain.js";
@@ -109,7 +110,7 @@ function applyRemoteData(current, remoteData, superAdminEmails, { prefer = "shar
 }
 
 function cleanPoolState(state) {
-  return purgeExpiredPredictions(purgeFutureRoundPredictions(state));
+  return purgeClearedOpeningPredictions(purgeExpiredPredictions(purgeFutureRoundPredictions(state)));
 }
 
 function App() {
@@ -199,6 +200,13 @@ function App() {
     const timeoutId = window.setTimeout(() => setClockNow(new Date()), delay);
     return () => window.clearTimeout(timeoutId);
   }, [clockNow, state.matches]);
+
+  useEffect(() => {
+    const cleaned = cleanPoolState(state);
+    if (cleaned === state) return;
+    setState(cleaned);
+    saveCachedPoolState(cleaned);
+  }, [state]);
 
   // Initial load from Supabase (with one-time migration from legacy localStorage)
   useEffect(() => {

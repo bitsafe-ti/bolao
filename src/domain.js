@@ -11,6 +11,7 @@ export const scoringRules = [
 ];
 
 export const emptyPrediction = { home: "", away: "" };
+export const clearedOpeningPredictionMatchIds = ["group-a-1", "group-a-2", "group-b-1", "group-d-1"];
 
 export function makeId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -269,6 +270,27 @@ export function purgeFutureRoundPredictions(state) {
         Object.entries(perMatch ?? {}).filter(([matchId]) => {
           const round = matchRoundById[matchId];
           const keep = round === null || round <= activeRound;
+          if (!keep) changed = true;
+          return keep;
+        })
+      );
+      return [participantId, filtered];
+    })
+  );
+
+  if (!changed) return state;
+  return { ...state, predictions: cleanedPredictions };
+}
+
+export function purgeClearedOpeningPredictions(state) {
+  const matchIds = new Set(clearedOpeningPredictionMatchIds);
+  let changed = false;
+
+  const cleanedPredictions = Object.fromEntries(
+    Object.entries(state.predictions ?? {}).map(([participantId, perMatch]) => {
+      const filtered = Object.fromEntries(
+        Object.entries(perMatch ?? {}).filter(([matchId]) => {
+          const keep = !matchIds.has(matchId);
           if (!keep) changed = true;
           return keep;
         })

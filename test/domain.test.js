@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateRanking, createGroupStageMatches, normalizeUsers, purgeExpiredPredictions, scorePrediction } from "../src/domain.js";
+import {
+  calculateRanking,
+  createGroupStageMatches,
+  normalizeUsers,
+  purgeClearedOpeningPredictions,
+  purgeExpiredPredictions,
+  scorePrediction
+} from "../src/domain.js";
 import { applyResultUpdates } from "../src/resultsSync.js";
 import { getPublicPoolState, mergePublicPoolState } from "../src/sharedState.js";
 
@@ -88,6 +95,23 @@ test("keeps predictions saved before match kickoff", () => {
   const purged = purgeExpiredPredictions(state, new Date("2026-06-12T12:00:00.000Z"));
 
   assert.equal(purged, state);
+});
+
+test("purges cleared opening match predictions from cached state", () => {
+  const state = {
+    predictions: {
+      p1: {
+        "group-d-1": { home: "1", away: "2", updatedAt: "2026-06-13T13:20:00.000Z" },
+        "group-d-2": { home: "2", away: "0", updatedAt: "2026-06-13T13:20:00.000Z" }
+      }
+    }
+  };
+
+  const purged = purgeClearedOpeningPredictions(state);
+
+  assert.deepEqual(purged.predictions.p1, {
+    "group-d-2": { home: "2", away: "0", updatedAt: "2026-06-13T13:20:00.000Z" }
+  });
 });
 
 test("creates group-stage schedule with dates, times and rounds", () => {
