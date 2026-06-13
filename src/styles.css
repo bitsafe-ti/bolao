@@ -843,6 +843,14 @@ h3 {
   gap: 8px;
 }
 
+.prediction-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .daily-predictions {
   display: grid;
   gap: 14px;
@@ -1557,6 +1565,10 @@ tr:last-child td {
 
   .prediction-actions {
     justify-items: start;
+  }
+
+  .prediction-action-row {
+    justify-content: flex-start;
   }
 
   /* prevent any panel/card from creating horizontal overflow */

@@ -762,18 +762,20 @@ function App() {
                           <span>x</span>
                           <ScoreInput disabled={isLocked} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
                         </div>
-                        {isRoundLocked ? (
-                          <span className="round-locked-pill">
-                            {activePredictionRound < activeRound ? "Sem palpite" : "Indisponível"}
-                          </span>
-                        ) : isKickoffLocked ? (
-                          <span className="round-locked-pill">Prazo encerrado</span>
-                        ) : (
-                          <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id)}>
-                            {isSaved ? "Atualizar palpite" : "Salvar palpite"}
-                          </button>
-                        )}
-                        {isSaved && !isLocked && <span className="saved-pill">Palpite salvo</span>}
+                        <div className="prediction-action-row">
+                          {isRoundLocked ? (
+                            <span className="round-locked-pill">
+                              {activePredictionRound < activeRound ? "Sem palpite" : "Indisponível"}
+                            </span>
+                          ) : isKickoffLocked ? (
+                            <span className="round-locked-pill">Prazo encerrado</span>
+                          ) : (
+                            <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id)}>
+                              {isSaved ? "Atualizar palpite" : "Salvar palpite"}
+                            </button>
+                          )}
+                          {isSaved && !isLocked && <span className="saved-pill">Palpite salvo</span>}
+                        </div>
                       </div>
                     </article>
                   );
