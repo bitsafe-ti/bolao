@@ -1,5 +1,7 @@
-// One-time script: remove predictions for the first 4 World Cup matches
-// from all participants. Run with: node scripts/clear-first4-predictions.mjs
+// One-time script: tombstone predictions for the first 4 World Cup matches.
+// Sets home/away to "" with a fresh updatedAt so the merge logic always
+// prefers this cleared value over any stale localStorage cache.
+// Run with: node scripts/clear-first4-predictions.mjs
 
 const ENDPOINT      = "https://nyc.cloud.appwrite.io/v1";
 const PROJECT_ID    = "6a2c61c200150745bf42";
@@ -8,6 +10,7 @@ const COLLECTION_ID = "pool_state";
 const DOCUMENT_ID   = "copa-2026";
 
 const MATCHES_TO_CLEAR = ["group-a-1", "group-a-2", "group-b-1", "group-d-1"];
+const NOW = new Date().toISOString();
 
 const headers = {
   "X-Appwrite-Project": PROJECT_ID,
@@ -26,17 +29,19 @@ if (!getRes.ok) {
 const doc = await getRes.json();
 const data = JSON.parse(doc.data || "{}");
 
-// 2. Remove the 4 matches from every participant's predictions
-let removed = 0;
-for (const participantId of Object.keys(data.predictions ?? {})) {
+// 2. Overwrite each match prediction with a tombstone {home:"",away:"",updatedAt:NOW}
+//    so pickNewest always prefers this over older cached values.
+//    Also ensure ALL participants have the tombstone, not just those who predicted.
+const allParticipantIds = (data.participants ?? []).map(p => p.id);
+let written = 0;
+for (const participantId of allParticipantIds) {
+  if (!data.predictions[participantId]) data.predictions[participantId] = {};
   for (const matchId of MATCHES_TO_CLEAR) {
-    if (data.predictions[participantId][matchId] !== undefined) {
-      delete data.predictions[participantId][matchId];
-      removed++;
-    }
+    data.predictions[participantId][matchId] = { home: "", away: "", updatedAt: NOW, savedAt: NOW };
+    written++;
   }
 }
-console.log(`Removed ${removed} prediction entries across all participants.`);
+console.log(`Tombstoned ${written} prediction slots (${allParticipantIds.length} participants × ${MATCHES_TO_CLEAR.length} matches).`);
 
 // 3. Persist back
 const patchRes = await fetch(
@@ -44,7 +49,6 @@ const patchRes = await fetch(
   {
     method: "PATCH",
     headers,
-    // Appwrite REST wraps document attributes under a nested "data" key
     body: JSON.stringify({ data: { data: JSON.stringify(data) } }),
   }
 );
