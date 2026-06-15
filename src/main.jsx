@@ -904,7 +904,7 @@ function App() {
 
         {tab === "dailyPredictions" && (
           <section className="panel">
-            <SectionHeader title="Palpites do Dia" caption="Veja todos os palpites registrados para os jogos da rodada selecionada." />
+            <SectionHeader title="Palpites do Dia" />
             <div className="prediction-toolbar single">
               <label className="select-label">
                 Rodada
