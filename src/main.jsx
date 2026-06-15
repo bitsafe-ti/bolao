@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   calculateRanking,
@@ -128,7 +128,9 @@ function App() {
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
+  const [predictionScrollRequest, setPredictionScrollRequest] = useState(0);
   const [clockNow, setClockNow] = useState(() => new Date());
+  const workspaceRef = useRef(null);
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAdmin = currentUser?.role === "admin";
@@ -332,6 +334,52 @@ function App() {
       setTab("predictions");
     }
   }, [tab, visibleTabs]);
+
+  useEffect(() => {
+    if (tab !== "predictions" || predictionScrollRequest === 0) return undefined;
+    const workspace = workspaceRef.current;
+    if (!workspace) return undefined;
+
+    const votableMatch = activePredictionRound === activeRound
+      ? predictionMatches.find((match) => !isMatchClosed(match, clockNow))
+      : null;
+
+    let timeoutId;
+    const frameId = window.requestAnimationFrame(() => {
+      workspace.scrollTo({ top: 0, behavior: "auto" });
+      timeoutId = window.setTimeout(() => {
+        const target = votableMatch
+          ? [...workspace.querySelectorAll("[data-prediction-match-id]")]
+              .find((element) => element.dataset.predictionMatchId === votableMatch.id)
+          : workspace.querySelector("[data-predictions-panel]");
+        if (!target) return;
+
+        const workspaceTop = workspace.getBoundingClientRect().top;
+        const targetTop = target.getBoundingClientRect().top;
+        workspace.scrollTo({
+          top: workspace.scrollTop + targetTop - workspaceTop - 16,
+          behavior: "smooth"
+        });
+      }, 120);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, [activePredictionRound, activeRound, clockNow, predictionMatches, predictionScrollRequest, tab]);
+
+  function handleTabClick(tabId) {
+    setTab(tabId);
+    setMobileMenuOpen(false);
+    if (tabId === "predictions") {
+      setPredictionScrollRequest((current) => current + 1);
+    } else if (tabId === "ranking") {
+      window.requestAnimationFrame(() => {
+        workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
+      });
+    }
+  }
 
   // Optimistically update state then persist to Supabase
   function updateState(recipe) {
@@ -699,7 +747,7 @@ function App() {
         </div>
         <nav className="tabs" aria-label="Seções do bolão">
           {visibleTabs.map((item) => (
-            <button type="button" className={tab === item.id ? "active" : ""} key={item.id} onClick={() => { setTab(item.id); setMobileMenuOpen(false); }}>
+            <button type="button" className={tab === item.id ? "active" : ""} key={item.id} onClick={() => handleTabClick(item.id)}>
               {item.label}
             </button>
           ))}
@@ -724,7 +772,7 @@ function App() {
         </div>
       </aside>
 
-      <section className="workspace">
+      <section className="workspace" ref={workspaceRef}>
         <header className="topbar">
           <div className="topbar-left">
             <button type="button" className="hamburger" aria-label="Abrir menu" onClick={() => setMobileMenuOpen(true)}>☰</button>
@@ -787,7 +835,7 @@ function App() {
         )}
 
 {tab === "predictions" && (
-          <section className="panel">
+          <section className="panel" data-predictions-panel>
             <SectionHeader title="Palpites" caption="Selecione a rodada. Palpites podem ser editados até o horário de cada jogo." />
             <div className="prediction-toolbar single">
               <label className="select-label">
@@ -824,7 +872,7 @@ function App() {
                   const isKickoffLocked = isMatchClosed(match, clockNow);
                   const isLocked = isRoundLocked || isKickoffLocked;
                   return (
-                    <article className={`match-card prediction-card ${isLocked ? "locked" : ""}`} key={match.id}>
+                    <article className={`match-card prediction-card ${isLocked ? "locked" : ""}`} key={match.id} data-prediction-match-id={match.id}>
                       <div>
                         <span className="badge">{match.phase}</span>
                         <h3 className="teams-versus"><TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span> <TeamName teamId={match.awayTeamId} fallback={match.away} /></h3>
