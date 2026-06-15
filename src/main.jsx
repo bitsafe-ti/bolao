@@ -374,7 +374,7 @@ function App() {
     setMobileMenuOpen(false);
     if (tabId === "predictions") {
       setPredictionScrollRequest((current) => current + 1);
-    } else if (tabId === "ranking") {
+    } else if (tabId === "ranking" || tabId === "results") {
       window.requestAnimationFrame(() => {
         workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
       });
