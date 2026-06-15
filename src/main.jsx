@@ -1067,10 +1067,11 @@ function RankingTable({ ranking, compact = false }) {
         </div>
       )}
       {!compact && <ScoringExamples />}
+      {!compact && <RankingInfoCard />}
       {ranking.length ? (
         <div className="table-wrap">
           <table className="ranking-table">
-            <thead><tr><th>#</th><th>Participante</th><th>Pontos</th><th>Cravados</th><th>Ganhador</th><th>Jogos pontuados</th></tr></thead>
+            <thead><tr><th>#</th><th>Participante</th><th>Pontos</th><th>Cravados</th><th>Acertos 1 pt</th><th>Jogos pontuados</th></tr></thead>
             <tbody>
               {ranking.map((participant, index) => (
                 <tr key={participant.id}>
@@ -1242,8 +1243,17 @@ function ScoringExamples() {
   return (
     <div className="scoring-examples">
       <div><strong>3 pontos</strong><span>Cravou o placar: palpite 2 x 1, resultado 2 x 1.</span></div>
-      <div><strong>1 ponto</strong><span>Acertou só o ganhador: palpite 2 x 1, resultado 1 x 0.</span></div>
-      <div><strong>0 ponto</strong><span>Errou o ganhador ou o empate sem cravar: palpite 1 x 1, resultado 0 x 0.</span></div>
+      <div><strong>1 ponto</strong><span>Acertou o ganhador ou o empate: palpite 2 x 2, resultado 1 x 1.</span></div>
+      <div><strong>0 ponto</strong><span>Errou o ganhador ou indicou empate quando houve vencedor.</span></div>
+    </div>
+  );
+}
+
+function RankingInfoCard() {
+  return (
+    <div className="ranking-info-card">
+      <strong>Empate também pontua</strong>
+      <span>Se o palpite e o resultado forem empate, soma 1 ponto mesmo sem cravar o placar. Exemplo: palpite 2 x 2, resultado 1 x 1.</span>
     </div>
   );
 }

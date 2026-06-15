@@ -1325,6 +1325,26 @@ h3 {
   color: var(--muted);
 }
 
+.ranking-info-card {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+  border-left: 4px solid var(--primary);
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--text);
+  padding: 12px 14px;
+}
+
+.ranking-info-card strong,
+.ranking-info-card span {
+  display: block;
+}
+
+.ranking-info-card span {
+  color: var(--muted);
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--line);

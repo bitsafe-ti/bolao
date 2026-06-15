@@ -23,8 +23,20 @@ test("scores exact draw with three points", () => {
   assert.equal(scorePrediction({ home: 1, away: 1 }, { homeScore: 1, awayScore: 1 }), 3);
 });
 
-test("scores non-exact draw with zero points", () => {
-  assert.equal(scorePrediction({ home: 3, away: 3 }, { homeScore: 1, awayScore: 1 }), 0);
+test("scores non-exact draw with one point", () => {
+  assert.equal(scorePrediction({ home: 3, away: 3 }, { homeScore: 1, awayScore: 1 }), 1);
+});
+
+test("counts non-exact draw as one-point ranking hit", () => {
+  const ranking = calculateRanking(
+    [{ id: "a", name: "Ana" }],
+    [{ id: "m1", homeScore: 1, awayScore: 1 }],
+    { a: { m1: { home: 3, away: 3 } } }
+  );
+
+  assert.equal(ranking[0].total, 1);
+  assert.equal(ranking[0].winnerHits, 1);
+  assert.equal(ranking[0].scoredMatches, 1);
 });
 
 test("scores wrong outcome with zero points", () => {

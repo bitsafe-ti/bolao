@@ -6,7 +6,7 @@ export const APP_VERSION = 3;
 
 export const scoringRules = [
   { label: "Placar cravado", points: 3 },
-  { label: "Ganhador correto", points: 1 },
+  { label: "Ganhador ou empate correto", points: 1 },
   { label: "Palpite errado", points: 0 }
 ];
 
@@ -45,7 +45,6 @@ export function scorePrediction(prediction, match) {
 
   if (predictedHome === actualHome && predictedAway === actualAway) return 3;
   if (predictedOutcome !== actualOutcome) return 0;
-  if (actualOutcome === "draw") return 0;
   return 1;
 }
 
