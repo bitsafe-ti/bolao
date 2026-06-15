@@ -128,6 +128,7 @@ function App() {
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const [clockNow, setClockNow] = useState(() => new Date());
   const workspaceRef = useRef(null);
 
@@ -716,24 +717,51 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <div className="sidebar-user">
-            {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
-            <div className="sidebar-user-info">
-              <strong>{currentUser.name}</strong>
-              {isAdmin && <small>Admin</small>}
+          {isAdmin ? (
+            <button type="button" className="sidebar-user sidebar-user-button" onClick={() => setAdminMenuOpen(true)}>
+              {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
+              <div className="sidebar-user-info">
+                <strong>{currentUser.name}</strong>
+                <small>Admin</small>
+              </div>
+            </button>
+          ) : (
+            <div className="sidebar-user">
+              {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
+              <div className="sidebar-user-info">
+                <strong>{currentUser.name}</strong>
+              </div>
             </div>
-          </div>
+          )}
           <div className="sidebar-actions">
-            {isAdmin && (
-              <button type="button" onClick={() => { syncResults("manual"); setMobileMenuOpen(false); }}>Atualizar resultados</button>
-            )}
             <button type="button" onClick={logoutUser}>Sair</button>
-            {isAdmin && (
-              <button type="button" className="danger" onClick={() => { resetData(); setMobileMenuOpen(false); }}>Reiniciar dados</button>
-            )}
           </div>
         </div>
       </aside>
+
+      {adminMenuOpen && isAdmin && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setAdminMenuOpen(false)}>
+          <section className="modal-card admin-menu-modal" role="dialog" aria-modal="true" aria-labelledby="admin-menu-title" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <p className="eyebrow">Administrador</p>
+                <h2 id="admin-menu-title">{currentUser.name}</h2>
+              </div>
+              <button type="button" className="modal-close" aria-label="Fechar modal" onClick={() => setAdminMenuOpen(false)}>✕</button>
+            </div>
+            <div className="admin-modal-actions">
+              <button type="button" onClick={() => { syncResults("manual"); setAdminMenuOpen(false); setMobileMenuOpen(false); }}>
+                <strong>Atualizar resultados</strong>
+                <span>Sincronizar os placares mais recentes da Copa.</span>
+              </button>
+              <button type="button" className="danger" onClick={() => { resetData(); setAdminMenuOpen(false); setMobileMenuOpen(false); }}>
+                <strong>Reiniciar dados</strong>
+                <span>Apagar dados do bolão e voltar ao estado inicial.</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       <section className="workspace" ref={workspaceRef}>
         <header className="topbar">

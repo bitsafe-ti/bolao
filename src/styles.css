@@ -336,6 +336,19 @@ select:focus {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.sidebar-user-button {
+  width: 100%;
+  min-height: auto;
+  border: 1px solid transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.sidebar-user-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
 .sidebar-user-info {
   display: flex;
   flex-direction: column;
@@ -665,6 +678,33 @@ h3 {
 .modal-form {
   display: grid;
   gap: 12px;
+}
+
+.admin-menu-modal {
+  width: min(100%, 440px);
+}
+
+.admin-modal-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-modal-actions button {
+  display: grid;
+  gap: 5px;
+  min-height: auto;
+  padding: 14px;
+  text-align: left;
+}
+
+.admin-modal-actions span {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.admin-modal-actions button.danger span {
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .modal-actions {
