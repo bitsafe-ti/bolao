@@ -27,8 +27,10 @@ import {
 } from "./sharedState.js";
 import "./styles.css";
 
-const SESSION_KEY = "bolao-copa-2026:session";
-const CACHE_KEY = "bolao-copa-2026:cache";
+const ACTIVE_POOL_ID = import.meta.env.VITE_POOL_ID || "copa-2026";
+const STORAGE_SCOPE = ACTIVE_POOL_ID === "copa-2026" ? "" : `:${ACTIVE_POOL_ID}`;
+const SESSION_KEY = `bolao-copa-2026${STORAGE_SCOPE}:session`;
+const CACHE_KEY = `bolao-copa-2026${STORAGE_SCOPE}:cache`;
 const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
 const DATA_LOAD_TIMEOUT_MS = 7000;
 const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva25@gmail.com,guilhermesaraiva.rocha@hotmail.com";
