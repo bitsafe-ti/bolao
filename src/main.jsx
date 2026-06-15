@@ -717,22 +717,6 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          {isAdmin ? (
-            <button type="button" className="sidebar-user sidebar-user-button" onClick={() => setAdminMenuOpen(true)}>
-              {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
-              <div className="sidebar-user-info">
-                <strong>{currentUser.name}</strong>
-                <small>Admin</small>
-              </div>
-            </button>
-          ) : (
-            <div className="sidebar-user">
-              {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
-              <div className="sidebar-user-info">
-                <strong>{currentUser.name}</strong>
-              </div>
-            </div>
-          )}
           <div className="sidebar-actions">
             <button type="button" onClick={logoutUser}>Sair</button>
           </div>
@@ -772,6 +756,22 @@ function App() {
               <h1>{visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
             </div>
           </div>
+          {isAdmin ? (
+            <button type="button" className="topbar-user topbar-user-button" onClick={() => setAdminMenuOpen(true)}>
+              {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
+              <div className="topbar-user-info">
+                <strong>{currentUser.name}</strong>
+                <small>Admin</small>
+              </div>
+            </button>
+          ) : (
+            <div className="topbar-user">
+              {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
+              <div className="topbar-user-info">
+                <strong>{currentUser.name}</strong>
+              </div>
+            </div>
+          )}
         </header>
 
         {tab === "participants" && isAdmin && (

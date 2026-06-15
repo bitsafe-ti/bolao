@@ -315,7 +315,10 @@ select:focus {
 }
 
 .topbar-left {
-  display: contents;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
 .sidebar-footer {
@@ -325,54 +328,6 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.sidebar-user {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.sidebar-user-button {
-  width: 100%;
-  min-height: auto;
-  border: 1px solid transparent;
-  color: inherit;
-  text-align: left;
-}
-
-.sidebar-user-button:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-.sidebar-user-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  flex: 1;
-}
-
-.sidebar-user-info strong {
-  color: rgba(255, 255, 255, 0.95);
-  font-size: 0.9rem;
-  font-weight: 800;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sidebar-user-info small {
-  align-self: flex-start;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-size: 0.72rem;
-  padding: 2px 7px;
 }
 
 .sidebar-actions {
@@ -414,6 +369,50 @@ select:focus {
   border-bottom: 1px solid var(--line);
   margin-bottom: 18px;
   padding-bottom: 18px;
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: auto;
+  max-width: min(280px, 42vw);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.topbar-user-button:hover {
+  background: var(--soft);
+  border-color: var(--line-warm);
+}
+
+.topbar-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.topbar-user-info strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-user-info small {
+  align-self: flex-start;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 0.72rem;
+  padding: 2px 7px;
 }
 
 .eyebrow {
@@ -1557,6 +1556,10 @@ tr:last-child td {
     align-items: center;
     gap: 10px;
     flex: 1;
+  }
+
+  .topbar-user {
+    max-width: 100%;
   }
 
   .workspace {
