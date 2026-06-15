@@ -128,7 +128,6 @@ function App() {
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
-  const [predictionScrollRequest, setPredictionScrollRequest] = useState(0);
   const [clockNow, setClockNow] = useState(() => new Date());
   const workspaceRef = useRef(null);
 
@@ -335,46 +334,10 @@ function App() {
     }
   }, [tab, visibleTabs]);
 
-  useEffect(() => {
-    if (tab !== "predictions" || predictionScrollRequest === 0) return undefined;
-    const workspace = workspaceRef.current;
-    if (!workspace) return undefined;
-
-    const votableMatch = activePredictionRound === activeRound
-      ? predictionMatches.find((match) => !isMatchClosed(match, clockNow))
-      : null;
-
-    let timeoutId;
-    const frameId = window.requestAnimationFrame(() => {
-      workspace.scrollTo({ top: 0, behavior: "auto" });
-      timeoutId = window.setTimeout(() => {
-        const target = votableMatch
-          ? [...workspace.querySelectorAll("[data-prediction-match-id]")]
-              .find((element) => element.dataset.predictionMatchId === votableMatch.id)
-          : workspace.querySelector("[data-predictions-panel]");
-        if (!target) return;
-
-        const workspaceTop = workspace.getBoundingClientRect().top;
-        const targetTop = target.getBoundingClientRect().top;
-        workspace.scrollTo({
-          top: workspace.scrollTop + targetTop - workspaceTop - 16,
-          behavior: "smooth"
-        });
-      }, 120);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      if (timeoutId) window.clearTimeout(timeoutId);
-    };
-  }, [activePredictionRound, activeRound, clockNow, predictionMatches, predictionScrollRequest, tab]);
-
   function handleTabClick(tabId) {
     setTab(tabId);
     setMobileMenuOpen(false);
-    if (tabId === "predictions") {
-      setPredictionScrollRequest((current) => current + 1);
-    } else if (tabId === "ranking" || tabId === "results") {
+    if (tabId === "predictions" || tabId === "ranking" || tabId === "results") {
       window.requestAnimationFrame(() => {
         workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
       });
@@ -835,7 +798,7 @@ function App() {
         )}
 
 {tab === "predictions" && (
-          <section className="panel" data-predictions-panel>
+          <section className="panel">
             <SectionHeader title="Palpites" caption="Selecione a rodada. Palpites podem ser editados até o horário de cada jogo." />
             <div className="prediction-toolbar single">
               <label className="select-label">
@@ -872,7 +835,7 @@ function App() {
                   const isKickoffLocked = isMatchClosed(match, clockNow);
                   const isLocked = isRoundLocked || isKickoffLocked;
                   return (
-                    <article className={`match-card prediction-card ${isLocked ? "locked" : ""}`} key={match.id} data-prediction-match-id={match.id}>
+                    <article className={`match-card prediction-card ${isLocked ? "locked" : ""}`} key={match.id}>
                       <div>
                         <span className="badge">{match.phase}</span>
                         <h3 className="teams-versus"><TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span> <TeamName teamId={match.awayTeamId} fallback={match.away} /></h3>
