@@ -366,9 +366,12 @@ select:focus {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf8;
+  box-shadow: 0 1px 0 rgba(20, 20, 19, 0.04);
   margin-bottom: 18px;
-  padding-bottom: 18px;
+  padding: 16px 18px;
 }
 
 .topbar-user {
@@ -379,7 +382,7 @@ select:focus {
   max-width: min(280px, 42vw);
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--surface);
+  background: #ffffff;
   color: var(--text);
   padding: 8px 10px;
   text-align: left;

@@ -699,8 +699,6 @@ function App() {
       userParticipant ??
       state.participants[0]
     : userParticipant;
-  const currentFavoriteTeam = teamsById[currentUser.favoriteTeamId];
-
   return (
     <main className="app-shell">
       {mobileMenuOpen && <div className="menu-overlay" onClick={() => setMobileMenuOpen(false)} />}
@@ -758,7 +756,6 @@ function App() {
           </div>
           {isAdmin ? (
             <button type="button" className="topbar-user topbar-user-button" onClick={() => setAdminMenuOpen(true)}>
-              {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
               <div className="topbar-user-info">
                 <strong>{currentUser.name}</strong>
                 <small>Admin</small>
@@ -766,7 +763,6 @@ function App() {
             </button>
           ) : (
             <div className="topbar-user">
-              {currentFavoriteTeam && <Flag team={currentFavoriteTeam} />}
               <div className="topbar-user-info">
                 <strong>{currentUser.name}</strong>
               </div>
