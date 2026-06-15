@@ -776,7 +776,7 @@ function App() {
 
         {tab === "participants" && isAdmin && (
           <section className="panel">
-            <SectionHeader title="Participantes" caption="Área administrativa. Usuários comuns devem se auto cadastrar e sempre entram com perfil user." />
+            <SectionHeader title="Participantes" />
             <div className="panel-actions">
               <button type="button" onClick={() => setParticipantModalOpen(true)}>Novo contato</button>
             </div>
@@ -827,7 +827,7 @@ function App() {
 
 {tab === "predictions" && (
           <section className="panel">
-            <SectionHeader title="Palpites" caption="Selecione a rodada. Palpites podem ser editados até o horário de cada jogo." />
+            <SectionHeader title="Palpites" />
             <div className="prediction-toolbar single">
               <label className="select-label">
                 Rodada
@@ -931,7 +931,7 @@ function App() {
 
         {tab === "results" && (
           <section className="panel">
-            <SectionHeader title="Resultados dos Jogos" caption="Placar oficial sincronizado automaticamente quando a fonte de resultados publicar a partida." />
+            <SectionHeader title="Resultados dos Jogos" />
             <div className={`sync-strip ${syncStatus.state}`}>
               <strong>{syncStatus.message}</strong>
               <span>{state.lastResultSyncAt ? `Última checagem: ${formatDate(state.lastResultSyncAt)}` : "A atualização roda ao entrar e a cada 5 minutos."}</span>
@@ -1076,7 +1076,7 @@ function RankingTable({ ranking, compact = false }) {
 
   return (
     <section className="panel table-panel">
-      <SectionHeader title={compact ? "Top 5" : "Ranking"} caption="Critérios: pontos, placares cravados e nome." />
+      <SectionHeader title={compact ? "Top 5" : "Ranking"} />
       {!compact && (
         <div className="ranking-summary">
           <div>
