@@ -1127,6 +1127,7 @@ function ResultsList({ matches }) {
       setOpenMatchId("");
       return;
     }
+    if (!openMatchId) return;
     if (matches.some((match) => match.id === openMatchId && getResultMeta(match).hasResult)) return;
     setOpenMatchId(preferredOpenMatchId);
   }, [matches, openMatchId, preferredOpenMatchId]);
