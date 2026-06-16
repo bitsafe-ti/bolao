@@ -1119,42 +1119,124 @@ function RankingTable({ ranking, compact = false }) {
 
 function ResultsList({ matches }) {
   if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
+  const preferredOpenMatchId = matches.find((match) => getResultMeta(match).hasResult)?.id ?? "";
+  const [openMatchId, setOpenMatchId] = useState(preferredOpenMatchId);
+
+  useEffect(() => {
+    if (!matches.length) {
+      setOpenMatchId("");
+      return;
+    }
+    if (matches.some((match) => match.id === openMatchId && getResultMeta(match).hasResult)) return;
+    setOpenMatchId(preferredOpenMatchId);
+  }, [matches, openMatchId, preferredOpenMatchId]);
+
   return (
     <div className="match-list results-list">
-      {matches.map((match) => <ResultCard key={match.id} match={match} />)}
+      {matches.map((match) => (
+        <ResultCard
+          key={match.id}
+          match={match}
+          isOpen={openMatchId === match.id}
+          onToggle={() => setOpenMatchId((current) => current === match.id ? "" : match.id)}
+        />
+      ))}
     </div>
   );
 }
 
-function ResultCard({ match }) {
+function getResultMeta(match) {
   const homeScore = match.homeScore === "" || match.homeScore === undefined ? null : Number(match.homeScore);
   const awayScore = match.awayScore === "" || match.awayScore === undefined ? null : Number(match.awayScore);
   const hasResult = Number.isInteger(homeScore) && Number.isInteger(awayScore);
   const homeWon = hasResult && homeScore > awayScore;
   const awayWon = hasResult && awayScore > homeScore;
   const isLive = !hasResult && isMatchClosed(match);
+  return {
+    homeScore,
+    awayScore,
+    hasResult,
+    homeWon,
+    awayWon,
+    isLive,
+    statusLabel: hasResult ? "Resultado atualizado" : isLive ? "Em andamento" : "Aguardando resultado",
+    statusClass: hasResult ? "finished" : isLive ? "live" : "pending"
+  };
+}
 
-  const statusLabel = hasResult ? "Resultado atualizado" : isLive ? "Em andamento" : "Aguardando resultado";
-  const statusClass = hasResult ? "finished" : isLive ? "live" : "pending";
+function ResultCard({ match, isOpen, onToggle }) {
+  const {
+    homeScore,
+    awayScore,
+    hasResult,
+    homeWon,
+    awayWon,
+    statusLabel,
+    statusClass
+  } = getResultMeta(match);
+
+  if (!hasResult) {
+    return (
+      <article className={`match-card result-card ${statusClass}`}>
+        <div className="result-card-header">
+          <div>
+            <span className="badge">{match.phase}</span>
+            <h3 className="teams-versus">
+              <TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span>{" "}
+              <TeamName teamId={match.awayTeamId} fallback={match.away} />
+            </h3>
+            <p>{formatDate(match.date)}</p>
+            <p className="match-location">{formatVenue(match)}</p>
+          </div>
+          <span className={`result-status ${statusClass}`}>
+            {statusLabel}
+          </span>
+        </div>
+        <div className="result-board">
+          <ResultTeam teamId={match.homeTeamId} fallback={match.home} score={homeScore} isWinner={homeWon} />
+          <span className="result-separator">x</span>
+          <ResultTeam teamId={match.awayTeamId} fallback={match.away} score={awayScore} isWinner={awayWon} align="right" />
+        </div>
+      </article>
+    );
+  }
 
   return (
-    <article className={`match-card result-card ${statusClass}`}>
-      <div className="result-card-header">
-        <div>
-          <span className="badge">{match.phase}</span>
-          <p>{formatDate(match.date)}</p>
-          <p className="match-location">{formatVenue(match)}</p>
+    <article className={`match-card result-card result-accordion ${statusClass} ${isOpen ? "open" : ""}`}>
+      <button type="button" className="result-accordion-toggle" onClick={onToggle} aria-expanded={isOpen}>
+        <div className="result-card-header">
+          <div>
+            <span className="badge">{match.phase}</span>
+            <h3 className="teams-versus">
+              <TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span>{" "}
+              <TeamName teamId={match.awayTeamId} fallback={match.away} />
+            </h3>
+            <p>{formatDate(match.date)}</p>
+            <p className="match-location">{formatVenue(match)}</p>
+          </div>
+          <div className="result-card-summary">
+            <div className="result-accordion-score">
+              <strong>{homeScore === null ? "-" : homeScore}</strong>
+              <span>x</span>
+              <strong>{awayScore === null ? "-" : awayScore}</strong>
+            </div>
+            <span className={`result-status ${statusClass}`}>
+              {statusLabel}
+            </span>
+            <span className="result-accordion-icon" aria-hidden="true">{isOpen ? "-" : "+"}</span>
+          </div>
         </div>
-        <span className={`result-status ${statusClass}`}>
-          {statusLabel}
-        </span>
-      </div>
-      <div className="result-board">
-        <ResultTeam teamId={match.homeTeamId} fallback={match.home} score={homeScore} isWinner={homeWon} />
-        <span className="result-separator">x</span>
-        <ResultTeam teamId={match.awayTeamId} fallback={match.away} score={awayScore} isWinner={awayWon} align="right" />
-      </div>
-      <ResultGoals match={match} hasResult={hasResult} />
+      </button>
+      {isOpen && (
+        <div className="result-accordion-body">
+          <div className="result-board">
+            <ResultTeam teamId={match.homeTeamId} fallback={match.home} score={homeScore} isWinner={homeWon} />
+            <span className="result-separator">x</span>
+            <ResultTeam teamId={match.awayTeamId} fallback={match.away} score={awayScore} isWinner={awayWon} align="right" />
+          </div>
+          <ResultGoals match={match} hasResult={hasResult} />
+        </div>
+      )}
     </article>
   );
 }
