@@ -1119,8 +1119,7 @@ function RankingTable({ ranking, compact = false }) {
 
 function ResultsList({ matches }) {
   if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
-  const preferredOpenMatchId = matches.find((match) => getResultMeta(match).hasResult)?.id ?? "";
-  const [openMatchId, setOpenMatchId] = useState(preferredOpenMatchId);
+  const [openMatchId, setOpenMatchId] = useState("");
 
   useEffect(() => {
     if (!matches.length) {
@@ -1129,8 +1128,8 @@ function ResultsList({ matches }) {
     }
     if (!openMatchId) return;
     if (matches.some((match) => match.id === openMatchId && getResultMeta(match).hasResult)) return;
-    setOpenMatchId(preferredOpenMatchId);
-  }, [matches, openMatchId, preferredOpenMatchId]);
+    setOpenMatchId("");
+  }, [matches, openMatchId]);
 
   return (
     <div className="match-list results-list">
