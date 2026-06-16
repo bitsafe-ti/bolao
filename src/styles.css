@@ -959,9 +959,80 @@ h3 {
 }
 
 .daily-prediction-card {
-  grid-template-columns: minmax(260px, 0.85fr) minmax(360px, 1.15fr);
-  align-items: start;
   border-left: 4px solid var(--secondary);
+}
+
+.daily-prediction-accordion {
+  padding: 0;
+  overflow: hidden;
+}
+
+.daily-prediction-toggle {
+  width: 100%;
+  min-height: auto;
+  background: transparent;
+  color: var(--text);
+  padding: 18px;
+  text-align: left;
+}
+
+.daily-prediction-toggle:hover {
+  background: rgba(20, 20, 19, 0.02);
+}
+
+.daily-prediction-accordion.open .daily-prediction-toggle {
+  border-bottom: 1px solid var(--line);
+}
+
+.daily-prediction-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.daily-prediction-header p {
+  color: var(--muted);
+  margin-bottom: 0;
+}
+
+.daily-prediction-header .match-location {
+  color: var(--text);
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.daily-prediction-summary {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.daily-prediction-count {
+  border-radius: 999px;
+  background: var(--secondary-soft);
+  color: var(--secondary);
+  font-size: 0.78rem;
+  font-weight: 900;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.daily-prediction-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--secondary-soft);
+  color: var(--secondary);
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.daily-prediction-body {
+  padding: 18px;
 }
 
 .result-card {
@@ -1716,6 +1787,14 @@ tr:last-child td {
   }
 
   .result-card-summary {
+    justify-items: start;
+  }
+
+  .daily-prediction-header {
+    display: grid;
+  }
+
+  .daily-prediction-summary {
     justify-items: start;
   }
 

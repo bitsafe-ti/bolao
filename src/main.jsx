@@ -1287,47 +1287,81 @@ function GoalList({ teamId, fallback, goals, align = "left" }) {
 function DailyPredictions({ matches, participants, predictions }) {
   if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
   if (!participants.length) return <EmptyState text="Nenhum participante cadastrado ainda." />;
+  const [openMatchId, setOpenMatchId] = useState("");
+
+  useEffect(() => {
+    if (!matches.length) {
+      setOpenMatchId("");
+      return;
+    }
+    if (matches.some((match) => match.id === openMatchId)) return;
+    setOpenMatchId("");
+  }, [matches, openMatchId]);
+
   return (
     <div className="daily-predictions">
       {matches.map((match) => (
-        <DailyPredictionCard key={match.id} match={match} participants={participants} predictions={predictions} />
+        <DailyPredictionCard
+          key={match.id}
+          match={match}
+          participants={participants}
+          predictions={predictions}
+          isOpen={openMatchId === match.id}
+          onToggle={() => setOpenMatchId((current) => current === match.id ? "" : match.id)}
+        />
       ))}
     </div>
   );
 }
 
-function DailyPredictionCard({ match, participants, predictions }) {
+function DailyPredictionCard({ match, participants, predictions, isOpen, onToggle }) {
   const offeredPredictions = participants
     .map((participant) => ({ participant, prediction: predictions[participant.id]?.[match.id] }))
     .filter(({ prediction }) => hasPrediction(prediction));
 
   return (
-    <article className="match-card daily-prediction-card">
-      <div>
-        <span className="badge">{match.phase}</span>
-        <h3 className="teams-versus">
-          <TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span>{" "}
-          <TeamName teamId={match.awayTeamId} fallback={match.away} />
-        </h3>
-        <p>{formatDate(match.date)}</p>
-        <p className="match-location">{formatVenue(match)}</p>
-      </div>
-      {offeredPredictions.length ? (
-        <div className="table-wrap">
-          <table className="compact-table">
-            <thead><tr><th>Participante</th><th>Palpite</th></tr></thead>
-            <tbody>
-              {offeredPredictions.map(({ participant, prediction }) => (
-                <tr key={participant.id}>
-                  <td>{participant.name}</td>
-                  <td><span className="prediction-pill">{formatPrediction(prediction)}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <article className={`match-card daily-prediction-card daily-prediction-accordion ${isOpen ? "open" : ""}`}>
+      <button type="button" className="daily-prediction-toggle" onClick={onToggle} aria-expanded={isOpen}>
+        <div className="daily-prediction-header">
+          <div>
+            <span className="badge">{match.phase}</span>
+            <h3 className="teams-versus">
+              <TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span>{" "}
+              <TeamName teamId={match.awayTeamId} fallback={match.away} />
+            </h3>
+            <p>{formatDate(match.date)}</p>
+            <p className="match-location">{formatVenue(match)}</p>
+          </div>
+          <div className="daily-prediction-summary">
+            <span className="daily-prediction-count">
+              {offeredPredictions.length} palpite{offeredPredictions.length === 1 ? "" : "s"}
+            </span>
+            <span className="daily-prediction-icon" aria-hidden="true">{isOpen ? "-" : "+"}</span>
+          </div>
         </div>
-      ) : (
-        <p className="empty">Nenhum palpite registrado para este jogo.</p>
+      </button>
+      {isOpen && (
+        offeredPredictions.length ? (
+          <div className="daily-prediction-body">
+            <div className="table-wrap">
+              <table className="compact-table">
+                <thead><tr><th>Participante</th><th>Palpite</th></tr></thead>
+                <tbody>
+                  {offeredPredictions.map(({ participant, prediction }) => (
+                    <tr key={participant.id}>
+                      <td>{participant.name}</td>
+                      <td><span className="prediction-pill">{formatPrediction(prediction)}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="daily-prediction-body">
+            <p className="empty">Nenhum palpite registrado para este jogo.</p>
+          </div>
+        )
       )}
     </article>
   );
