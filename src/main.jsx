@@ -15,11 +15,12 @@ import {
   purgeExpiredPredictions,
   purgeFutureRoundPredictions
 } from "./domain.js";
-import { getFlagUrl, teamsById } from "./teams.js";
+import { getFlagUrl, getTeamsByGroup, teamsById } from "./teams.js";
 import { attachPasswordCredential, hasLegacyPassword, verifyPassword } from "./passwords.js";
 import { applyResultUpdates, fetchWorldCupResults } from "./resultsSync.js";
 import {
   fetchPoolState,
+  fetchPoolStateFromPool,
   mergePublicPoolState,
   persistPoolState,
   subscribeToPoolChanges,
@@ -28,9 +29,11 @@ import {
 import "./styles.css";
 
 const ACTIVE_POOL_ID = import.meta.env.VITE_POOL_ID || "copa-2026";
+const PRIMARY_POOL_ID = "copa-2026";
 const STORAGE_SCOPE = ACTIVE_POOL_ID === "copa-2026" ? "" : `:${ACTIVE_POOL_ID}`;
 const SESSION_KEY = `bolao-copa-2026${STORAGE_SCOPE}:session`;
 const CACHE_KEY = `bolao-copa-2026${STORAGE_SCOPE}:cache`;
+const DEV_POOL_SEEDED_KEY = `bolao-copa-2026${STORAGE_SCOPE}:seeded`;
 const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
 const DATA_LOAD_TIMEOUT_MS = 7000;
 const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva25@gmail.com,guilhermesaraiva.rocha@hotmail.com";
@@ -80,6 +83,28 @@ function saveCachedPoolState(state) {
   } catch {}
 }
 
+function hasMeaningfulPoolData(state) {
+  return Boolean(
+    state?.users?.length ||
+    state?.participants?.length ||
+    Object.keys(state?.predictions ?? {}).length
+  );
+}
+
+function wasDevPoolSeeded() {
+  try {
+    return localStorage.getItem(DEV_POOL_SEEDED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markDevPoolSeeded() {
+  try {
+    localStorage.setItem(DEV_POOL_SEEDED_KEY, "1");
+  } catch {}
+}
+
 function withTimeout(promise, timeoutMs, message) {
   let timeoutId;
   const timeout = new Promise((_, reject) => {
@@ -93,6 +118,7 @@ const userTabs = [
   { id: "predictions", label: "Palpites" },
   { id: "dailyPredictions", label: "Palpites do Dia" },
   { id: "results", label: "Resultados" },
+  { id: "groups", label: "Grupos" },
   { id: "ranking", label: "Ranking" }
 ];
 
@@ -141,6 +167,7 @@ function App() {
     () => calculateRanking(state.participants, state.matches, state.predictions),
     [state.matches, state.participants, state.predictions]
   );
+  const groupStandings = useMemo(() => calculateGroupStandings(state.matches), [state.matches]);
   const activeRound = useMemo(() => getActiveRound(state.matches), [state.matches]);
   const availableRounds = useMemo(() => {
     return [...new Set(
@@ -245,11 +272,28 @@ function App() {
       }
 
       try {
-        const remote = await withTimeout(
+        let remote = await withTimeout(
           fetchPoolState(),
           DATA_LOAD_TIMEOUT_MS,
           "Tempo excedido ao carregar dados do banco."
         );
+
+        if (ACTIVE_POOL_ID !== PRIMARY_POOL_ID && !wasDevPoolSeeded() && !hasMeaningfulPoolData(remote)) {
+          try {
+            const seededRemote = await withTimeout(
+              fetchPoolStateFromPool(PRIMARY_POOL_ID),
+              DATA_LOAD_TIMEOUT_MS,
+              "Tempo excedido ao copiar dados do ambiente principal."
+            );
+            if (hasMeaningfulPoolData(seededRemote)) {
+              remote = seededRemote;
+              try {
+                await persistPoolState(seededRemote);
+                markDevPoolSeeded();
+              } catch {}
+            }
+          } catch {}
+        }
 
         // Migrate any data saved by the old local-first architecture
         let legacyData = null;
@@ -950,6 +994,8 @@ function App() {
           </section>
         )}
 
+        {tab === "groups" && <GroupStandingsBoard groups={groupStandings} />}
+
         {tab === "ranking" && <RankingTable ranking={ranking} />}
       </section>
     </main>
@@ -1284,6 +1330,77 @@ function GoalList({ teamId, fallback, goals, align = "left" }) {
   );
 }
 
+function calculateGroupStandings(matches) {
+  const groups = getTeamsByGroup();
+  const standingsByGroup = Object.fromEntries(
+    Object.entries(groups).map(([group, teams]) => [
+      group,
+      teams.map((team) => ({
+        teamId: team.id,
+        name: team.name,
+        points: 0,
+        played: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        goalDiff: 0
+      }))
+    ])
+  );
+
+  for (const match of matches) {
+    const homeTeam = teamsById[match.homeTeamId];
+    const awayTeam = teamsById[match.awayTeamId];
+    if (!homeTeam || !awayTeam || homeTeam.group !== awayTeam.group) continue;
+
+    const homeScore = Number(match.homeScore);
+    const awayScore = Number(match.awayScore);
+    if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore)) continue;
+
+    const groupRows = standingsByGroup[homeTeam.group];
+    const homeRow = groupRows.find((row) => row.teamId === homeTeam.id);
+    const awayRow = groupRows.find((row) => row.teamId === awayTeam.id);
+    if (!homeRow || !awayRow) continue;
+
+    homeRow.played += 1;
+    awayRow.played += 1;
+    homeRow.goalsFor += homeScore;
+    homeRow.goalsAgainst += awayScore;
+    awayRow.goalsFor += awayScore;
+    awayRow.goalsAgainst += homeScore;
+
+    if (homeScore > awayScore) {
+      homeRow.wins += 1;
+      awayRow.losses += 1;
+      homeRow.points += 3;
+    } else if (homeScore < awayScore) {
+      awayRow.wins += 1;
+      homeRow.losses += 1;
+      awayRow.points += 3;
+    } else {
+      homeRow.draws += 1;
+      awayRow.draws += 1;
+      homeRow.points += 1;
+      awayRow.points += 1;
+    }
+  }
+
+  return Object.entries(standingsByGroup).map(([group, rows]) => ({
+    group,
+    rows: rows
+      .map((row) => ({ ...row, goalDiff: row.goalsFor - row.goalsAgainst }))
+      .sort((a, b) =>
+        b.points - a.points ||
+        b.goalDiff - a.goalDiff ||
+        b.goalsFor - a.goalsFor ||
+        b.wins - a.wins ||
+        a.name.localeCompare(b.name)
+      )
+  }));
+}
+
 function DailyPredictions({ matches, participants, predictions }) {
   if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
   if (!participants.length) return <EmptyState text="Nenhum participante cadastrado ainda." />;
@@ -1397,6 +1514,57 @@ function RankingInfoCard() {
       <strong>Empate também pontua</strong>
       <span>Se o palpite e o resultado forem empate, soma 1 ponto mesmo sem cravar o placar. Exemplo: palpite 2 x 2, resultado 1 x 1.</span>
     </div>
+  );
+}
+
+function GroupStandingsBoard({ groups }) {
+  return (
+    <section className="panel">
+      <SectionHeader title="Classificacao dos Grupos" />
+      <div className="groups-standings-layout">
+        {groups.map((group) => (
+          <section className="group-standings-card" key={group.group}>
+            <div className="group-standings-header">
+              <span className="badge">{`Grupo ${group.group}`}</span>
+            </div>
+            <div className="table-wrap">
+              <table className="group-standings-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Selecao</th>
+                    <th>PTS</th>
+                    <th>J</th>
+                    <th>V</th>
+                    <th>E</th>
+                    <th>D</th>
+                    <th>GP</th>
+                    <th>GC</th>
+                    <th>SG</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.rows.map((row, index) => (
+                    <tr key={row.teamId} className={index < 2 ? "qualified" : ""}>
+                      <td><span className="rank-position">{index + 1}</span></td>
+                      <td className="group-team-cell"><TeamName teamId={row.teamId} fallback={row.name} /></td>
+                      <td><strong>{row.points}</strong></td>
+                      <td>{row.played}</td>
+                      <td>{row.wins}</td>
+                      <td>{row.draws}</td>
+                      <td>{row.losses}</td>
+                      <td>{row.goalsFor}</td>
+                      <td>{row.goalsAgainst}</td>
+                      <td>{row.goalDiff}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ))}
+      </div>
+    </section>
   );
 }
 

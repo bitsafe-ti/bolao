@@ -203,15 +203,23 @@ export function mergePublicPoolState(current, shared = {}, options = {}) {
   });
 }
 
-export async function fetchPoolState() {
+async function fetchPoolStateByDocumentId(documentId) {
   try {
-    const doc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, DOCUMENT_ID);
+    const doc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, documentId);
     const parsed = JSON.parse(doc.data || "{}");
     return { ...EMPTY_STATE, ...parsed };
   } catch (error) {
     if (error.code === 404) return { ...EMPTY_STATE };
     throw new Error(`Banco indisponível: ${error.message}`);
   }
+}
+
+export async function fetchPoolState() {
+  return fetchPoolStateByDocumentId(DOCUMENT_ID);
+}
+
+export async function fetchPoolStateFromPool(poolId) {
+  return fetchPoolStateByDocumentId(poolId);
 }
 
 export async function persistPoolState(nextState) {
