@@ -6,6 +6,7 @@ import {
   emptyPrediction,
   getActiveRound,
   getMatchRound,
+  getReleasedPredictionRound,
   isMatchClosed,
   isSuperAdminEmail,
   makeId,
@@ -75,8 +76,10 @@ function saveCachedPoolState(state) {
       users: state.users ?? [],
       participants: state.participants ?? [],
       predictions: state.predictions ?? {},
+      auditLogs: state.auditLogs ?? [],
       matches: state.matches ?? [],
       lastResultSyncAt: state.lastResultSyncAt ?? "",
+      releasedPredictionRound: Number(state.releasedPredictionRound) || 1,
       deletedUserIds: state.deletedUserIds ?? [],
       deletedParticipantIds: state.deletedParticipantIds ?? []
     }));
@@ -124,10 +127,14 @@ const userTabs = [
 
 const adminTabs = [
   { id: "participants", label: "Participantes" },
-  ...userTabs
+  { id: "rounds", label: "Rodadas" },
+  { id: "audit", label: "Auditoria" },
+  ...userTabs.filter((tab) => tab.id !== "predictions")
 ];
 
 const defaultRounds = [1, 2, 3];
+const autoScrollTabs = new Set(["predictions", "dailyPredictions", "results"]);
+const AUDIT_LOG_LIMIT = 300;
 
 function applyRemoteData(current, remoteData, superAdminEmails, { prefer = "shared" } = {}) {
   const merged = mergePublicPoolState(current, remoteData, { prefer });
@@ -141,6 +148,46 @@ function applyRemoteData(current, remoteData, superAdminEmails, { prefer = "shar
 
 function cleanPoolState(state) {
   return purgeClearedOpeningPredictions(purgeExpiredPredictions(purgeFutureRoundPredictions(state)));
+}
+
+function matchHasResult(match) {
+  return parseScoreValue(match?.homeScore) !== null && parseScoreValue(match?.awayScore) !== null;
+}
+
+function getLastExecutedMatchId(matches, now) {
+  const nowTime = now.getTime();
+  const executedMatches = matches
+    .filter((match) => {
+      const kickoffTime = Date.parse(match.date || "");
+      return matchHasResult(match) || (!Number.isNaN(kickoffTime) && kickoffTime <= nowTime);
+    })
+    .sort((a, b) => Date.parse(a.date || "") - Date.parse(b.date || ""));
+
+  return executedMatches[executedMatches.length - 1]?.id ?? "";
+}
+
+function parseScoreValue(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const score = Number(value);
+  return Number.isInteger(score) ? score : null;
+}
+
+function maskEmail(email = "") {
+  const [name = "", domain = ""] = String(email).split("@");
+  if (!name || !domain) return "";
+  const visible = name.slice(0, 2);
+  return `${visible}${"*".repeat(Math.max(2, name.length - 2))}@${domain}`;
+}
+
+function appendAuditLog(state, entry) {
+  return {
+    ...state,
+    auditLogs: [entry, ...(state.auditLogs ?? [])].slice(0, AUDIT_LOG_LIMIT)
+  };
+}
+
+function makeAuditEntry(actor, action, details = "") {
+  return { id: makeId("audit"), createdAt: new Date().toISOString(), actor, action, details };
 }
 
 function App() {
@@ -159,16 +206,26 @@ function App() {
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const [clockNow, setClockNow] = useState(() => new Date());
   const workspaceRef = useRef(null);
+  const pendingAutoScrollTabRef = useRef("");
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAdmin = currentUser?.role === "admin";
   const visibleTabs = isAdmin ? adminTabs : userTabs;
+  const adminParticipantIds = useMemo(
+    () => new Set(state.users.filter((user) => user.role === "admin").map((user) => user.participantId).filter(Boolean)),
+    [state.users]
+  );
+  const contestParticipants = useMemo(
+    () => state.participants.filter((participant) => !adminParticipantIds.has(participant.id)),
+    [adminParticipantIds, state.participants]
+  );
   const ranking = useMemo(
-    () => calculateRanking(state.participants, state.matches, state.predictions),
-    [state.matches, state.participants, state.predictions]
+    () => calculateRanking(contestParticipants, state.matches, state.predictions),
+    [contestParticipants, state.matches, state.predictions]
   );
   const groupStandings = useMemo(() => calculateGroupStandings(state.matches), [state.matches]);
-  const activeRound = useMemo(() => getActiveRound(state.matches), [state.matches]);
+  const automaticRound = useMemo(() => getActiveRound(state.matches), [state.matches]);
+  const activeRound = useMemo(() => getReleasedPredictionRound(state), [state.matches, state.releasedPredictionRound]);
   const availableRounds = useMemo(() => {
     return [...new Set(
       state.matches.map((m) => getMatchRound(m)).filter((r) => r !== null && !Number.isNaN(r))
@@ -186,6 +243,9 @@ function App() {
   const resultMatches = state.matches
     .filter((match) => getMatchRound(match) === activeResultRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const lastPredictionExecutedMatchId = getLastExecutedMatchId(predictionMatches, clockNow);
+  const lastOverviewExecutedMatchId = getLastExecutedMatchId(overviewMatches, clockNow);
+  const lastResultExecutedMatchId = getLastExecutedMatchId(resultMatches, clockNow);
   const userRows = useMemo(() => {
     const participantById = new Map(state.participants.map((participant) => [participant.id, participant]));
     const linkedParticipantIds = new Set(state.users.map((user) => user.participantId).filter(Boolean));
@@ -251,7 +311,7 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [participantModalOpen]);
 
-  // Initial load from Supabase (with one-time migration from legacy localStorage)
+  // Initial load from Cloudflare D1 (with one-time migration from legacy localStorage)
   useEffect(() => {
     async function init() {
       const session = loadSession();
@@ -381,17 +441,61 @@ function App() {
     }
   }, [tab, visibleTabs]);
 
+  useEffect(() => {
+    if (pendingAutoScrollTabRef.current !== tab) return undefined;
+    const timeoutId = window.setTimeout(() => scrollToExecutedMatch(tab), 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    tab,
+    activePredictionRound,
+    activeOverviewRound,
+    activeResultRound,
+    lastPredictionExecutedMatchId,
+    lastOverviewExecutedMatchId,
+    lastResultExecutedMatchId
+  ]);
+
+  function queueExecutedMatchScroll(tabId, immediate = false) {
+    if (!autoScrollTabs.has(tabId)) return;
+    pendingAutoScrollTabRef.current = tabId;
+    if (immediate) window.setTimeout(() => scrollToExecutedMatch(tabId), 0);
+  }
+
+  function scrollToExecutedMatch(tabId) {
+    if (pendingAutoScrollTabRef.current !== tabId) return;
+    const workspace = workspaceRef.current;
+    if (!workspace) return;
+
+    const target = workspace.querySelector(
+      `[data-scroll-tab="${tabId}"][data-last-executed-match="true"]`
+    );
+    if (!target) {
+      workspace.scrollTo({ top: 0, behavior: "auto" });
+      pendingAutoScrollTabRef.current = "";
+      return;
+    }
+
+    workspace.scrollTo({
+      top: Math.max(0, target.offsetTop - 96),
+      behavior: "smooth"
+    });
+    pendingAutoScrollTabRef.current = "";
+  }
+
   function handleTabClick(tabId) {
+    const isSameTab = tabId === tab;
     setTab(tabId);
     setMobileMenuOpen(false);
-    if (tabId === "predictions" || tabId === "ranking" || tabId === "results") {
+    if (autoScrollTabs.has(tabId)) {
+      queueExecutedMatchScroll(tabId, isSameTab);
+    } else if (tabId === "ranking") {
       window.requestAnimationFrame(() => {
         workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
       });
     }
   }
 
-  // Optimistically update state then persist to Supabase
+  // Optimistically update state then persist to Cloudflare D1
   function updateState(recipe) {
     // Compute nextState using the current closure value of `state` so it is
     // available synchronously — React 19 batches setState callbacks lazily
@@ -421,7 +525,18 @@ function App() {
       updateState((current) => {
         const update = applyResultUpdates(current.matches, sourceMatches);
         changed = update.changed;
-        return { ...current, matches: update.matches, lastResultSyncAt: new Date().toISOString() };
+        const nextState = { ...current, matches: update.matches, lastResultSyncAt: new Date().toISOString() };
+        if (update.changed > 0) {
+          return appendAuditLog(
+            nextState,
+            makeAuditEntry(
+              currentUser?.name ?? "Sistema",
+              "results_synced",
+              `${update.changed} jogo${update.changed === 1 ? "" : "s"} atualizado${update.changed === 1 ? "" : "s"}`
+            )
+          );
+        }
+        return nextState;
       });
       setSyncStatus({
         state: "success",
@@ -469,13 +584,16 @@ function App() {
     }
 
     saveSession({ currentUserId: user.id, activeParticipantId: participant.id });
-    updateState((current) => ({
-      ...current,
-      users: [...current.users, user],
-      participants: [...current.participants, participant],
-      currentUserId: user.id,
-      activeParticipantId: participant.id
-    }));
+    updateState((current) => appendAuditLog(
+      {
+        ...current,
+        users: [...current.users, user],
+        participants: [...current.participants, participant],
+        currentUserId: user.id,
+        activeParticipantId: participant.id
+      },
+      makeAuditEntry(cleanName, "user_registered", maskEmail(cleanEmail))
+    ));
     setAuthError("");
   }
 
@@ -545,14 +663,15 @@ function App() {
       setSharedStatus({ state: "error", message: error.message });
       return;
     }
-    updateState((current) => {
-      return {
+    updateState((current) => appendAuditLog(
+      {
         ...current,
         users: [...current.users, user],
         participants: [...current.participants, participant],
         activeParticipantId: current.activeParticipantId || participant.id
-      };
-    });
+      },
+      makeAuditEntry(currentUser?.name ?? "Admin", "participant_added", name)
+    ));
     event.currentTarget.reset();
     setParticipantModalOpen(false);
   }
@@ -597,17 +716,20 @@ function App() {
       const users = current.users.filter((user) => !userIdsToRemove.has(user.id));
       const participants = current.participants.filter((participant) => !participantIdsToRemove.has(participant.id));
 
-      return {
-        ...current,
-        users,
-        participants,
-        predictions,
-        deletedUserIds: [...new Set([...(current.deletedUserIds ?? []), ...userIdsToRemove])],
-        deletedParticipantIds: [...new Set([...(current.deletedParticipantIds ?? []), ...participantIdsToRemove])],
-        activeParticipantId: participantIdsToRemove.has(current.activeParticipantId)
-          ? participants[0]?.id ?? ""
-          : current.activeParticipantId
-      };
+      return appendAuditLog(
+        {
+          ...current,
+          users,
+          participants,
+          predictions,
+          deletedUserIds: [...new Set([...(current.deletedUserIds ?? []), ...userIdsToRemove])],
+          deletedParticipantIds: [...new Set([...(current.deletedParticipantIds ?? []), ...participantIdsToRemove])],
+          activeParticipantId: participantIdsToRemove.has(current.activeParticipantId)
+            ? participants[0]?.id ?? ""
+            : current.activeParticipantId
+        },
+        makeAuditEntry(currentUser?.name ?? "Admin", "participant_removed", row.name)
+      );
     });
   }
 
@@ -628,7 +750,12 @@ function App() {
       updatedAt: new Date().toISOString()
     };
     if (!match.homeTeamId || !match.awayTeamId || match.homeTeamId === match.awayTeamId) return;
-    updateState((current) => ({ ...current, matches: [...current.matches, match] }));
+    const homeTeamName = teamsById[match.homeTeamId]?.name ?? match.homeTeamId;
+    const awayTeamName = teamsById[match.awayTeamId]?.name ?? match.awayTeamId;
+    updateState((current) => appendAuditLog(
+      { ...current, matches: [...current.matches, match] },
+      makeAuditEntry(currentUser?.name ?? "Admin", "match_added", `${homeTeamName} x ${awayTeamName}`)
+    ));
     event.currentTarget.reset();
   }
 
@@ -643,6 +770,9 @@ function App() {
 
   function removeMatch(matchId) {
     updateState((current) => {
+      const match = current.matches.find((m) => m.id === matchId);
+      const home = teamsById[match?.homeTeamId]?.name ?? match?.homeTeamId ?? matchId;
+      const away = teamsById[match?.awayTeamId]?.name ?? match?.awayTeamId ?? "";
       const predictions = Object.fromEntries(
         Object.entries(current.predictions).map(([participantId, participantPredictions]) => {
           const nextPredictions = { ...participantPredictions };
@@ -650,7 +780,10 @@ function App() {
           return [participantId, nextPredictions];
         })
       );
-      return { ...current, matches: current.matches.filter((match) => match.id !== matchId), predictions };
+      return appendAuditLog(
+        { ...current, matches: current.matches.filter((m) => m.id !== matchId), predictions },
+        makeAuditEntry(currentUser?.name ?? "Admin", "match_removed", [home, away].filter(Boolean).join(" x "))
+      );
     });
   }
 
@@ -711,17 +844,32 @@ function App() {
       setSharedStatus({ state: "error", message: error.message });
       return;
     }
-    updateState((current) => ({
-      ...current,
-      users: current.users.map((user) =>
-        user.id === userId ? updatedUser : user
-      )
-    }));
+    updateState((current) => appendAuditLog(
+      {
+        ...current,
+        users: current.users.map((u) => u.id === userId ? updatedUser : u)
+      },
+      makeAuditEntry(currentUser?.name ?? "Admin", "password_reset", user.name)
+    ));
   }
 
   function resetData() {
     if (!confirm("Apagar todos os dados do bolão? Esta ação não pode ser desfeita.")) return;
-    updateState(createInitialState());
+    updateState(appendAuditLog(
+      createInitialState(),
+      makeAuditEntry(currentUser?.name ?? "Admin", "data_reset", "")
+    ));
+  }
+
+  function releasePredictionRound(round) {
+    updateState((current) => appendAuditLog(
+      {
+        ...current,
+        releasedPredictionRound: Math.max(Number(current.releasedPredictionRound) || 1, Number(round) || 1)
+      },
+      makeAuditEntry(currentUser?.name ?? "Admin", "round_released", `Rodada ${round}`)
+    ));
+    setSharedStatus({ state: "success", message: `Rodada ${round} liberada para votação.` });
   }
 
   if (isLoading) {
@@ -867,13 +1015,52 @@ function App() {
           </section>
         )}
 
-{tab === "predictions" && (
+        {tab === "rounds" && isAdmin && (
+          <section className="panel">
+            <SectionHeader title="Rodadas" />
+            <div className="prediction-toolbar round-release-toolbar">
+              {availableRounds.map((round) => {
+                const isReleased = round <= activeRound;
+                const isAutomatic = round <= automaticRound;
+                return (
+                  <button
+                    type="button"
+                    className={isReleased ? "ghost" : ""}
+                    disabled={isReleased}
+                    onClick={() => releasePredictionRound(round)}
+                    key={round}
+                  >
+                    {isReleased
+                      ? `Rodada ${round} ${isAutomatic ? "automática" : "liberada"}`
+                      : `Liberar rodada ${round}`}
+                  </button>
+                );
+              })}
+            </div>
+            <div className={`sync-strip ${sharedStatus.state}`}>
+              <strong>{sharedStatus.message}</strong>
+              <span>Rodada atual para palpites: {activeRound}</span>
+            </div>
+          </section>
+        )}
+
+        {tab === "audit" && isAdmin && (
+          <section className="panel">
+            <SectionHeader title="Auditoria" caption={`${state.auditLogs?.length ?? 0} / ${AUDIT_LOG_LIMIT} registros`} />
+            <AuditLogPanel logs={state.auditLogs} />
+          </section>
+        )}
+
+        {tab === "predictions" && (
           <section className="panel">
             <SectionHeader title="Palpites" />
             <div className="prediction-toolbar single">
               <label className="select-label">
                 Rodada
-                <select value={activePredictionRound} onChange={(event) => setSelectedPredictionRound(Number(event.target.value))}>
+                <select value={activePredictionRound} onChange={(event) => {
+                  setSelectedPredictionRound(Number(event.target.value));
+                  queueExecutedMatchScroll("predictions");
+                }}>
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
                       {round === activeRound ? `Rodada ${round} - liberada` : `Rodada ${round}`}
@@ -905,7 +1092,12 @@ function App() {
                   const isKickoffLocked = isMatchClosed(match, clockNow);
                   const isLocked = isRoundLocked || isKickoffLocked;
                   return (
-                    <article className={`match-card prediction-card ${isLocked ? "locked" : ""}`} key={match.id}>
+                    <article
+                      className={`match-card prediction-card ${isLocked ? "locked" : ""}`}
+                      data-last-executed-match={match.id === lastPredictionExecutedMatchId ? "true" : undefined}
+                      data-scroll-tab="predictions"
+                      key={match.id}
+                    >
                       <div>
                         <span className="badge">{match.phase}</span>
                         <h3 className="teams-versus"><TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span> <TeamName teamId={match.awayTeamId} fallback={match.away} /></h3>
@@ -950,7 +1142,10 @@ function App() {
             <div className="prediction-toolbar single">
               <label className="select-label">
                 Rodada
-                <select value={activeOverviewRound} onChange={(event) => setSelectedOverviewRound(Number(event.target.value))}>
+                <select value={activeOverviewRound} onChange={(event) => {
+                  setSelectedOverviewRound(Number(event.target.value));
+                  queueExecutedMatchScroll("dailyPredictions");
+                }}>
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
                       {round === activeRound ? `Rodada ${round} — em andamento` : `Rodada ${round}`}
@@ -965,7 +1160,8 @@ function App() {
             </div>
             <DailyPredictions
               matches={overviewMatches}
-              participants={state.participants}
+              lastExecutedMatchId={lastOverviewExecutedMatchId}
+              participants={contestParticipants}
               predictions={state.predictions}
             />
           </section>
@@ -981,7 +1177,10 @@ function App() {
             <div className="prediction-toolbar">
               <label className="select-label">
                 Rodada
-                <select value={activeResultRound} onChange={(event) => setSelectedResultRound(Number(event.target.value))}>
+                <select value={activeResultRound} onChange={(event) => {
+                  setSelectedResultRound(Number(event.target.value));
+                  queueExecutedMatchScroll("results");
+                }}>
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
                       {round === activeRound ? `Rodada ${round} - em andamento` : `Rodada ${round}`}
@@ -990,7 +1189,7 @@ function App() {
                 </select>
               </label>
             </div>
-            <ResultsList matches={resultMatches} />
+            <ResultsList matches={resultMatches} lastExecutedMatchId={lastResultExecutedMatchId} />
           </section>
         )}
 
@@ -1163,7 +1362,7 @@ function RankingTable({ ranking, compact = false }) {
   );
 }
 
-function ResultsList({ matches }) {
+function ResultsList({ matches, lastExecutedMatchId = "" }) {
   if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
   const [openMatchId, setOpenMatchId] = useState("");
 
@@ -1183,6 +1382,7 @@ function ResultsList({ matches }) {
         <ResultCard
           key={match.id}
           match={match}
+          isLastExecuted={match.id === lastExecutedMatchId}
           isOpen={openMatchId === match.id}
           onToggle={() => setOpenMatchId((current) => current === match.id ? "" : match.id)}
         />
@@ -1210,7 +1410,7 @@ function getResultMeta(match) {
   };
 }
 
-function ResultCard({ match, isOpen, onToggle }) {
+function ResultCard({ match, isLastExecuted = false, isOpen, onToggle }) {
   const {
     homeScore,
     awayScore,
@@ -1223,7 +1423,11 @@ function ResultCard({ match, isOpen, onToggle }) {
 
   if (!hasResult) {
     return (
-      <article className={`match-card result-card ${statusClass}`}>
+      <article
+        className={`match-card result-card ${statusClass}`}
+        data-last-executed-match={isLastExecuted ? "true" : undefined}
+        data-scroll-tab="results"
+      >
         <div className="result-card-header">
           <div>
             <span className="badge">{match.phase}</span>
@@ -1248,7 +1452,11 @@ function ResultCard({ match, isOpen, onToggle }) {
   }
 
   return (
-    <article className={`match-card result-card result-accordion ${statusClass} ${isOpen ? "open" : ""}`}>
+    <article
+      className={`match-card result-card result-accordion ${statusClass} ${isOpen ? "open" : ""}`}
+      data-last-executed-match={isLastExecuted ? "true" : undefined}
+      data-scroll-tab="results"
+    >
       <button type="button" className="result-accordion-toggle" onClick={onToggle} aria-expanded={isOpen}>
         <div className="result-card-header">
           <div>
@@ -1355,9 +1563,9 @@ function calculateGroupStandings(matches) {
     const awayTeam = teamsById[match.awayTeamId];
     if (!homeTeam || !awayTeam || homeTeam.group !== awayTeam.group) continue;
 
-    const homeScore = Number(match.homeScore);
-    const awayScore = Number(match.awayScore);
-    if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore)) continue;
+    const homeScore = parseScoreValue(match.homeScore);
+    const awayScore = parseScoreValue(match.awayScore);
+    if (homeScore === null || awayScore === null) continue;
 
     const groupRows = standingsByGroup[homeTeam.group];
     const homeRow = groupRows.find((row) => row.teamId === homeTeam.id);
@@ -1401,7 +1609,7 @@ function calculateGroupStandings(matches) {
   }));
 }
 
-function DailyPredictions({ matches, participants, predictions }) {
+function DailyPredictions({ matches, lastExecutedMatchId = "", participants, predictions }) {
   if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
   if (!participants.length) return <EmptyState text="Nenhum participante cadastrado ainda." />;
   const [openMatchId, setOpenMatchId] = useState("");
@@ -1421,6 +1629,7 @@ function DailyPredictions({ matches, participants, predictions }) {
         <DailyPredictionCard
           key={match.id}
           match={match}
+          isLastExecuted={match.id === lastExecutedMatchId}
           participants={participants}
           predictions={predictions}
           isOpen={openMatchId === match.id}
@@ -1431,13 +1640,17 @@ function DailyPredictions({ matches, participants, predictions }) {
   );
 }
 
-function DailyPredictionCard({ match, participants, predictions, isOpen, onToggle }) {
+function DailyPredictionCard({ match, isLastExecuted = false, participants, predictions, isOpen, onToggle }) {
   const offeredPredictions = participants
     .map((participant) => ({ participant, prediction: predictions[participant.id]?.[match.id] }))
     .filter(({ prediction }) => hasPrediction(prediction));
 
   return (
-    <article className={`match-card daily-prediction-card daily-prediction-accordion ${isOpen ? "open" : ""}`}>
+    <article
+      className={`match-card daily-prediction-card daily-prediction-accordion ${isOpen ? "open" : ""}`}
+      data-last-executed-match={isLastExecuted ? "true" : undefined}
+      data-scroll-tab="dailyPredictions"
+    >
       <button type="button" className="daily-prediction-toggle" onClick={onToggle} aria-expanded={isOpen}>
         <div className="daily-prediction-header">
           <div>
@@ -1570,6 +1783,87 @@ function GroupStandingsBoard({ groups }) {
 
 function EmptyState({ text }) {
   return <p className="empty">{text}</p>;
+}
+
+const AUDIT_ACTION_LABELS = {
+  user_registered: "Usuário cadastrado",
+  participant_added: "Participante adicionado",
+  participant_removed: "Participante removido",
+  password_reset: "Senha redefinida",
+  match_added: "Jogo adicionado",
+  match_removed: "Jogo removido",
+  results_synced: "Resultados sincronizados",
+  data_reset: "Dados reiniciados",
+  round_released: "Rodada liberada"
+};
+
+const AUDIT_ACTION_CLASS = {
+  user_registered: "info",
+  participant_added: "info",
+  participant_removed: "danger",
+  password_reset: "warning",
+  match_added: "info",
+  match_removed: "danger",
+  results_synced: "success",
+  data_reset: "danger",
+  round_released: "success"
+};
+
+function AuditLogPanel({ logs }) {
+  const [filter, setFilter] = useState("all");
+  const allLogs = logs ?? [];
+  const filtered = filter === "all" ? allLogs : allLogs.filter((log) => log.action === filter);
+  const actionCounts = allLogs.reduce((acc, log) => {
+    acc[log.action] = (acc[log.action] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  if (!allLogs.length) {
+    return (
+      <div className="sync-strip">
+        <strong>Nenhuma ação registrada ainda.</strong>
+        <span>Os logs passarão a ser registrados a partir desta sessão.</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="audit-filter-bar">
+        <label className="select-label">
+          Filtrar por ação
+          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="all">Todas ({allLogs.length})</option>
+            {Object.entries(AUDIT_ACTION_LABELS).map(([key, label]) => {
+              const count = actionCounts[key] ?? 0;
+              if (!count) return null;
+              return <option key={key} value={key}>{label} ({count})</option>;
+            })}
+          </select>
+        </label>
+        <p className="audit-count">{filtered.length} registro{filtered.length === 1 ? "" : "s"}</p>
+      </div>
+      <div className="audit-log-list">
+        {filtered.map((log) => {
+          const cls = AUDIT_ACTION_CLASS[log.action] ?? "info";
+          return (
+            <div className={`audit-log-entry audit-log-${cls}`} key={log.id ?? log.createdAt}>
+              <span className="audit-log-time">{formatDate(log.createdAt)}</span>
+              <div className="audit-log-body">
+                <div className="audit-log-header">
+                  <span className="audit-log-actor">{log.actor}</span>
+                  <span className={`audit-log-badge audit-badge-${cls}`}>
+                    {AUDIT_ACTION_LABELS[log.action] ?? log.action}
+                  </span>
+                </div>
+                {log.details && <p className="audit-log-details">{log.details}</p>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
 }
 
 function formatDate(value) {
