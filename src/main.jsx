@@ -409,7 +409,9 @@ function App() {
       const cleanedRemote = cleanPoolState(remoteData);
       saveCachedPoolState(cleanedRemote);
       setState((current) => applyRemoteData(current, cleanedRemote, SUPER_ADMIN_EMAILS));
-      if (cleanedRemote !== remoteData) void persistPoolState(cleanedRemote);
+      // Do not persist purge-only changes from background reads — same race condition
+      // concern as init(): a concurrent persistAndSync from a user action may have already
+      // written audit logs that this stale-fetched state would overwrite.
       setSharedStatus({ state: "success", message: "Atualizado em tempo real." });
     });
     return () => unsubscribeFromPoolChanges(channel);
@@ -427,7 +429,9 @@ function App() {
         const cleanedRemote = cleanPoolState(remote);
         saveCachedPoolState(cleanedRemote);
         setState((current) => applyRemoteData(current, cleanedRemote, SUPER_ADMIN_EMAILS));
-        if (cleanedRemote !== remote) void persistPoolState(cleanedRemote);
+        // Do not persist purge-only changes from background reads — same race condition
+        // concern as init(): a concurrent persistAndSync from a user action may have already
+        // written audit logs that this stale-fetched state would overwrite.
       } catch {}
     }, 30_000);
     return () => window.clearInterval(intervalId);
@@ -507,6 +511,10 @@ function App() {
     // available synchronously — React 19 batches setState callbacks lazily
     // and the updater may not run before persistAndSync needs the value.
     const nextState = typeof recipe === "function" ? recipe(state) : recipe;
+    // Skip persist when the recipe returned the same reference (e.g. syncResults
+    // with 0 changed matches). An extra write would race with concurrent writes
+    // and could overwrite audit logs written by those concurrent calls.
+    if (nextState === state) return;
     setState(nextState);
     void persistAndSync(nextState);
   }
