@@ -42,7 +42,7 @@ const WORLD_CUP_LOGO_URL =
 
 function loadSession() {
   try {
-    const saved = localStorage.getItem(SESSION_KEY);
+    const saved = sessionStorage.getItem(SESSION_KEY);
     return saved ? JSON.parse(saved) : {};
   } catch {
     return {};
@@ -51,7 +51,7 @@ function loadSession() {
 
 function saveSession(updates) {
   try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ ...loadSession(), ...updates }));
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...loadSession(), ...updates }));
   } catch {}
 }
 
@@ -131,7 +131,6 @@ const defaultRounds = [1, 2, 3];
 const autoScrollTabs = new Set(["predictions", "dailyPredictions", "results"]);
 const AUDIT_LOG_LIMIT = 1000;
 const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
-const INACTIVITY_WARNING_MS = 60 * 1000;
 
 function applyRemoteData(current, remoteData, { prefer = "shared" } = {}) {
   const merged = mergePublicPoolState(current, remoteData, { prefer });
@@ -205,8 +204,6 @@ function App() {
   const workspaceRef = useRef(null);
   const pendingAutoScrollTabRef = useRef("");
   const lastActivityRef = useRef(Date.now());
-  const [inactivityWarning, setInactivityWarning] = useState(false);
-  const [inactivitySecondsLeft, setInactivitySecondsLeft] = useState(0);
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAdmin = currentUser?.role === "admin";
@@ -462,10 +459,7 @@ function App() {
   ]);
 
   useEffect(() => {
-    if (!currentUser?.id) {
-      setInactivityWarning(false);
-      return;
-    }
+    if (!currentUser?.id) return;
 
     function onActivity() {
       lastActivityRef.current = Date.now();
@@ -476,22 +470,13 @@ function App() {
     lastActivityRef.current = Date.now();
 
     const interval = setInterval(() => {
-      const idle = Date.now() - lastActivityRef.current;
-      const remaining = INACTIVITY_TIMEOUT_MS - idle;
-
-      if (remaining <= 0) {
+      if (Date.now() - lastActivityRef.current >= INACTIVITY_TIMEOUT_MS) {
         clearInterval(interval);
         saveSession({ currentUserId: "", activeParticipantId: "" });
         setState((s) => ({ ...s, currentUserId: "", activeParticipantId: "" }));
-        setInactivityWarning(false);
         setAuthError("Sessão encerrada por inatividade.");
-      } else if (remaining <= INACTIVITY_WARNING_MS) {
-        setInactivityWarning(true);
-        setInactivitySecondsLeft(Math.ceil(remaining / 1000));
-      } else {
-        setInactivityWarning(false);
       }
-    }, 1000);
+    }, 10000);
 
     return () => {
       events.forEach((e) => window.removeEventListener(e, onActivity));
@@ -984,17 +969,9 @@ function App() {
   return (
     <main className="app-shell">
       {mobileMenuOpen && <div className="menu-overlay" onClick={() => setMobileMenuOpen(false)} />}
-      {inactivityWarning && (
-        <div className="inactivity-warning">
-          <p>Você será desconectado por inatividade em <strong>{inactivitySecondsLeft}s</strong></p>
-          <button type="button" onClick={() => { lastActivityRef.current = Date.now(); setInactivityWarning(false); }}>
-            Continuar conectado
-          </button>
-        </div>
-      )}
       <aside className={`sidebar${mobileMenuOpen ? " open" : ""}`}>
         <div className="brand-block">
-          <img src={SIDEMENU_LOGO_URL} alt="Logo FIFA World Cup 2026" />
+          <img src={SIDEMENU_LOGO_URL} alt="Logo FIFA World Cup 2026" fetchpriority="high" />
           <button type="button" className="menu-close" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>✕</button>
         </div>
         <nav className="tabs" aria-label="Seções do bolão">
@@ -1323,6 +1300,7 @@ function AuthScreen({ error, onLogin, onRegister }) {
         <img
           src={`${import.meta.env.BASE_URL}capa-bolao.png`}
           alt="Bolão da Copa do Mundo 2026"
+          fetchpriority="high"
         />
       </section>
       <section className="auth-card">
