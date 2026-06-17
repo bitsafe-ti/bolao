@@ -535,23 +535,32 @@ function App() {
     setSyncStatus({ state: "loading", message: "Atualizando resultados..." });
     try {
       const sourceMatches = await fetchWorldCupResults();
-      let changed = 0;
-      updateState((current) => {
-        const update = applyResultUpdates(current.matches, sourceMatches);
-        changed = update.changed;
-        const nextState = { ...current, matches: update.matches, lastResultSyncAt: new Date().toISOString() };
-        if (update.changed > 0) {
+      // Compute against current closure state to know whether a D1 write is needed.
+      const preview = applyResultUpdates(state.matches, sourceMatches);
+      const changed = preview.changed;
+      const now = new Date().toISOString();
+
+      if (changed > 0) {
+        // Real changes: write to D1 and append audit log.
+        // The recipe re-runs against the latest state snapshot to avoid stale data.
+        updateState((current) => {
+          const update = applyResultUpdates(current.matches, sourceMatches);
           return appendAuditLog(
-            nextState,
+            { ...current, matches: update.matches, lastResultSyncAt: now },
             makeAuditEntry(
               currentUser?.name ?? "Sistema",
               "results_synced",
               `${update.changed} jogo${update.changed === 1 ? "" : "s"} atualizado${update.changed === 1 ? "" : "s"}`
             )
           );
-        }
-        return nextState;
-      });
+        });
+      } else {
+        // No changes: update lastResultSyncAt locally only — no D1 write.
+        // Writing to D1 here with auditLogs from a potentially stale local state
+        // would race with concurrent persistAndSync calls and overwrite audit logs.
+        setState((current) => ({ ...current, lastResultSyncAt: now }));
+      }
+
       setSyncStatus({
         state: "success",
         message:

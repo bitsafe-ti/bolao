@@ -3,9 +3,11 @@ import test from "node:test";
 import {
   calculateRanking,
   createGroupStageMatches,
+  getReleasedPredictionRound,
   normalizeUsers,
   purgeClearedOpeningPredictions,
   purgeExpiredPredictions,
+  purgeFutureRoundPredictions,
   scorePrediction
 } from "../src/domain.js";
 import { applyResultUpdates } from "../src/resultsSync.js";
@@ -209,10 +211,36 @@ test("public shared state includes predictions, participants and match results",
     users: state.users,
     participants: state.participants,
     predictions: state.predictions,
+    auditLogs: [],
     matches: state.matches,
     lastResultSyncAt: state.lastResultSyncAt,
+    releasedPredictionRound: 1,
     deletedUserIds: state.deletedUserIds,
     deletedParticipantIds: state.deletedParticipantIds
+  });
+});
+
+test("manual round release keeps future round predictions", () => {
+  const state = {
+    releasedPredictionRound: 2,
+    matches: [
+      { id: "r1", round: 1, homeScore: "", awayScore: "" },
+      { id: "r2", round: 2, homeScore: "", awayScore: "" },
+      { id: "r3", round: 3, homeScore: "", awayScore: "" }
+    ],
+    predictions: {
+      p1: {
+        r1: { home: "1", away: "0" },
+        r2: { home: "2", away: "1" },
+        r3: { home: "0", away: "0" }
+      }
+    }
+  };
+
+  assert.equal(getReleasedPredictionRound(state), 2);
+  assert.deepEqual(purgeFutureRoundPredictions(state).predictions.p1, {
+    r1: { home: "1", away: "0" },
+    r2: { home: "2", away: "1" }
   });
 });
 
