@@ -134,7 +134,7 @@ const adminTabs = [
 
 const defaultRounds = [1, 2, 3];
 const autoScrollTabs = new Set(["predictions", "dailyPredictions", "results"]);
-const AUDIT_LOG_LIMIT = 300;
+const AUDIT_LOG_LIMIT = 1000;
 
 function applyRemoteData(current, remoteData, superAdminEmails, { prefer = "shared" } = {}) {
   const merged = mergePublicPoolState(current, remoteData, { prefer });
@@ -816,17 +816,26 @@ function App() {
       away: draft.away !== "" ? draft.away : "0",
     };
 
+    const participant = state.participants.find((p) => p.id === participantId);
+    const actorName = participant?.name ?? currentUser?.name ?? "Participante";
+    const homeTeam = teamsById[match?.homeTeamId]?.name ?? "?";
+    const awayTeam = teamsById[match?.awayTeamId]?.name ?? "?";
+    const detail = `${homeTeam} ${normalizedDraft.home} x ${normalizedDraft.away} ${awayTeam}`;
+
     const savedAt = new Date().toISOString();
-    updateState((current) => ({
-      ...current,
-      predictions: {
-        ...current.predictions,
-        [participantId]: {
-          ...current.predictions[participantId],
-          [matchId]: { ...emptyPrediction, ...current.predictions[participantId]?.[matchId], ...normalizedDraft, savedAt, updatedAt: savedAt }
+    updateState((current) => appendAuditLog(
+      {
+        ...current,
+        predictions: {
+          ...current.predictions,
+          [participantId]: {
+            ...current.predictions[participantId],
+            [matchId]: { ...emptyPrediction, ...current.predictions[participantId]?.[matchId], ...normalizedDraft, savedAt, updatedAt: savedAt }
+          }
         }
-      }
-    }));
+      },
+      makeAuditEntry(actorName, "prediction_saved", detail)
+    ));
     setDraftPredictions((current) => {
       const next = { ...current };
       delete next[key];
@@ -1786,6 +1795,7 @@ function EmptyState({ text }) {
 }
 
 const AUDIT_ACTION_LABELS = {
+  prediction_saved: "Palpite salvo",
   user_registered: "Usuário cadastrado",
   participant_added: "Participante adicionado",
   participant_removed: "Participante removido",
@@ -1798,6 +1808,7 @@ const AUDIT_ACTION_LABELS = {
 };
 
 const AUDIT_ACTION_CLASS = {
+  prediction_saved: "info",
   user_registered: "info",
   participant_added: "info",
   participant_removed: "danger",

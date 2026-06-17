@@ -1,33 +1,54 @@
-import { Client, Databases, Permission, Role } from "appwrite";
-
 const viteEnv = import.meta.env ?? {};
 
-const ENDPOINT    = viteEnv.VITE_APPWRITE_ENDPOINT    || "https://nyc.cloud.appwrite.io/v1";
-const PROJECT_ID  = viteEnv.VITE_APPWRITE_PROJECT_ID  || "6a2c61c200150745bf42";
-const DATABASE_ID = viteEnv.VITE_APPWRITE_DATABASE_ID || "bolao";
-const COLLECTION_ID = viteEnv.VITE_APPWRITE_COLLECTION_ID || "pool_state";
-const DOCUMENT_ID = viteEnv.VITE_POOL_ID              || "copa-2026";
-
-const client = new Client().setEndpoint(ENDPOINT).setProject(PROJECT_ID);
-const databases = new Databases(client);
+const DOCUMENT_ID = viteEnv.VITE_POOL_ID || "copa-2026";
+const API_BASE_URL = (viteEnv.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 const EMPTY_STATE = {
   users: [],
   participants: [],
   predictions: {},
+  auditLogs: [],
   matches: [],
   lastResultSyncAt: "",
+  releasedPredictionRound: 1,
   deletedUserIds: [],
   deletedParticipantIds: []
 };
+
+function getPoolStateUrl(documentId = DOCUMENT_ID) {
+  return `${API_BASE_URL}/api/pool-state/${encodeURIComponent(documentId)}`;
+}
+
+async function requestJson(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers ?? {})
+    }
+  });
+
+  if (!response.ok) {
+    let message = response.statusText || "Erro desconhecido";
+    try {
+      const payload = await response.json();
+      message = payload.error || payload.message || message;
+    } catch {}
+    throw new Error(message);
+  }
+
+  return response.json();
+}
 
 export function getPublicPoolState(state) {
   return {
     users: state.users ?? [],
     participants: state.participants ?? [],
     predictions: state.predictions ?? {},
+    auditLogs: state.auditLogs ?? [],
     matches: state.matches ?? [],
     lastResultSyncAt: state.lastResultSyncAt ?? "",
+    releasedPredictionRound: Number(state.releasedPredictionRound) || 1,
     deletedUserIds: state.deletedUserIds ?? [],
     deletedParticipantIds: state.deletedParticipantIds ?? []
   };
@@ -75,11 +96,18 @@ function mergeDeletedIds(currentIds = [], sharedIds = []) {
   return [...new Set([...(currentIds ?? []), ...(sharedIds ?? [])].filter(Boolean))];
 }
 
-// Collapse duplicate users/participants that share the same email.
-// Keeps the oldest registration; migrates predictions from removed participant IDs
-// to the canonical one so no score data is lost.
+function mergeAuditLogs(currentLogs = [], sharedLogs = []) {
+  const logsById = new Map();
+  for (const log of [...(currentLogs ?? []), ...(sharedLogs ?? [])]) {
+    if (!log?.id) continue;
+    logsById.set(log.id, log);
+  }
+  return [...logsById.values()]
+    .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""))
+    .slice(0, 1000);
+}
+
 function deduplicateEmails(users, participants, predictions) {
-  // 1. Deduplicate users by email — keep oldest (lowest createdAt)
   const sortedUsers = [...users].sort((a, b) => {
     const ta = Date.parse(a.createdAt || a.updatedAt || "");
     const tb = Date.parse(b.createdAt || b.updatedAt || "");
@@ -92,7 +120,6 @@ function deduplicateEmails(users, participants, predictions) {
   }
   const cleanUsers = [...usersByEmail.values()];
 
-  // 2. Determine canonical participantId per email (what the kept user points to)
   const canonicalParticipantIdByEmail = new Map();
   for (const user of cleanUsers) {
     if (user.participantId && user.email) {
@@ -100,23 +127,21 @@ function deduplicateEmails(users, participants, predictions) {
     }
   }
 
-  // 3. Deduplicate participants by email — prefer the one linked to the kept user
   const participantsByEmail = new Map();
-  for (const p of participants) {
-    const key = (p.email || "").toLowerCase();
+  for (const participant of participants) {
+    const key = (participant.email || "").toLowerCase();
     if (!key) continue;
     if (!participantsByEmail.has(key)) participantsByEmail.set(key, []);
-    participantsByEmail.get(key).push(p);
+    participantsByEmail.get(key).push(participant);
   }
 
   const cleanParticipants = [];
-  const participantIdRemap = new Map(); // discarded id → canonical id
+  const participantIdRemap = new Map();
 
   for (const [email, group] of participantsByEmail) {
     const canonicalId = canonicalParticipantIdByEmail.get(email);
-    let canonical = group.find((p) => p.id === canonicalId);
+    let canonical = group.find((participant) => participant.id === canonicalId);
     if (!canonical) {
-      // No user link — keep oldest
       canonical = [...group].sort((a, b) => {
         const ta = Date.parse(a.createdAt || a.updatedAt || "");
         const tb = Date.parse(b.createdAt || b.updatedAt || "");
@@ -124,26 +149,25 @@ function deduplicateEmails(users, participants, predictions) {
       })[0];
     }
     cleanParticipants.push(canonical);
-    for (const p of group) {
-      if (p.id !== canonical.id) participantIdRemap.set(p.id, canonical.id);
+    for (const participant of group) {
+      if (participant.id !== canonical.id) participantIdRemap.set(participant.id, canonical.id);
     }
   }
-  // Keep participants without an email as-is (no dedup possible)
-  for (const p of participants) {
-    if (!(p.email || "").toLowerCase()) cleanParticipants.push(p);
+
+  for (const participant of participants) {
+    if (!(participant.email || "").toLowerCase()) cleanParticipants.push(participant);
   }
 
   if (participantIdRemap.size === 0) {
     return { users: cleanUsers, participants: cleanParticipants, predictions };
   }
 
-  // 4. Migrate predictions from discarded participant IDs to canonical IDs
   const newPredictions = {};
   for (const [participantId, perMatch] of Object.entries(predictions ?? {})) {
     const canonicalId = participantIdRemap.get(participantId) ?? participantId;
     if (!newPredictions[canonicalId]) newPredictions[canonicalId] = {};
-    for (const [matchId, pred] of Object.entries(perMatch ?? {})) {
-      newPredictions[canonicalId][matchId] = pickNewest(newPredictions[canonicalId][matchId], pred);
+    for (const [matchId, prediction] of Object.entries(perMatch ?? {})) {
+      newPredictions[canonicalId][matchId] = pickNewest(newPredictions[canonicalId][matchId], prediction);
     }
   }
 
@@ -195,7 +219,12 @@ export function mergePublicPoolState(current, shared = {}, options = {}) {
     users,
     participants,
     predictions,
+    auditLogs: mergeAuditLogs(current.auditLogs, shared.auditLogs),
     matches: [...matchesById.values()],
+    releasedPredictionRound: Math.max(
+      Number(current.releasedPredictionRound) || 1,
+      Number(shared.releasedPredictionRound) || 1
+    ),
     lastResultSyncAt:
       (Number.isNaN(sharedSyncTime) ? 0 : sharedSyncTime) > (Number.isNaN(currentSyncTime) ? 0 : currentSyncTime)
         ? shared.lastResultSyncAt
@@ -205,12 +234,10 @@ export function mergePublicPoolState(current, shared = {}, options = {}) {
 
 async function fetchPoolStateByDocumentId(documentId) {
   try {
-    const doc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, documentId);
-    const parsed = JSON.parse(doc.data || "{}");
-    return { ...EMPTY_STATE, ...parsed };
+    const state = await requestJson(getPoolStateUrl(documentId));
+    return { ...EMPTY_STATE, ...state };
   } catch (error) {
-    if (error.code === 404) return { ...EMPTY_STATE };
-    throw new Error(`Banco indisponível: ${error.message}`);
+    throw new Error(`Banco indisponivel: ${error.message}`);
   }
 }
 
@@ -239,44 +266,24 @@ export async function persistPoolState(nextState) {
   const payload = getPublicPoolState({
     ...merged,
     users: (merged.users ?? []).filter(
-      (u) => !deletedUserSet.has(u.id) && !deletedParticipantSet.has(u.participantId)
+      (user) => !deletedUserSet.has(user.id) && !deletedParticipantSet.has(user.participantId)
     ),
-    participants: (merged.participants ?? []).filter((p) => !deletedParticipantSet.has(p.id)),
+    participants: (merged.participants ?? []).filter((participant) => !deletedParticipantSet.has(participant.id)),
     predictions: Object.fromEntries(
-      Object.entries(merged.predictions ?? {}).filter(([pid]) => !deletedParticipantSet.has(pid))
+      Object.entries(merged.predictions ?? {}).filter(([participantId]) => !deletedParticipantSet.has(participantId))
     ),
     deletedUserIds,
-    deletedParticipantIds,
+    deletedParticipantIds
   });
 
-  const docData = { data: JSON.stringify(payload) };
-  const permissions = [
-    Permission.read(Role.any()),
-    Permission.update(Role.any()),
-  ];
-
-  try {
-    await databases.updateDocument(DATABASE_ID, COLLECTION_ID, DOCUMENT_ID, docData);
-  } catch (error) {
-    if (error.code === 404) {
-      await databases.createDocument(DATABASE_ID, COLLECTION_ID, DOCUMENT_ID, docData, permissions);
-    } else {
-      throw new Error(`Erro ao salvar: ${error.message}`);
-    }
-  }
-
-  return payload;
+  return requestJson(getPoolStateUrl(DOCUMENT_ID), {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
 }
 
-export function subscribeToPoolChanges(onUpdate) {
-  const channel = `databases.${DATABASE_ID}.collections.${COLLECTION_ID}.documents.${DOCUMENT_ID}`;
-  return client.subscribe(channel, (response) => {
-    const rawData = response.payload?.data;
-    if (!rawData) return;
-    try {
-      onUpdate(JSON.parse(rawData));
-    } catch {}
-  });
+export function subscribeToPoolChanges() {
+  return () => {};
 }
 
 export function unsubscribeFromPoolChanges(unsubscribeFn) {
