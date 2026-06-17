@@ -210,10 +210,7 @@ function App() {
     () => new Set(state.users.filter((user) => user.role === "admin").map((user) => user.participantId).filter(Boolean)),
     [state.users]
   );
-  const contestParticipants = useMemo(
-    () => state.participants.filter((participant) => !adminParticipantIds.has(participant.id)),
-    [adminParticipantIds, state.participants]
-  );
+  const contestParticipants = state.participants;
   const ranking = useMemo(
     () => calculateRanking(contestParticipants, state.matches, state.predictions),
     [contestParticipants, state.matches, state.predictions]
