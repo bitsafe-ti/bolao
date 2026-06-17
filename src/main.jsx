@@ -383,8 +383,13 @@ function App() {
           return cleanPoolState(next);
         });
 
-        // Persist if data was migrated from localStorage or expired/future predictions were purged.
-        if (legacyData || cleanedBase !== base) {
+        // Only persist when migrating legacy localStorage data.
+        // Purge-only changes are intentionally skipped here to avoid a race condition where
+        // this write (with auditLogs from the initial D1 fetch) races against a concurrent
+        // syncResults write and overwrites audit log entries that syncResults just persisted.
+        // Purge is idempotent — expired predictions are removed on every client load, and the
+        // next user action will persist the cleaned state via persistAndSync anyway.
+        if (legacyData) {
           try { await persistPoolState(cleanedBase); } catch {}
         }
 
