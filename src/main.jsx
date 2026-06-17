@@ -122,7 +122,8 @@ const userTabs = [
   { id: "dailyPredictions", label: "Palpites do Dia" },
   { id: "results", label: "Resultados" },
   { id: "groups", label: "Grupos" },
-  { id: "ranking", label: "Ranking" }
+  { id: "ranking", label: "Ranking" },
+  { id: "audit", label: "Auditoria" }
 ];
 
 const adminTabs = [
@@ -1053,7 +1054,7 @@ function App() {
           </section>
         )}
 
-        {tab === "audit" && isAdmin && (
+        {tab === "audit" && (
           <section className="panel">
             <SectionHeader title="Auditoria" caption={`${state.auditLogs?.length ?? 0} / ${AUDIT_LOG_LIMIT} registros`} />
             <AuditLogPanel logs={state.auditLogs} />
