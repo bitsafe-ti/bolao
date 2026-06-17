@@ -10,6 +10,7 @@ import {
   purgeFutureRoundPredictions,
   scorePrediction
 } from "../src/domain.js";
+
 import { applyResultUpdates } from "../src/resultsSync.js";
 import { getPublicPoolState, mergePublicPoolState } from "../src/sharedState.js";
 
@@ -139,12 +140,12 @@ test("creates group-stage schedule with dates, times and rounds", () => {
   assert.ok(matches.every((match) => match.city && match.stadium && match.country));
 });
 
-test("normalizes only configured super admin email as admin", () => {
+test("normalizes stored admin role as admin, all others as user", () => {
   const users = normalizeUsers([
-    { id: "1", email: "dono@bolao.com", role: "user" },
-    { id: "2", email: "outro@bolao.com", role: "admin" },
+    { id: "1", email: "dono@bolao.com", role: "admin" },
+    { id: "2", email: "outro@bolao.com", role: "user" },
     { id: "3", email: "participante@bolao.com", role: "participant" }
-  ], ["dono@bolao.com"]);
+  ]);
 
   assert.deepEqual(
     users.map((user) => user.role),
@@ -152,9 +153,9 @@ test("normalizes only configured super admin email as admin", () => {
   );
 });
 
-test("normalizes everyone as user when no super admin email is configured", () => {
+test("normalizes everyone as user when no stored admin role exists", () => {
   const users = normalizeUsers([
-    { id: "1", email: "primeiro@bolao.com", role: "admin" },
+    { id: "1", email: "primeiro@bolao.com", role: "user" },
     { id: "2", email: "segundo@bolao.com", role: "user" }
   ]);
 

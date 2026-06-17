@@ -1,0 +1,8 @@
+name = "bolao-copa2026"
+compatibility_date = "2026-06-17"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bolao-copa2026"
+database_id = "3cddae90-3152-4d45-90a0-c928495278af"

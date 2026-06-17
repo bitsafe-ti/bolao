@@ -1,0 +1,13 @@
+name: Deploy to GitHub Pages
+
+# Disabled after migrating production to Cloudflare Pages + D1.
+# Keep this file only as a reference for the former GitHub Pages deployment.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  disabled:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "GitHub Pages deployment is disabled. Use Cloudflare Pages instead."

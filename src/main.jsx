@@ -8,9 +8,7 @@ import {
   getMatchRound,
   getReleasedPredictionRound,
   isMatchClosed,
-  isSuperAdminEmail,
   makeId,
-  normalizeEmailList,
   normalizeUsers,
   purgeClearedOpeningPredictions,
   purgeExpiredPredictions,
@@ -37,14 +35,10 @@ const CACHE_KEY = `bolao-copa-2026${STORAGE_SCOPE}:cache`;
 const DEV_POOL_SEEDED_KEY = `bolao-copa-2026${STORAGE_SCOPE}:seeded`;
 const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
 const DATA_LOAD_TIMEOUT_MS = 7000;
-const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva25@gmail.com,guilhermesaraiva.rocha@hotmail.com";
 const ENTRY_FEE = 20;
 const SIDEMENU_LOGO_URL = `${import.meta.env.BASE_URL}sidemenu-logo.png`;
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
-const SUPER_ADMIN_EMAILS = normalizeEmailList(
-  `${import.meta.env.VITE_SUPER_ADMIN_EMAILS ?? ""},${import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? DEFAULT_SUPER_ADMIN_EMAIL}`
-);
 
 function loadSession() {
   try {
@@ -137,11 +131,11 @@ const defaultRounds = [1, 2, 3];
 const autoScrollTabs = new Set(["predictions", "dailyPredictions", "results"]);
 const AUDIT_LOG_LIMIT = 1000;
 
-function applyRemoteData(current, remoteData, superAdminEmails, { prefer = "shared" } = {}) {
+function applyRemoteData(current, remoteData, { prefer = "shared" } = {}) {
   const merged = mergePublicPoolState(current, remoteData, { prefer });
   return cleanPoolState({
     ...merged,
-    users: normalizeUsers(merged.users ?? [], superAdminEmails),
+    users: normalizeUsers(merged.users ?? []),
     currentUserId: current.currentUserId,
     activeParticipantId: current.activeParticipantId
   });
@@ -323,7 +317,7 @@ function App() {
           const merged = mergePublicPoolState(current, cached, { prefer: "shared" });
           return cleanPoolState({
             ...merged,
-            users: normalizeUsers(merged.users ?? [], SUPER_ADMIN_EMAILS),
+            users: normalizeUsers(merged.users ?? []),
             currentUserId: session.currentUserId ?? "",
             activeParticipantId: session.activeParticipantId ?? ""
           });
@@ -376,7 +370,7 @@ function App() {
           const merged = mergePublicPoolState(current, cleanedBase, { prefer: "shared" });
           const next = {
             ...merged,
-            users: normalizeUsers(merged.users ?? [], SUPER_ADMIN_EMAILS),
+            users: normalizeUsers(merged.users ?? []),
             currentUserId: session.currentUserId ?? "",
             activeParticipantId: session.activeParticipantId ?? ""
           };
@@ -408,7 +402,7 @@ function App() {
     const channel = subscribeToPoolChanges((remoteData) => {
       const cleanedRemote = cleanPoolState(remoteData);
       saveCachedPoolState(cleanedRemote);
-      setState((current) => applyRemoteData(current, cleanedRemote, SUPER_ADMIN_EMAILS));
+      setState((current) => applyRemoteData(current, cleanedRemote));
       // Do not persist purge-only changes from background reads — same race condition
       // concern as init(): a concurrent persistAndSync from a user action may have already
       // written audit logs that this stale-fetched state would overwrite.
@@ -428,7 +422,7 @@ function App() {
         );
         const cleanedRemote = cleanPoolState(remote);
         saveCachedPoolState(cleanedRemote);
-        setState((current) => applyRemoteData(current, cleanedRemote, SUPER_ADMIN_EMAILS));
+        setState((current) => applyRemoteData(current, cleanedRemote));
         // Do not persist purge-only changes from background reads — same race condition
         // concern as init(): a concurrent persistAndSync from a user action may have already
         // written audit logs that this stale-fetched state would overwrite.
@@ -525,7 +519,7 @@ function App() {
       const cleanedSaved = cleanPoolState(saved);
       saveCachedPoolState(cleanedSaved);
       // prefer: "current" → local deletions and edits always win over the just-saved remote snapshot
-      setState((current) => applyRemoteData(current, cleanedSaved, SUPER_ADMIN_EMAILS, { prefer: "current" }));
+      setState((current) => applyRemoteData(current, cleanedSaved, { prefer: "current" }));
     } catch (error) {
       setSharedStatus({ state: "error", message: `Erro ao salvar: ${error.message}` });
     }
@@ -580,6 +574,10 @@ function App() {
       setAuthError("Preencha nome, e-mail e senha para criar sua conta.");
       return;
     }
+    if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
+      setAuthError("Informe um e-mail válido.");
+      return;
+    }
     const emailTaken =
       state.users.some((u) => u.email === cleanEmail) ||
       state.participants.some((p) => p.email === cleanEmail);
@@ -596,7 +594,7 @@ function App() {
         id: makeId("user"),
         name: cleanName,
         email: cleanEmail,
-        role: isSuperAdminEmail(cleanEmail, SUPER_ADMIN_EMAILS) ? "admin" : "user",
+        role: "user",
         favoriteTeamId: "",
         participantId: participant.id,
         createdAt: now
@@ -661,6 +659,10 @@ function App() {
     const email = (form.get("email") || "").trim().toLowerCase();
     const password = (form.get("password") || "").trim();
     if (!name || !email || !password) return;
+    if (!email.includes("@") || !email.includes(".")) {
+      setSharedStatus({ state: "error", message: "Informe um e-mail válido." });
+      return;
+    }
     const emailTaken =
       state.users.some((u) => u.email === email) ||
       state.participants.some((p) => p.email === email);
@@ -1136,12 +1138,10 @@ function App() {
               <strong>Regra de votação</strong>
               <span>A votação fica aberta para a rodada liberada, e cada palpite pode ser alterado até o início do jogo. Quando todos os jogos da rodada forem finalizados, a próxima rodada será liberada automaticamente.</span>
             </div>
-            {activePredictionRound !== activeRound && (
-              <div className={`sync-strip ${activePredictionRound < activeRound ? "disabled" : "loading"}`}>
+            {activePredictionRound > activeRound && (
+              <div className="sync-strip loading">
                 <strong>
-                  {activePredictionRound < activeRound
-                    ? "Rodada encerrada - palpites não são mais aceitos."
-                    : `Rodada ${activePredictionRound} ainda não está liberada. Aguarde a conclusão da Rodada ${activeRound}.`}
+                  Rodada {activePredictionRound} ainda não está liberada. Aguarde a conclusão da Rodada {activeRound}.
                 </strong>
               </div>
             )}
@@ -1151,7 +1151,7 @@ function App() {
                   const storedPrediction = state.predictions[activeParticipant.id]?.[match.id] ?? emptyPrediction;
                   const prediction = getDraftPrediction(activeParticipant.id, match.id, storedPrediction);
                   const isSaved = hasPrediction(storedPrediction);
-                  const isRoundLocked = activePredictionRound !== activeRound;
+                  const isRoundLocked = activePredictionRound > activeRound;
                   const isKickoffLocked = isMatchClosed(match, clockNow);
                   const isLocked = isRoundLocked || isKickoffLocked;
                   return (
@@ -1175,9 +1175,7 @@ function App() {
                         </div>
                         <div className="prediction-action-row">
                           {isRoundLocked ? (
-                            <span className="round-locked-pill">
-                              {activePredictionRound < activeRound ? "Sem palpite" : "Indisponível"}
-                            </span>
+                            <span className="round-locked-pill">Indisponível</span>
                           ) : isKickoffLocked ? (
                             <span className="round-locked-pill">Prazo encerrado</span>
                           ) : (

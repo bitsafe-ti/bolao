@@ -6,14 +6,20 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
+    "build:cloudflare": "cross-env VITE_BASE_PATH=/ VITE_POOL_ID=copa-2026 vite build",
+    "pages:dev": "npm run build:cloudflare && wrangler pages dev dist --d1 DB=bolao-copa2026 --persist-to .wrangler/state",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler pages deploy dist",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.2",
-    "appwrite": "^26.0.0",
+    "cross-env": "^10.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "vite": "^8.0.16"
+  },
+  "devDependencies": {
+    "wrangler": "^4.54.0"
   }
 }

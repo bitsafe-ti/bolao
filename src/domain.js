@@ -115,23 +115,11 @@ export function calculateRanking(participants, matches, predictions) {
     .sort((a, b) => b.total - a.total || b.exactScores - a.exactScores || a.name.localeCompare(b.name));
 }
 
-export function normalizeEmailList(value = "") {
-  const rawValue = Array.isArray(value) ? value.join(",") : value;
-  return String(rawValue)
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-export function isSuperAdminEmail(email, superAdminEmails = []) {
-  return normalizeEmailList(superAdminEmails).includes(String(email ?? "").trim().toLowerCase());
-}
-
-export function normalizeUsers(users, superAdminEmails = []) {
-  return users.map((user) => {
-    const role = isSuperAdminEmail(user.email, superAdminEmails) ? "admin" : "user";
-    return { ...user, role };
-  });
+export function normalizeUsers(users) {
+  return users.map((user) => ({
+    ...user,
+    role: user.role === "admin" ? "admin" : "user"
+  }));
 }
 
 export function createGroupStageMatches() {
@@ -220,10 +208,12 @@ export function createInitialState() {
     participants: [],
     matches: createGroupStageMatches(),
     predictions: {},
+    auditLogs: [],
     deletedUserIds: [],
     deletedParticipantIds: [],
     activeParticipantId: "",
     lastResultSyncAt: "",
+    releasedPredictionRound: 1,
     totalTeams: worldCupTeams.length
   };
 }
@@ -256,8 +246,14 @@ export function getActiveRound(matches) {
   return rounds[rounds.length - 1] ?? 1;
 }
 
+export function getReleasedPredictionRound(state) {
+  const automaticRound = getActiveRound(state.matches ?? []);
+  const manualRound = Number(state.releasedPredictionRound);
+  return Math.max(automaticRound, Number.isInteger(manualRound) && manualRound > 0 ? manualRound : 1);
+}
+
 export function purgeFutureRoundPredictions(state) {
-  const activeRound = getActiveRound(state.matches ?? []);
+  const activeRound = getReleasedPredictionRound(state);
   const matchRoundById = Object.fromEntries(
     (state.matches ?? []).map((m) => [m.id, getMatchRound(m)])
   );
