@@ -123,8 +123,8 @@ const userTabs = [
 const adminTabs = [
   { id: "participants", label: "Participantes" },
   { id: "rounds", label: "Rodadas" },
-  { id: "audit", label: "Auditoria" },
-  ...userTabs.filter((tab) => tab.id !== "predictions")
+  ...userTabs.filter((tab) => tab.id !== "audit"),
+  { id: "audit", label: "Auditoria" }
 ];
 
 const defaultRounds = [1, 2, 3];
