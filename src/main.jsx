@@ -1270,8 +1270,8 @@ function AuthScreen({ error, onLogin, onRegister }) {
     <main className="auth-page">
       <section className="auth-visual">
         <img
-          src="https://store.fifa.com/cdn/shop/files/image_217bb8c0-803c-4772-9c18-18f1e677f831.jpg?v=1780325535&width=900"
-          alt="Pôster oficial da FIFA World Cup 2026"
+          src={`${import.meta.env.BASE_URL}capa-bolao.png`}
+          alt="Bolão da Copa do Mundo 2026"
         />
       </section>
       <section className="auth-card">
