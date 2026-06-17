@@ -225,9 +225,9 @@ function App() {
       state.matches.map((m) => getMatchRound(m)).filter((r) => r !== null && !Number.isNaN(r))
     )].sort((a, b) => a - b);
   }, [state.matches]);
-  const activePredictionRound = selectedPredictionRound ?? activeRound;
-  const activeOverviewRound = selectedOverviewRound ?? activeRound;
-  const activeResultRound = selectedResultRound ?? activeRound;
+  const activePredictionRound = selectedPredictionRound ?? automaticRound;
+  const activeOverviewRound = selectedOverviewRound ?? automaticRound;
+  const activeResultRound = selectedResultRound ?? automaticRound;
   const predictionMatches = state.matches
     .filter((match) => getMatchRound(match) === activePredictionRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
