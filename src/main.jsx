@@ -882,6 +882,20 @@ function App() {
     setSharedStatus({ state: "success", message: `Rodada ${round} liberada para votação.` });
   }
 
+  function lockRound(round) {
+    const now = new Date().toISOString();
+    updateState((current) => appendAuditLog(
+      {
+        ...current,
+        matches: current.matches.map((m) =>
+          getMatchRound(m) === round ? { ...m, locked: true, updatedAt: now } : m
+        )
+      },
+      makeAuditEntry(currentUser?.name ?? "Admin", "round_locked", `Rodada ${round}`)
+    ));
+    setSharedStatus({ state: "success", message: `Rodada ${round} travada manualmente.` });
+  }
+
   if (isLoading) {
     return (
       <main className="loading-page">
@@ -1028,22 +1042,39 @@ function App() {
         {tab === "rounds" && isAdmin && (
           <section className="panel">
             <SectionHeader title="Rodadas" />
-            <div className="prediction-toolbar round-release-toolbar">
+            <div className="round-management-list">
               {availableRounds.map((round) => {
                 const isReleased = round <= activeRound;
                 const isAutomatic = round <= automaticRound;
+                const roundMatches = state.matches.filter((m) => getMatchRound(m) === round);
+                const isManuallyLocked = roundMatches.length > 0 && roundMatches.every((m) => m.locked);
                 return (
-                  <button
-                    type="button"
-                    className={isReleased ? "ghost" : ""}
-                    disabled={isReleased}
-                    onClick={() => releasePredictionRound(round)}
-                    key={round}
-                  >
-                    {isReleased
-                      ? `Rodada ${round} ${isAutomatic ? "automática" : "liberada"}`
-                      : `Liberar rodada ${round}`}
-                  </button>
+                  <div className="round-management-row" key={round}>
+                    <div className="round-management-info">
+                      <strong>Rodada {round}</strong>
+                      <span className={`round-status-label${isManuallyLocked ? " locked" : isReleased ? " released" : ""}`}>
+                        {isManuallyLocked
+                          ? "Travada manualmente"
+                          : isAutomatic
+                          ? "Liberada automaticamente"
+                          : isReleased
+                          ? "Liberada manualmente"
+                          : "Aguardando liberação"}
+                      </span>
+                    </div>
+                    <div className="round-management-actions">
+                      {!isReleased && (
+                        <button type="button" onClick={() => releasePredictionRound(round)}>
+                          Liberar rodada {round}
+                        </button>
+                      )}
+                      {isReleased && !isManuallyLocked && (
+                        <button type="button" className="ghost danger" onClick={() => lockRound(round)}>
+                          Travar rodada {round}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -1805,7 +1836,8 @@ const AUDIT_ACTION_LABELS = {
   match_removed: "Jogo removido",
   results_synced: "Resultados sincronizados",
   data_reset: "Dados reiniciados",
-  round_released: "Rodada liberada"
+  round_released: "Rodada liberada",
+  round_locked: "Rodada travada"
 };
 
 const AUDIT_ACTION_CLASS = {
@@ -1818,7 +1850,8 @@ const AUDIT_ACTION_CLASS = {
   match_removed: "danger",
   results_synced: "success",
   data_reset: "danger",
-  round_released: "success"
+  round_released: "success",
+  round_locked: "warning"
 };
 
 function AuditLogPanel({ logs }) {

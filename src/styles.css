@@ -99,6 +99,17 @@ button.ghost:hover {
   box-shadow: 0 0 0 1px #c2c0b6;
 }
 
+button.ghost.danger {
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+
+button.ghost.danger:hover {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  box-shadow: 0 0 0 1px var(--danger);
+}
+
 button.danger {
   background: var(--danger);
   color: var(--ivory);
@@ -887,6 +898,59 @@ h3 {
 .prediction-toolbar.round-release-toolbar {
   display: flex;
   flex-wrap: wrap;
+}
+
+.round-management-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.round-management-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--warm-sand);
+  border: 1px solid var(--line-warm);
+  border-radius: 8px;
+}
+
+.round-management-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.round-management-info strong {
+  font-size: 0.95rem;
+}
+
+.round-status-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.round-status-label.released {
+  color: var(--success, #16a34a);
+}
+
+.round-status-label.locked {
+  color: var(--danger);
+}
+
+.round-management-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.round-management-actions button {
+  min-height: 34px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
 }
 
 .readonly-field {
