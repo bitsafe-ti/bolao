@@ -1288,7 +1288,7 @@ function App() {
 }
 
 function AuthScreen({ error, onLogin, onRegister }) {
-  const [mode, setMode] = useState("register");
+  const [mode, setMode] = useState("login");
   async function handleSubmit(event) {
     event.preventDefault();
     const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
