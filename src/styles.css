@@ -915,9 +915,6 @@ h3 {
   text-align: center;
 }
 
-.participant-grid-row .participant-grid-cell:nth-child(3) {
-  justify-items: center;
-}
 
 .icon-btn {
   min-width: 34px;
@@ -965,6 +962,7 @@ h3 {
   display: inline-flex;
   font-size: 0.82rem;
   font-weight: 900;
+  justify-self: center;
   min-height: 34px;
   padding: 0 12px;
   white-space: nowrap;
@@ -978,7 +976,7 @@ h3 {
   display: inline-flex;
   font-size: 0.82rem;
   font-weight: 800;
-  justify-self: start;
+  justify-self: center;
   min-height: 34px;
   padding: 0 12px;
   white-space: nowrap;
