@@ -2252,15 +2252,38 @@ tr:last-child td {
   }
 
   .result-card-header {
-    display: grid;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .result-card-header > div:first-child {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .result-card-header .match-location {
+    font-size: 0.76rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .result-card-summary {
-    justify-items: start;
+    flex: 0 0 auto;
+    justify-items: end;
+  }
+
+  .result-accordion-score {
+    font-size: 0.88rem;
+    padding: 4px 8px;
   }
 
   .result-status {
-    justify-self: start;
+    font-size: 0.72rem;
+    padding: 4px 8px;
+    justify-self: end;
   }
 
   .result-team.right {
@@ -2333,6 +2356,15 @@ tr:last-child td {
   /* ranking table: allow scroll within wrapper, not full page */
   .table-panel {
     overflow: visible;
+  }
+
+  .result-accordion-toggle {
+    padding: 12px;
+  }
+
+  .result-accordion-body {
+    padding: 12px;
+    gap: 10px;
   }
 }
 
