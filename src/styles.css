@@ -390,10 +390,6 @@ select:focus {
   padding: 16px 18px;
 }
 
-.topbar-logo {
-  display: none;
-}
-
 .topbar-user {
   display: flex;
   align-items: center;
@@ -1810,14 +1806,7 @@ tr:last-child td {
     flex: 1;
   }
 
-  .topbar-logo {
-    display: block;
-    height: 36px;
-    width: auto;
-    object-fit: contain;
-  }
-
-  .topbar-user {
+.topbar-user {
     max-width: 100%;
   }
 
