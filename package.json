@@ -13,6 +13,9 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^7.2.0",
+    "@fortawesome/free-solid-svg-icons": "^7.2.0",
+    "@fortawesome/react-fontawesome": "^3.3.1",
     "@vitejs/plugin-react": "^6.0.2",
     "cross-env": "^10.1.0",
     "react": "^19.0.0",

@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTrophy } from "@fortawesome/free-solid-svg-icons";
 import {
   calculateRanking,
   createInitialState,
@@ -39,7 +41,8 @@ const DEV_POOL_SEEDED_KEY = `bolao-copa-2026${STORAGE_SCOPE}:seeded`;
 const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
 const DATA_LOAD_TIMEOUT_MS = 7000;
 const ENTRY_FEE = 20;
-const SIDEMENU_LOGO_URL = `${import.meta.env.BASE_URL}logo_bolao_transparente.png`;
+const SIDEMENU_LOGO_URL = `${import.meta.env.BASE_URL}sidemenu-logo.png`;
+const AUTH_LOGO_URL = `${import.meta.env.BASE_URL}logo_bolao_transparente.png`;
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
 
@@ -116,11 +119,9 @@ function withTimeout(promise, timeoutMs, message) {
 
 const userTabs = [
   { id: "predictions", label: "Palpites" },
-  { id: "dailyPredictions", label: "Palpites do Dia" },
   { id: "results", label: "Resultados" },
   { id: "groups", label: "Grupos" },
-  { id: "ranking", label: "Ranking" },
-  { id: "audit", label: "Auditoria" }
+  { id: "ranking", label: "Ranking" }
 ];
 
 const adminTabs = [
@@ -131,9 +132,12 @@ const adminTabs = [
 ];
 
 const defaultRounds = [1, 2, 3];
-const autoScrollTabs = new Set(["predictions", "dailyPredictions", "results"]);
 const AUDIT_LOG_LIMIT = 1000;
 const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
+const RESULT_SYNC_IDLE_MS = 5 * 60 * 1000;
+const RESULT_SYNC_LIVE_MS = 30 * 1000;
+const RESULT_SYNC_LIVE_BEFORE_MS = 30 * 60 * 1000;
+const RESULT_SYNC_LIVE_AFTER_MS = 4 * 60 * 60 * 1000;
 
 function applyRemoteData(current, remoteData, { prefer = "shared" } = {}) {
   const merged = mergePublicPoolState(current, remoteData, { prefer });
@@ -149,26 +153,20 @@ function cleanPoolState(state) {
   return purgeClearedOpeningPredictions(purgeExpiredPredictions(purgeFutureRoundPredictions(state)));
 }
 
-function matchHasResult(match) {
-  return parseScoreValue(match?.homeScore) !== null && parseScoreValue(match?.awayScore) !== null;
-}
-
-function getLastExecutedMatchId(matches, now) {
-  const nowTime = now.getTime();
-  const executedMatches = matches
-    .filter((match) => {
-      const kickoffTime = Date.parse(match.date || "");
-      return matchHasResult(match) || (!Number.isNaN(kickoffTime) && kickoffTime <= nowTime);
-    })
-    .sort((a, b) => Date.parse(a.date || "") - Date.parse(b.date || ""));
-
-  return executedMatches[executedMatches.length - 1]?.id ?? "";
-}
-
 function parseScoreValue(value) {
   if (value === "" || value === null || value === undefined) return null;
   const score = Number(value);
   return Number.isInteger(score) ? score : null;
+}
+
+function shouldUseFastResultSync(matches, now = new Date()) {
+  const nowTime = now.getTime();
+  return matches.some((match) => {
+    if (parseScoreValue(match.homeScore) !== null && parseScoreValue(match.awayScore) !== null) return false;
+    const kickoffTime = Date.parse(match.date || "");
+    if (Number.isNaN(kickoffTime)) return false;
+    return nowTime >= kickoffTime - RESULT_SYNC_LIVE_BEFORE_MS && nowTime <= kickoffTime + RESULT_SYNC_LIVE_AFTER_MS;
+  });
 }
 
 function maskEmail(email = "") {
@@ -197,15 +195,14 @@ function App() {
   const [syncStatus, setSyncStatus] = useState({ state: "idle", message: "Resultados automáticos ativos." });
   const [sharedStatus, setSharedStatus] = useState({ state: "idle", message: "Carregando dados do bolão..." });
   const [selectedPredictionRound, setSelectedPredictionRound] = useState(null);
-  const [selectedOverviewRound, setSelectedOverviewRound] = useState(null);
   const [selectedResultRound, setSelectedResultRound] = useState(null);
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  const [historyTeamId, setHistoryTeamId] = useState("");
   const [clockNow, setClockNow] = useState(() => new Date());
   const workspaceRef = useRef(null);
-  const pendingAutoScrollTabRef = useRef("");
   const lastActivityRef = useRef(Date.now());
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
@@ -228,21 +225,22 @@ function App() {
       state.matches.map((m) => getMatchRound(m)).filter((r) => r !== null && !Number.isNaN(r))
     )].sort((a, b) => a - b);
   }, [state.matches]);
-  const activePredictionRound = selectedPredictionRound ?? automaticRound;
-  const activeOverviewRound = selectedOverviewRound ?? automaticRound;
+  const activePredictionRound = selectedPredictionRound ?? activeRound;
   const activeResultRound = selectedResultRound ?? automaticRound;
   const predictionMatches = state.matches
     .filter((match) => getMatchRound(match) === activePredictionRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  const overviewMatches = state.matches
-    .filter((match) => getMatchRound(match) === activeOverviewRound)
-    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   const resultMatches = state.matches
     .filter((match) => getMatchRound(match) === activeResultRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  const lastPredictionExecutedMatchId = getLastExecutedMatchId(predictionMatches, clockNow);
-  const lastOverviewExecutedMatchId = getLastExecutedMatchId(overviewMatches, clockNow);
-  const lastResultExecutedMatchId = getLastExecutedMatchId(resultMatches, clockNow);
+  const resultSyncIntervalMs = useMemo(
+    () => shouldUseFastResultSync(state.matches, clockNow) ? RESULT_SYNC_LIVE_MS : RESULT_SYNC_IDLE_MS,
+    [state.matches, clockNow]
+  );
+  const resultSyncIntervalText =
+    resultSyncIntervalMs === RESULT_SYNC_LIVE_MS
+      ? "Atualização em tempo quase real: checagem a cada 30 segundos durante jogos próximos ou em andamento."
+      : "A atualização roda ao entrar e a cada 5 minutos fora de jogos próximos ou em andamento.";
   const userRows = useMemo(() => {
     const participantById = new Map(state.participants.map((participant) => [participant.id, participant]));
     const linkedParticipantIds = new Set(state.users.map((user) => user.participantId).filter(Boolean));
@@ -277,6 +275,7 @@ function App() {
   }, [state.participants, state.users]);
   const adminParticipantRows = userRows.filter((row) => row.role === "admin");
   const regularParticipantRows = userRows.filter((row) => row.role !== "admin");
+  const historyTeam = historyTeamId ? teamsById[historyTeamId] : null;
 
   useEffect(() => {
     const now = Date.now();
@@ -383,7 +382,7 @@ function App() {
         // Purge-only changes are intentionally skipped here to avoid a race condition where
         // this write (with auditLogs from the initial D1 fetch) races against a concurrent
         // syncResults write and overwrites audit log entries that syncResults just persisted.
-        // Purge is idempotent — expired predictions are removed on every client load, and the
+        // Purge is idempotent - expired predictions are removed on every client load, and the
         // next user action will persist the cleaned state via persistAndSync anyway.
         if (legacyData) {
           try { await persistPoolState(cleanedBase); } catch {}
@@ -405,7 +404,7 @@ function App() {
       const cleanedRemote = cleanPoolState(remoteData);
       saveCachedPoolState(cleanedRemote);
       setState((current) => applyRemoteData(current, cleanedRemote));
-      // Do not persist purge-only changes from background reads — same race condition
+      // Do not persist purge-only changes from background reads - same race condition
       // concern as init(): a concurrent persistAndSync from a user action may have already
       // written audit logs that this stale-fetched state would overwrite.
       setSharedStatus({ state: "success", message: "Atualizado em tempo real." });
@@ -425,7 +424,7 @@ function App() {
         const cleanedRemote = cleanPoolState(remote);
         saveCachedPoolState(cleanedRemote);
         setState((current) => applyRemoteData(current, cleanedRemote));
-        // Do not persist purge-only changes from background reads — same race condition
+        // Do not persist purge-only changes from background reads - same race condition
         // concern as init(): a concurrent persistAndSync from a user action may have already
         // written audit logs that this stale-fetched state would overwrite.
       } catch {}
@@ -437,29 +436,15 @@ function App() {
   useEffect(() => {
     if (!currentUser) return undefined;
     syncResults("auto");
-    const intervalId = window.setInterval(() => syncResults("auto"), 5 * 60 * 1000);
+    const intervalId = window.setInterval(() => syncResults("auto"), resultSyncIntervalMs);
     return () => window.clearInterval(intervalId);
-  }, [currentUser?.id]);
+  }, [currentUser?.id, resultSyncIntervalMs]);
 
   useEffect(() => {
     if (!visibleTabs.some((item) => item.id === tab)) {
       setTab("predictions");
     }
   }, [tab, visibleTabs]);
-
-  useEffect(() => {
-    if (pendingAutoScrollTabRef.current !== tab) return undefined;
-    const timeoutId = window.setTimeout(() => scrollToExecutedMatch(tab), 0);
-    return () => window.clearTimeout(timeoutId);
-  }, [
-    tab,
-    activePredictionRound,
-    activeOverviewRound,
-    activeResultRound,
-    lastPredictionExecutedMatchId,
-    lastOverviewExecutedMatchId,
-    lastResultExecutedMatchId
-  ]);
 
   useEffect(() => {
     if (!currentUser?.id) return;
@@ -487,50 +472,18 @@ function App() {
     };
   }, [currentUser?.id]);
 
-  function queueExecutedMatchScroll(tabId, immediate = false) {
-    if (!autoScrollTabs.has(tabId)) return;
-    pendingAutoScrollTabRef.current = tabId;
-    if (immediate) window.setTimeout(() => scrollToExecutedMatch(tabId), 0);
-  }
-
-  function scrollToExecutedMatch(tabId) {
-    if (pendingAutoScrollTabRef.current !== tabId) return;
-    const workspace = workspaceRef.current;
-    if (!workspace) return;
-
-    const target = workspace.querySelector(
-      `[data-scroll-tab="${tabId}"][data-last-executed-match="true"]`
-    );
-    if (!target) {
-      workspace.scrollTo({ top: 0, behavior: "auto" });
-      pendingAutoScrollTabRef.current = "";
-      return;
-    }
-
-    workspace.scrollTo({
-      top: Math.max(0, target.offsetTop - 96),
-      behavior: "smooth"
-    });
-    pendingAutoScrollTabRef.current = "";
-  }
-
   function handleTabClick(tabId) {
-    const isSameTab = tabId === tab;
     setTab(tabId);
     setMobileMenuOpen(false);
-    if (autoScrollTabs.has(tabId)) {
-      queueExecutedMatchScroll(tabId, isSameTab);
-    } else if (tabId === "ranking") {
-      window.requestAnimationFrame(() => {
-        workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
-      });
-    }
+    window.requestAnimationFrame(() => {
+      workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
+    });
   }
 
   // Optimistically update state then persist to Cloudflare D1
   function updateState(recipe) {
     // Compute nextState using the current closure value of `state` so it is
-    // available synchronously — React 19 batches setState callbacks lazily
+    // available synchronously - React 19 batches setState callbacks lazily
     // and the updater may not run before persistAndSync needs the value.
     const nextState = typeof recipe === "function" ? recipe(state) : recipe;
     // Skip persist when the recipe returned the same reference (e.g. syncResults
@@ -547,7 +500,7 @@ function App() {
       const saved = await persistPoolState(nextState);
       const cleanedSaved = cleanPoolState(saved);
       saveCachedPoolState(cleanedSaved);
-      // prefer: "current" → local deletions and edits always win over the just-saved remote snapshot
+      // prefer: "current" - local deletions and edits always win over the just-saved remote snapshot
       setState((current) => applyRemoteData(current, cleanedSaved, { prefer: "current" }));
     } catch (error) {
       setSharedStatus({ state: "error", message: `Erro ao salvar: ${error.message}` });
@@ -578,7 +531,7 @@ function App() {
           );
         });
       } else {
-        // No changes: update lastResultSyncAt locally only — no D1 write.
+        // No changes: update lastResultSyncAt locally only - no D1 write.
         // Writing to D1 here with auditLogs from a potentially stale local state
         // would race with concurrent persistAndSync calls and overwrite audit logs.
         setState((current) => ({ ...current, lastResultSyncAt: now }));
@@ -864,7 +817,7 @@ function App() {
     if (getMatchRound(match) > activeRound || isMatchClosed(match)) return;
 
     const draft = getDraftPrediction(participantId, matchId, currentPrediction);
-    // Treat blank input as 0 — user leaving the field empty means "zero gols"
+    // Treat blank input as 0 - user leaving the field empty means "zero gols"
     const normalizedDraft = {
       home: draft.home !== "" ? draft.home : "0",
       away: draft.away !== "" ? draft.away : "0",
@@ -975,8 +928,8 @@ function App() {
       {mobileMenuOpen && <div className="menu-overlay" onClick={() => setMobileMenuOpen(false)} />}
       <aside className={`sidebar${mobileMenuOpen ? " open" : ""}`}>
         <div className="brand-block">
-          <img src={SIDEMENU_LOGO_URL} alt="Logo FIFA World Cup 2026" fetchpriority="high" />
-          <button type="button" className="menu-close" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>✕</button>
+          <img src={SIDEMENU_LOGO_URL} alt="Logo FIFA World Cup 2026" fetchPriority="high" />
+          <button type="button" className="menu-close" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>×</button>
         </div>
         <nav className="tabs" aria-label="Seções do bolão">
           {visibleTabs.map((item) => (
@@ -1000,7 +953,7 @@ function App() {
                 <p className="eyebrow">Administrador</p>
                 <h2 id="admin-menu-title">{currentUser.name}</h2>
               </div>
-              <button type="button" className="modal-close" aria-label="Fechar modal" onClick={() => setAdminMenuOpen(false)}>✕</button>
+              <button type="button" className="modal-close" aria-label="Fechar modal" onClick={() => setAdminMenuOpen(false)}>×</button>
             </div>
             <div className="admin-modal-actions">
               <button type="button" onClick={() => { syncResults("manual"); setAdminMenuOpen(false); setMobileMenuOpen(false); }}>
@@ -1014,6 +967,14 @@ function App() {
             </div>
           </section>
         </div>
+      )}
+
+      {historyTeam && (
+        <TeamHistoryModal
+          team={historyTeam}
+          matches={state.matches}
+          onClose={() => setHistoryTeamId("")}
+        />
       )}
 
       <section className="workspace" ref={workspaceRef}>
@@ -1075,7 +1036,7 @@ function App() {
                       <p className="eyebrow">Participantes</p>
                       <h2 id="participant-modal-title">Novo contato</h2>
                     </div>
-                    <button type="button" className="modal-close" aria-label="Fechar modal" onClick={() => setParticipantModalOpen(false)}>✕</button>
+                    <button type="button" className="modal-close" aria-label="Fechar modal" onClick={() => setParticipantModalOpen(false)}>×</button>
                   </div>
                   <form className="modal-form participant-form" onSubmit={addParticipant}>
                     <input name="name" placeholder="Nome do participante" autoFocus />
@@ -1153,15 +1114,14 @@ function App() {
                 Rodada
                 <select value={activePredictionRound} onChange={(event) => {
                   setSelectedPredictionRound(Number(event.target.value));
-                  queueExecutedMatchScroll("predictions");
                 }}>
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
                       {round < automaticRound
-                        ? `Rodada ${round} — Encerrada`
-                        : round === automaticRound
-                        ? `Rodada ${round} — Em andamento`
-                        : `Rodada ${round} — Pendente`}
+                        ? `Rodada ${round} - Encerrada`
+                        : round <= activeRound
+                        ? `Rodada ${round} - Liberada`
+                        : `Rodada ${round} - Pendente`}
                     </option>
                   ))}
                 </select>
@@ -1190,35 +1150,44 @@ function App() {
                   return (
                     <article
                       className={`match-card prediction-card ${isLocked ? "locked" : ""}`}
-                      data-last-executed-match={match.id === lastPredictionExecutedMatchId ? "true" : undefined}
-                      data-scroll-tab="predictions"
                       key={match.id}
                     >
-                      <div>
-                        <span className="badge">{match.phase}</span>
-                        <h3 className="teams-versus"><TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span> <TeamName teamId={match.awayTeamId} fallback={match.away} /></h3>
-                        <p>{formatDate(match.date)}</p>
-                        <p className="match-location">{formatVenue(match)}</p>
-                      </div>
-                      <div className="prediction-actions">
-                        <div className="prediction-inputs">
-                          <ScoreInput disabled={isLocked} value={prediction.home} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "home", value)} />
-                          <span>x</span>
-                          <ScoreInput disabled={isLocked} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
+                      <div className="prediction-card-vote">
+                        <div className="prediction-match-info">
+                          <span className="badge">{match.phase}</span>
+                          <div className="prediction-teams-grid">
+                            <PredictionTeamColumn teamId={match.homeTeamId} fallback={match.home} onHistory={setHistoryTeamId} />
+                            <span className="prediction-versus">x</span>
+                            <PredictionTeamColumn teamId={match.awayTeamId} fallback={match.away} onHistory={setHistoryTeamId} />
+                          </div>
+                          <p>{formatDate(match.date)}</p>
+                          <p className="match-location">{formatVenue(match)}</p>
                         </div>
-                        <div className="prediction-action-row">
-                          {isRoundLocked ? (
-                            <span className="round-locked-pill">Indisponível</span>
-                          ) : isKickoffLocked ? (
-                            <span className="round-locked-pill">Prazo encerrado</span>
-                          ) : (
-                            <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id)}>
-                              {isSaved ? "Atualizar palpite" : "Salvar palpite"}
-                            </button>
-                          )}
-                          {isSaved && !isLocked && <span className="saved-pill">Palpite salvo</span>}
+                        <div className="prediction-actions">
+                          <div className="prediction-inputs">
+                            <ScoreInput disabled={isLocked} value={prediction.home} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "home", value)} />
+                            <span>x</span>
+                            <ScoreInput disabled={isLocked} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
+                          </div>
+                          <div className="prediction-action-row">
+                            {isRoundLocked ? (
+                              <span className="round-locked-pill">Indisponível</span>
+                            ) : isKickoffLocked ? (
+                              <span className="round-locked-pill">Prazo encerrado</span>
+                            ) : (
+                              <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id)}>
+                                {isSaved ? "Atualizar palpite" : "Salvar palpite"}
+                              </button>
+                            )}
+                            {isSaved && !isLocked && <span className="saved-pill">Palpite salvo</span>}
+                          </div>
                         </div>
                       </div>
+                      <MatchPredictionOverview
+                        match={match}
+                        participants={contestParticipants.filter((participant) => participant.id !== activeParticipant.id)}
+                        predictions={state.predictions}
+                      />
                     </article>
                   );
                 })}
@@ -1230,68 +1199,32 @@ function App() {
           </section>
         )}
 
-        {tab === "dailyPredictions" && (
-          <section className="panel">
-            <SectionHeader title="Palpites do Dia" />
-            <div className="prediction-toolbar single">
-              <label className="select-label">
-                Rodada
-                <select value={activeOverviewRound} onChange={(event) => {
-                  setSelectedOverviewRound(Number(event.target.value));
-                  queueExecutedMatchScroll("dailyPredictions");
-                }}>
-                  {availableRounds.map((round) => (
-                    <option value={round} key={round}>
-                      {round < automaticRound
-                        ? `Rodada ${round} — Encerrada`
-                        : round === automaticRound
-                        ? `Rodada ${round} — Em andamento`
-                        : `Rodada ${round} — Pendente`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className={`sync-strip ${sharedStatus.state}`}>
-              <strong>{sharedStatus.message}</strong>
-              <span>Participantes, palpites, jogos e resultados são sincronizados em tempo real.</span>
-            </div>
-            <DailyPredictions
-              matches={overviewMatches}
-              lastExecutedMatchId={lastOverviewExecutedMatchId}
-              participants={contestParticipants}
-              predictions={state.predictions}
-            />
-          </section>
-        )}
-
         {tab === "results" && (
           <section className="panel">
             <SectionHeader title="Resultados dos Jogos" />
             <div className={`sync-strip ${syncStatus.state}`}>
               <strong>{syncStatus.message}</strong>
-              <span>{state.lastResultSyncAt ? `Última checagem: ${formatDate(state.lastResultSyncAt)}` : "A atualização roda ao entrar e a cada 5 minutos."}</span>
+              <span>{state.lastResultSyncAt ? `Última checagem: ${formatDate(state.lastResultSyncAt)}. ${resultSyncIntervalText}` : resultSyncIntervalText}</span>
             </div>
             <div className="prediction-toolbar">
               <label className="select-label">
                 Rodada
                 <select value={activeResultRound} onChange={(event) => {
                   setSelectedResultRound(Number(event.target.value));
-                  queueExecutedMatchScroll("results");
                 }}>
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
                       {round < automaticRound
-                        ? `Rodada ${round} — Encerrada`
+                        ? `Rodada ${round} - Encerrada`
                         : round === automaticRound
-                        ? `Rodada ${round} — Em andamento`
-                        : `Rodada ${round} — Pendente`}
+                        ? `Rodada ${round} - Em andamento`
+                        : `Rodada ${round} - Pendente`}
                     </option>
                   ))}
                 </select>
               </label>
             </div>
-            <ResultsList matches={resultMatches} lastExecutedMatchId={lastResultExecutedMatchId} />
+            <ResultsList matches={resultMatches} />
           </section>
         )}
 
@@ -1314,14 +1247,14 @@ function AuthScreen({ error, onLogin, onRegister }) {
     <main className="auth-page">
       <section className="auth-visual">
         <img
-          src={`${import.meta.env.BASE_URL}capa-bolao.png`}
+          src={`${import.meta.env.BASE_URL}capa-bolao-login.png`}
           alt="Bolão da Copa do Mundo 2026"
-          fetchpriority="high"
+          fetchPriority="high"
         />
       </section>
       <section className="auth-card">
         <div className="auth-card-header">
-          <img src={SIDEMENU_LOGO_URL} alt="Bolão da Copa" className="auth-logo" />
+          <img src={AUTH_LOGO_URL} alt="Bolão da Copa" className="auth-logo" />
           <span>Copa do Mundo 2026</span>
           <h2>{mode === "register" ? "Criar sua conta" : "Entrar no bolão"}</h2>
           <p>{mode === "register" ? "Seu cadastro já entra como participante." : "Use seu e-mail e senha cadastrados."}</p>
@@ -1364,6 +1297,61 @@ function TeamName({ teamId, fallback }) {
   return <span className="team-name"><Flag team={team} />{team.name}</span>;
 }
 
+function PredictionTeamColumn({ teamId, fallback, onHistory }) {
+  const team = teamsById[teamId];
+  return (
+    <div className="prediction-team-column">
+      <TeamName teamId={teamId} fallback={fallback} />
+      {team && (
+        <button type="button" className="ghost history-button" onClick={() => onHistory(teamId)}>
+          Histórico
+        </button>
+      )}
+    </div>
+  );
+}
+
+function TeamHistoryModal({ team, matches, onClose }) {
+  const teamMatches = (matches ?? [])
+    .filter((match) => match.homeTeamId === team.id || match.awayTeamId === team.id)
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="modal-card team-history-modal" role="dialog" aria-modal="true" aria-labelledby="team-history-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">Histórico</p>
+            <h2 id="team-history-title"><TeamName teamId={team.id} fallback={team.name} /></h2>
+          </div>
+          <button type="button" className="modal-close" aria-label="Fechar modal" onClick={onClose}>x</button>
+        </div>
+        {teamMatches.length ? (
+          <div className="team-history-list">
+            {teamMatches.map((match) => (
+              <article className="team-history-item" key={match.id}>
+                <div>
+                  <span className="badge">{match.phase}</span>
+                  <h3 className="teams-versus">
+                    <TeamName teamId={match.homeTeamId} fallback={match.home} />
+                    <span>x</span>
+                    <TeamName teamId={match.awayTeamId} fallback={match.away} />
+                  </h3>
+                  <p>{formatDate(match.date)}</p>
+                  <p className="match-location">{formatVenue(match)}</p>
+                </div>
+                <strong className="team-history-score">{formatMatchScore(match)}</strong>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState text="Nenhum jogo encontrado para esta seleção." />
+        )}
+      </section>
+    </div>
+  );
+}
+
 function Flag({ team }) {
   return <img className="flag" src={getFlagUrl(team)} alt={`Bandeira: ${team.name}`} loading="lazy" />;
 }
@@ -1377,6 +1365,51 @@ function ScoreInput({ value, onChange, disabled = false }) {
 }
 
 function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, onRemove, canRemove = true, removeLabel = "Remover", protectedUserId = "" }) {
+  const [editingKey, setEditingKey] = useState("");
+  const [drafts, setDrafts] = useState({});
+
+  function getRowKey(row) {
+    return `${row.userId || "orphan"}-${row.participantId || row.id}`;
+  }
+
+  function startEdit(row) {
+    const key = getRowKey(row);
+    setEditingKey(key);
+    setDrafts((current) => ({
+      ...current,
+      [key]: { name: row.name ?? "", email: row.email ?? "", password: "" }
+    }));
+  }
+
+  function cancelEdit(row) {
+    const key = getRowKey(row);
+    setEditingKey("");
+    setDrafts((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }
+
+  function updateDraft(key, field, value) {
+    setDrafts((current) => ({
+      ...current,
+      [key]: { ...current[key], [field]: value }
+    }));
+  }
+
+  async function saveEdit(row) {
+    const key = getRowKey(row);
+    const draft = drafts[key] ?? {};
+    const name = (draft.name ?? "").trim();
+    const email = (draft.email ?? "").trim().toLowerCase();
+    const password = (draft.password ?? "").trim();
+    if (name && name !== row.name) onChange(row, "name", name);
+    if (email && email !== row.email) onChange(row, "email", email);
+    if (row.linkedUser && password) await onResetPassword(row.userId, password);
+    cancelEdit(row);
+  }
+
   return (
     <section className="participant-section">
       <div className="participant-section-title">
@@ -1388,27 +1421,69 @@ function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, on
           <div className="participant-grid-header">
             <span>Nome</span>
             <span>E-mail</span>
+            <span>Perfil</span>
             <span>Ações</span>
           </div>
-          {rows.map((row) => (
-            <div className={`participant-grid-row${row.orphan ? " orphan" : ""}`} key={`${row.userId || "orphan"}-${row.participantId || row.id}`}>
-              <input value={row.name} placeholder="Nome" onChange={(event) => onChange(row, "name", event.target.value)} />
-              <input type="email" value={row.email} placeholder="Sem e-mail vinculado" onChange={(event) => onChange(row, "email", event.target.value)} />
-              <div className="list-row-actions">
-                {row.linkedUser && (
-                  <button type="button" className="ghost subtle" onClick={() => {
-                    const nova = prompt(`Nova senha para ${row.name}:`);
-                    if (nova?.trim()) onResetPassword(row.userId, nova.trim());
-                  }}>Resetar senha</button>
+          {rows.map((row) => {
+            const key = getRowKey(row);
+            const isEditing = editingKey === key;
+            const draft = drafts[key] ?? { name: row.name ?? "", email: row.email ?? "", password: "" };
+            return (
+              <React.Fragment key={key}>
+                <div className={`participant-grid-row${row.orphan ? " orphan" : ""}`}>
+                  <div className="participant-grid-cell">
+                    <strong>{row.name || "Sem nome"}</strong>
+                  </div>
+                  <div className="participant-grid-cell">
+                    <span>{row.email || "Sem e-mail vinculado"}</span>
+                  </div>
+                  <div className="participant-grid-cell">
+                    {row.userId && row.userId === protectedUserId ? (
+                      <span className="current-user-pill">Usuário atual</span>
+                    ) : (
+                      <span className="participant-role-pill">{row.linkedUser ? "Participante" : "Sem acesso"}</span>
+                    )}
+                  </div>
+                  <div className="list-row-actions">
+                    <button type="button" className="ghost subtle" onClick={() => (isEditing ? cancelEdit(row) : startEdit(row))}>
+                      {isEditing ? "Fechar" : "Editar"}
+                    </button>
+                  </div>
+                </div>
+                {isEditing && (
+                  <div className="participant-edit-panel">
+                    <label>
+                      Nome
+                      <input value={draft.name} placeholder="Nome" onChange={(event) => updateDraft(key, "name", event.target.value)} />
+                    </label>
+                    <label>
+                      E-mail
+                      <input type="email" value={draft.email} placeholder="E-mail" onChange={(event) => updateDraft(key, "email", event.target.value)} />
+                    </label>
+                    <label>
+                      Nova senha
+                      <input
+                        type="password"
+                        value={draft.password}
+                        disabled={!row.linkedUser}
+                        placeholder={row.linkedUser ? "Preencha para alterar" : "Sem usuário vinculado"}
+                        onChange={(event) => updateDraft(key, "password", event.target.value)}
+                      />
+                    </label>
+                    <div className="participant-edit-actions">
+                      <button type="button" onClick={() => saveEdit(row)}>Salvar alterações</button>
+                      <button type="button" className="ghost" onClick={() => cancelEdit(row)}>Cancelar</button>
+                      {row.userId && row.userId === protectedUserId ? (
+                        <span className="current-user-pill">Usuário atual</span>
+                      ) : canRemove && (
+                        <button type="button" className="danger" onClick={() => onRemove(row)}>{removeLabel}</button>
+                      )}
+                    </div>
+                  </div>
                 )}
-                {row.userId && row.userId === protectedUserId ? (
-                  <span className="current-user-pill">Usuário atual</span>
-                ) : canRemove && (
-                  <button type="button" className="danger subtle" onClick={() => onRemove(row)}>{removeLabel}</button>
-                )}
-              </div>
-            </div>
-          ))}
+              </React.Fragment>
+            );
+          })}
         </div>
       ) : (
         <EmptyState text={emptyText} />
@@ -1420,14 +1495,6 @@ function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, on
 function RankingTable({ ranking, matches = [], compact = false }) {
   const paidParticipants = ranking.length;
   const totalPoolValue = paidParticipants * ENTRY_FEE;
-  const isChampionshipOver =
-    matches.length > 0 &&
-    matches.every(
-      (m) =>
-        m.homeScore !== "" && m.homeScore !== null && m.homeScore !== undefined &&
-        m.awayScore !== "" && m.awayScore !== null && m.awayScore !== undefined
-    );
-  const champion = ranking[0] ?? null;
 
   return (
     <section className="panel table-panel">
@@ -1450,22 +1517,7 @@ function RankingTable({ ranking, matches = [], compact = false }) {
         </div>
       )}
       {!compact && <ScoringExamples />}
-      {!compact && <RankingInfoCard />}
-      {!compact && <TiebreakerCard />}
-      {!compact && (
-        <div className="podium-card">
-          <div className="podium-trophy">🏆</div>
-          <div className="podium-body">
-            <span className="podium-label">Campeão do Bolão</span>
-            {isChampionshipOver && champion ? (
-              <strong className="podium-winner">{champion.name}</strong>
-            ) : (
-              <span className="podium-pending">Será revelado ao final do campeonato</span>
-            )}
-            <span className="podium-prize">{formatCurrency(totalPoolValue)}</span>
-          </div>
-        </div>
-      )}
+      {!compact && <RankingTiebreakerCard />}
       {ranking.length ? (
         <div className="table-wrap">
           <table className="ranking-table">
@@ -1473,7 +1525,11 @@ function RankingTable({ ranking, matches = [], compact = false }) {
             <tbody>
               {ranking.map((participant, index) => (
                 <tr key={participant.id}>
-                  <td><span className="rank-position">{index === 0 ? "🏆" : index + 1}</span></td>
+                  <td>
+                    <span className={`rank-position ${index === 0 ? "rank-position-leader" : ""}`}>
+                      {index === 0 ? <FontAwesomeIcon icon={faTrophy} title="Primeiro colocado" /> : index + 1}
+                    </span>
+                  </td>
                   <td className="participant-cell">{participant.name}</td>
                   <td><strong className="points-pill">{participant.total}</strong></td>
                   <td>{participant.exactScores}</td>
@@ -1489,7 +1545,7 @@ function RankingTable({ ranking, matches = [], compact = false }) {
   );
 }
 
-function ResultsList({ matches, lastExecutedMatchId = "" }) {
+function ResultsList({ matches }) {
   if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
   const [openMatchId, setOpenMatchId] = useState("");
 
@@ -1499,7 +1555,7 @@ function ResultsList({ matches, lastExecutedMatchId = "" }) {
       return;
     }
     if (!openMatchId) return;
-    if (matches.some((match) => match.id === openMatchId && getResultMeta(match).hasResult)) return;
+    if (matches.some((match) => match.id === openMatchId)) return;
     setOpenMatchId("");
   }, [matches, openMatchId]);
 
@@ -1509,7 +1565,6 @@ function ResultsList({ matches, lastExecutedMatchId = "" }) {
         <ResultCard
           key={match.id}
           match={match}
-          isLastExecuted={match.id === lastExecutedMatchId}
           isOpen={openMatchId === match.id}
           onToggle={() => setOpenMatchId((current) => current === match.id ? "" : match.id)}
         />
@@ -1537,52 +1592,17 @@ function getResultMeta(match) {
   };
 }
 
-function ResultCard({ match, isLastExecuted = false, isOpen, onToggle }) {
+function ResultCard({ match, isOpen, onToggle }) {
   const {
     homeScore,
     awayScore,
-    hasResult,
-    homeWon,
-    awayWon,
     statusLabel,
     statusClass
   } = getResultMeta(match);
 
-  if (!hasResult) {
-    return (
-      <article
-        className={`match-card result-card ${statusClass}`}
-        data-last-executed-match={isLastExecuted ? "true" : undefined}
-        data-scroll-tab="results"
-      >
-        <div className="result-card-header">
-          <div>
-            <span className="badge">{match.phase}</span>
-            <h3 className="teams-versus">
-              <TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span>{" "}
-              <TeamName teamId={match.awayTeamId} fallback={match.away} />
-            </h3>
-            <p>{formatDate(match.date)}</p>
-            <p className="match-location">{formatVenue(match)}</p>
-          </div>
-          <span className={`result-status ${statusClass}`}>
-            {statusLabel}
-          </span>
-        </div>
-        <div className="result-board">
-          <ResultTeam teamId={match.homeTeamId} fallback={match.home} score={homeScore} isWinner={homeWon} />
-          <span className="result-separator">x</span>
-          <ResultTeam teamId={match.awayTeamId} fallback={match.away} score={awayScore} isWinner={awayWon} align="right" />
-        </div>
-      </article>
-    );
-  }
-
   return (
     <article
       className={`match-card result-card result-accordion ${statusClass} ${isOpen ? "open" : ""}`}
-      data-last-executed-match={isLastExecuted ? "true" : undefined}
-      data-scroll-tab="results"
     >
       <button type="button" className="result-accordion-toggle" onClick={onToggle} aria-expanded={isOpen}>
         <div className="result-card-header">
@@ -1610,57 +1630,47 @@ function ResultCard({ match, isLastExecuted = false, isOpen, onToggle }) {
       </button>
       {isOpen && (
         <div className="result-accordion-body">
-          <div className="result-board">
-            <ResultTeam teamId={match.homeTeamId} fallback={match.home} score={homeScore} isWinner={homeWon} />
-            <span className="result-separator">x</span>
-            <ResultTeam teamId={match.awayTeamId} fallback={match.away} score={awayScore} isWinner={awayWon} align="right" />
-          </div>
-          <ResultGoals match={match} hasResult={hasResult} />
+          <ResultGoals match={match} />
         </div>
       )}
     </article>
   );
 }
 
-function ResultTeam({ teamId, fallback, score, isWinner, align = "left" }) {
-  return (
-    <div className={`result-team ${isWinner ? "winner" : ""} ${align === "right" ? "right" : ""}`}>
-      <TeamName teamId={teamId} fallback={fallback} />
-      <strong className="result-score">{score === null ? "-" : score}</strong>
-    </div>
-  );
-}
-
-function ResultGoals({ match, hasResult }) {
+function ResultGoals({ match }) {
   const homeGoals = match.homeGoals ?? [];
   const awayGoals = match.awayGoals ?? [];
-  const hasGoals = homeGoals.length > 0 || awayGoals.length > 0;
-  if (!hasResult) return null;
-  if (!hasGoals) return <p className="result-goals-empty">Nenhum gol registrado para esta partida.</p>;
   return (
     <div className="result-goals">
-      <GoalList title="Gols mandante" teamId={match.homeTeamId} fallback={match.home} goals={homeGoals} />
-      <GoalList title="Gols visitante" teamId={match.awayTeamId} fallback={match.away} goals={awayGoals} align="right" />
+      <GoalList teamId={match.homeTeamId} fallback={match.home} goals={homeGoals} />
+      <GoalList teamId={match.awayTeamId} fallback={match.away} goals={awayGoals} />
     </div>
   );
 }
 
-function GoalList({ teamId, fallback, goals, align = "left" }) {
+function GoalList({ teamId, fallback, goals }) {
+  const teamName = teamsById[teamId]?.name ?? fallback ?? "Seleção";
   return (
-    <div className={`goal-list ${align === "right" ? "right" : ""}`}>
-      <div className="goal-list-title"><TeamName teamId={teamId} fallback={fallback} /></div>
+    <div className="goal-list">
+      <div className="goal-list-title">{teamName}</div>
       {goals.length ? (
         <ul>
           {goals.map((goal, index) => (
             <li key={`${goal.name}-${goal.minute}-${index}`}>
-              <span className="goal-minute">{formatGoalMinute(goal)}</span>
-              <strong>{goal.name}</strong>
-              {goal.penalty && <span className="goal-tag">Pênalti</span>}
-              {goal.ownGoal && <span className="goal-tag">Contra</span>}
+              <div className="goal-player">
+                <span className="goal-minute">{formatGoalMinute(goal)}</span>
+                <strong>{goal.name}</strong>
+              </div>
+              <div className="goal-tags">
+                {goal.penalty && <span className="goal-tag">Pênalti</span>}
+                {goal.ownGoal && <span className="goal-tag">Contra</span>}
+              </div>
             </li>
           ))}
         </ul>
-      ) : <p>Sem gols.</p>}
+      ) : (
+        <p>Sem gols.</p>
+      )}
     </div>
   );
 }
@@ -1736,91 +1746,35 @@ function calculateGroupStandings(matches) {
   }));
 }
 
-function DailyPredictions({ matches, lastExecutedMatchId = "", participants, predictions }) {
-  if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
-  if (!participants.length) return <EmptyState text="Nenhum participante cadastrado ainda." />;
-  const [openMatchId, setOpenMatchId] = useState("");
-
-  useEffect(() => {
-    if (!matches.length) {
-      setOpenMatchId("");
-      return;
-    }
-    if (matches.some((match) => match.id === openMatchId)) return;
-    setOpenMatchId("");
-  }, [matches, openMatchId]);
-
-  return (
-    <div className="daily-predictions">
-      {matches.map((match) => (
-        <DailyPredictionCard
-          key={match.id}
-          match={match}
-          isLastExecuted={match.id === lastExecutedMatchId}
-          participants={participants}
-          predictions={predictions}
-          isOpen={openMatchId === match.id}
-          onToggle={() => setOpenMatchId((current) => current === match.id ? "" : match.id)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function DailyPredictionCard({ match, isLastExecuted = false, participants, predictions, isOpen, onToggle }) {
+function MatchPredictionOverview({ match, participants, predictions }) {
   const offeredPredictions = participants
     .map((participant) => ({ participant, prediction: predictions[participant.id]?.[match.id] }))
     .filter(({ prediction }) => hasPrediction(prediction));
 
   return (
-    <article
-      className={`match-card daily-prediction-card daily-prediction-accordion ${isOpen ? "open" : ""}`}
-      data-last-executed-match={isLastExecuted ? "true" : undefined}
-      data-scroll-tab="dailyPredictions"
-    >
-      <button type="button" className="daily-prediction-toggle" onClick={onToggle} aria-expanded={isOpen}>
-        <div className="daily-prediction-header">
-          <div>
-            <span className="badge">{match.phase}</span>
-            <h3 className="teams-versus">
-              <TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span>{" "}
-              <TeamName teamId={match.awayTeamId} fallback={match.away} />
-            </h3>
-            <p>{formatDate(match.date)}</p>
-            <p className="match-location">{formatVenue(match)}</p>
-          </div>
-          <div className="daily-prediction-summary">
-            <span className="daily-prediction-count">
-              {offeredPredictions.length} palpite{offeredPredictions.length === 1 ? "" : "s"}
-            </span>
-            <span className="daily-prediction-icon" aria-hidden="true">{isOpen ? "-" : "+"}</span>
-          </div>
+    <div className="prediction-card-overview">
+      <div className="prediction-card-overview-header">
+        <strong>Palpites dos participantes</strong>
+        <span>{offeredPredictions.length} palpite{offeredPredictions.length === 1 ? "" : "s"}</span>
+      </div>
+      {offeredPredictions.length ? (
+        <div className="table-wrap">
+          <table className="compact-table">
+            <thead><tr><th>Participante</th><th>Palpite</th></tr></thead>
+            <tbody>
+              {offeredPredictions.map(({ participant, prediction }) => (
+                <tr key={participant.id}>
+                  <td>{participant.name}</td>
+                  <td><span className="prediction-pill">{formatPrediction(prediction)}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      </button>
-      {isOpen && (
-        offeredPredictions.length ? (
-          <div className="daily-prediction-body">
-            <div className="table-wrap">
-              <table className="compact-table">
-                <thead><tr><th>Participante</th><th>Palpite</th></tr></thead>
-                <tbody>
-                  {offeredPredictions.map(({ participant, prediction }) => (
-                    <tr key={participant.id}>
-                      <td>{participant.name}</td>
-                      <td><span className="prediction-pill">{formatPrediction(prediction)}</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <div className="daily-prediction-body">
-            <p className="empty">Nenhum palpite registrado para este jogo.</p>
-          </div>
-        )
+      ) : (
+        <p className="empty">Nenhum palpite registrado para este jogo.</p>
       )}
-    </article>
+    </div>
   );
 }
 
@@ -1833,6 +1787,12 @@ function formatPrediction(prediction) {
   return `${prediction.home} x ${prediction.away}`;
 }
 
+function formatMatchScore(match) {
+  const home = parseScoreValue(match?.homeScore);
+  const away = parseScoreValue(match?.awayScore);
+  return home === null || away === null ? "Aguardando" : `${home} x ${away}`;
+}
+
 function formatGoalMinute(goal) {
   if (goal.minute === "" || goal.minute === null || goal.minute === undefined) return "-";
   return goal.offset ? `${goal.minute}+${goal.offset}'` : `${goal.minute}'`;
@@ -1841,30 +1801,61 @@ function formatGoalMinute(goal) {
 function ScoringExamples() {
   return (
     <div className="scoring-examples">
-      <div><strong>3 pontos</strong><span>Cravou o placar: palpite 2 x 1, resultado 2 x 1.</span></div>
-      <div><strong>1 ponto</strong><span>Acertou o ganhador ou o empate: palpite 2 x 2, resultado 1 x 1.</span></div>
-      <div><strong>0 ponto</strong><span>Errou o ganhador ou indicou empate quando houve vencedor.</span></div>
+      <div className="scoring-card scoring-card-primary">
+        <div className="scoring-card-header">
+          <strong>3</strong>
+          <span>pontos</span>
+        </div>
+        <div className="scoring-card-copy">
+          <strong>Placar cravado</strong>
+          <span>Palpite 2 x 1, resultado 2 x 1.</span>
+        </div>
+      </div>
+      <div className="scoring-card">
+        <div className="scoring-card-header">
+          <strong>1</strong>
+          <span>ponto</span>
+        </div>
+        <div className="scoring-card-copy">
+          <strong>Vencedor correto</strong>
+          <span>Acertou quem venceu, mesmo sem cravar o placar.</span>
+        </div>
+      </div>
+      <div className="scoring-card">
+        <div className="scoring-card-header">
+          <strong>1</strong>
+          <span>ponto</span>
+        </div>
+        <div className="scoring-card-copy">
+          <strong>Empate correto</strong>
+          <span>Palpite e resultado foram empate, com placar diferente.</span>
+        </div>
+      </div>
+      <div className="scoring-card scoring-card-muted">
+        <div className="scoring-card-header">
+          <strong>0</strong>
+          <span>ponto</span>
+        </div>
+        <div className="scoring-card-copy">
+          <strong>Resultado errado</strong>
+          <span>Errou o vencedor ou marcou empate quando houve vencedor.</span>
+        </div>
+      </div>
     </div>
   );
 }
 
-function RankingInfoCard() {
+function RankingTiebreakerCard() {
   return (
-    <div className="ranking-info-card">
-      <strong>Empate também pontua</strong>
-      <span>Se o palpite e o resultado forem empate, soma 1 ponto mesmo sem cravar o placar. Exemplo: palpite 2 x 2, resultado 1 x 1.</span>
-    </div>
-  );
-}
-
-function TiebreakerCard() {
-  return (
-    <div className="tiebreaker-card">
-      <strong>Critérios de desempate</strong>
+    <div className="ranking-tiebreaker-card">
+      <div className="ranking-tiebreaker-heading">
+        <span>Critérios de desempate</span>
+        <strong>Se houver empate na pontuação final</strong>
+      </div>
       <ol>
-        <li><span className="tb-label">Placares exatos</span><span className="tb-desc">Quem cravou mais resultados (3 pts) vai na frente</span></li>
-        <li><span className="tb-label">Acertos de resultado</span><span className="tb-desc">Quem acertou mais vencedores ou empates (1 pt) desempata</span></li>
-        <li><span className="tb-label">Ordem alfabética</span><span className="tb-desc">Critério final para garantir ordenação determinística</span></li>
+        <li><strong>1</strong><span>Maior número de placares cravados.</span></li>
+        <li><strong>2</strong><span>Maior número de acertos de 1 ponto.</span></li>
+        <li><strong>3</strong><span>Persistindo o empate, prevalece a ordem alfabética.</span></li>
       </ol>
     </div>
   );
@@ -1873,7 +1864,7 @@ function TiebreakerCard() {
 function GroupStandingsBoard({ groups }) {
   return (
     <section className="panel">
-      <SectionHeader title="Classificacao dos Grupos" />
+      <SectionHeader title="Classificação dos Grupos" />
       <div className="groups-standings-layout">
         {groups.map((group) => (
           <section className="group-standings-card" key={group.group}>
@@ -1885,7 +1876,7 @@ function GroupStandingsBoard({ groups }) {
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Selecao</th>
+                    <th>Seleção</th>
                     <th>PTS</th>
                     <th>J</th>
                     <th>V</th>
