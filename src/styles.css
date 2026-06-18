@@ -1660,6 +1660,62 @@ h3 {
   color: var(--muted);
 }
 
+.podium-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 16px;
+  padding: 20px 24px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1a3a6b 0%, #0f2a55 100%);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 215, 0, 0.1);
+  text-align: center;
+}
+
+.podium-trophy {
+  font-size: 3rem;
+  line-height: 1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 8px rgba(255, 215, 0, 0.4));
+}
+
+.podium-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.podium-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 215, 0, 0.75);
+}
+
+.podium-winner {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #ffd700;
+  line-height: 1.2;
+}
+
+.podium-pending {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.55);
+  font-style: italic;
+}
+
+.podium-prize {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-top: 4px;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--line);

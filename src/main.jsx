@@ -28,6 +28,9 @@ import {
 import "./styles.css";
 
 const ACTIVE_POOL_ID = import.meta.env.VITE_POOL_ID || "copa-2026";
+const SUPER_ADMIN_EMAILS = new Set(
+  (import.meta.env.VITE_SUPER_ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
+);
 const PRIMARY_POOL_ID = "copa-2026";
 const STORAGE_SCOPE = ACTIVE_POOL_ID === "copa-2026" ? "" : `:${ACTIVE_POOL_ID}`;
 const SESSION_KEY = `bolao-copa-2026${STORAGE_SCOPE}:session`;
@@ -136,7 +139,7 @@ function applyRemoteData(current, remoteData, { prefer = "shared" } = {}) {
   const merged = mergePublicPoolState(current, remoteData, { prefer });
   return cleanPoolState({
     ...merged,
-    users: normalizeUsers(merged.users ?? []),
+    users: normalizeUsers(merged.users ?? [], SUPER_ADMIN_EMAILS),
     currentUserId: current.currentUserId,
     activeParticipantId: current.activeParticipantId
   });
@@ -316,7 +319,7 @@ function App() {
           const merged = mergePublicPoolState(current, cached, { prefer: "shared" });
           return cleanPoolState({
             ...merged,
-            users: normalizeUsers(merged.users ?? []),
+            users: normalizeUsers(merged.users ?? [], SUPER_ADMIN_EMAILS),
             currentUserId: session.currentUserId ?? "",
             activeParticipantId: session.activeParticipantId ?? ""
           });
@@ -369,7 +372,7 @@ function App() {
           const merged = mergePublicPoolState(current, cleanedBase, { prefer: "shared" });
           const next = {
             ...merged,
-            users: normalizeUsers(merged.users ?? []),
+            users: normalizeUsers(merged.users ?? [], SUPER_ADMIN_EMAILS),
             currentUserId: session.currentUserId ?? "",
             activeParticipantId: session.activeParticipantId ?? ""
           };
@@ -539,6 +542,7 @@ function App() {
   }
 
   async function persistAndSync(nextState) {
+    saveCachedPoolState(nextState);
     try {
       const saved = await persistPoolState(nextState);
       const cleanedSaved = cleanPoolState(saved);
@@ -1153,7 +1157,11 @@ function App() {
                 }}>
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
-                      {round === activeRound ? `Rodada ${round} - liberada` : `Rodada ${round}`}
+                      {round < automaticRound
+                        ? `Rodada ${round} — Encerrada`
+                        : round === automaticRound
+                        ? `Rodada ${round} — Em andamento`
+                        : `Rodada ${round} — Pendente`}
                     </option>
                   ))}
                 </select>
@@ -1234,7 +1242,11 @@ function App() {
                 }}>
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
-                      {round === activeRound ? `Rodada ${round} — em andamento` : `Rodada ${round}`}
+                      {round < automaticRound
+                        ? `Rodada ${round} — Encerrada`
+                        : round === automaticRound
+                        ? `Rodada ${round} — Em andamento`
+                        : `Rodada ${round} — Pendente`}
                     </option>
                   ))}
                 </select>
@@ -1269,7 +1281,11 @@ function App() {
                 }}>
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
-                      {round === activeRound ? `Rodada ${round} - em andamento` : `Rodada ${round}`}
+                      {round < automaticRound
+                        ? `Rodada ${round} — Encerrada`
+                        : round === automaticRound
+                        ? `Rodada ${round} — Em andamento`
+                        : `Rodada ${round} — Pendente`}
                     </option>
                   ))}
                 </select>
@@ -1281,7 +1297,7 @@ function App() {
 
         {tab === "groups" && <GroupStandingsBoard groups={groupStandings} />}
 
-        {tab === "ranking" && <RankingTable ranking={ranking} />}
+        {tab === "ranking" && <RankingTable ranking={ranking} matches={state.matches} />}
       </section>
     </main>
   );
@@ -1401,9 +1417,17 @@ function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, on
   );
 }
 
-function RankingTable({ ranking, compact = false }) {
+function RankingTable({ ranking, matches = [], compact = false }) {
   const paidParticipants = ranking.length;
   const totalPoolValue = paidParticipants * ENTRY_FEE;
+  const isChampionshipOver =
+    matches.length > 0 &&
+    matches.every(
+      (m) =>
+        m.homeScore !== "" && m.homeScore !== null && m.homeScore !== undefined &&
+        m.awayScore !== "" && m.awayScore !== null && m.awayScore !== undefined
+    );
+  const champion = ranking[0] ?? null;
 
   return (
     <section className="panel table-panel">
@@ -1427,6 +1451,20 @@ function RankingTable({ ranking, compact = false }) {
       )}
       {!compact && <ScoringExamples />}
       {!compact && <RankingInfoCard />}
+      {!compact && (
+        <div className="podium-card">
+          <div className="podium-trophy">🏆</div>
+          <div className="podium-body">
+            <span className="podium-label">Campeão do Bolão</span>
+            {isChampionshipOver && champion ? (
+              <strong className="podium-winner">{champion.name}</strong>
+            ) : (
+              <span className="podium-pending">Será revelado ao final do campeonato</span>
+            )}
+            <span className="podium-prize">{formatCurrency(totalPoolValue)}</span>
+          </div>
+        </div>
+      )}
       {ranking.length ? (
         <div className="table-wrap">
           <table className="ranking-table">

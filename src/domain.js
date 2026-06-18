@@ -115,10 +115,10 @@ export function calculateRanking(participants, matches, predictions) {
     .sort((a, b) => b.total - a.total || b.exactScores - a.exactScores || a.name.localeCompare(b.name));
 }
 
-export function normalizeUsers(users) {
+export function normalizeUsers(users, superAdminEmails = new Set()) {
   return users.map((user) => ({
     ...user,
-    role: user.role === "admin" ? "admin" : "user"
+    role: user.role === "admin" || superAdminEmails.has((user.email ?? "").toLowerCase()) ? "admin" : "user"
   }));
 }
 
