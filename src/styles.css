@@ -2520,6 +2520,27 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 
+  .group-standings-card .table-wrap {
+    overflow-x: visible;
+  }
+
+  .group-standings-table {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .group-standings-table th,
+  .group-standings-table td {
+    padding: 8px 5px;
+    font-size: 0.8rem;
+  }
+
+  /* Oculta GP, GC e SG no mobile */
+  .group-standings-table th:nth-child(n+8),
+  .group-standings-table td:nth-child(n+8) {
+    display: none;
+  }
+
   .ranking-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
