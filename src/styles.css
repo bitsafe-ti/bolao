@@ -907,7 +907,16 @@ h3 {
 }
 
 .participant-grid .list-row-actions {
-  justify-content: flex-end;
+  justify-content: center;
+}
+
+.participant-grid-header span:nth-child(3),
+.participant-grid-header span:nth-child(4) {
+  text-align: center;
+}
+
+.participant-grid-row .participant-grid-cell:nth-child(3) {
+  justify-items: center;
 }
 
 .icon-btn {
