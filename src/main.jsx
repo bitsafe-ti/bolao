@@ -33,8 +33,8 @@ const ACTIVE_POOL_ID = import.meta.env.VITE_POOL_ID || "copa-2026";
 const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva.rocha@hotmail.com";
 const SUPER_ADMIN_EMAILS = new Set(
   [
-    DEFAULT_SUPER_ADMIN_EMAIL,
     ...(import.meta.env.VITE_SUPER_ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean),
+    ...(import.meta.env.DEV ? [DEFAULT_SUPER_ADMIN_EMAIL] : []),
   ]
 );
 const PRIMARY_POOL_ID = "copa-2026";
