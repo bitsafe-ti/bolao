@@ -219,7 +219,7 @@ select:focus {
   height: 80px;
   width: auto;
   object-fit: contain;
-  justify-self: start;
+  justify-self: center;
 }
 
 .auth-card-header span {
