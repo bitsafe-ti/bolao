@@ -1368,6 +1368,10 @@ h3 {
   flex-wrap: wrap;
 }
 
+.result-card-tags .badge {
+  margin-bottom: 0;
+}
+
 .result-card-teams {
   display: flex;
   justify-content: space-between;
@@ -1439,7 +1443,7 @@ h3 {
 }
 
 .result-accordion-score {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
@@ -1448,8 +1452,8 @@ h3 {
   color: var(--text);
   font-size: 1rem;
   font-weight: 900;
-  padding: 7px 28px;
-  min-width: 110px;
+  padding: 7px 16px;
+  width: 50%;
 }
 
 .result-accordion-icon {
@@ -2293,8 +2297,7 @@ tr:last-child td {
 
   .result-accordion-score {
     font-size: 0.9rem;
-    padding: 6px 20px;
-    min-width: 90px;
+    width: 60%;
   }
 
   .result-team.right {
