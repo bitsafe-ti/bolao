@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrophy } from "@fortawesome/free-solid-svg-icons";
+import { faTrophy, faTrash } from "@fortawesome/free-solid-svg-icons";
 import {
   calculateRanking,
   createInitialState,
@@ -1365,50 +1365,31 @@ function ScoreInput({ value, onChange, disabled = false }) {
 }
 
 function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, onRemove, canRemove = true, removeLabel = "Remover", protectedUserId = "" }) {
-  const [editingKey, setEditingKey] = useState("");
-  const [drafts, setDrafts] = useState({});
-
-  function getRowKey(row) {
-    return `${row.userId || "orphan"}-${row.participantId || row.id}`;
-  }
+  const [editingRow, setEditingRow] = useState(null);
+  const [draft, setDraft] = useState({ name: "", email: "", password: "" });
 
   function startEdit(row) {
-    const key = getRowKey(row);
-    setEditingKey(key);
-    setDrafts((current) => ({
-      ...current,
-      [key]: { name: row.name ?? "", email: row.email ?? "", password: "" }
-    }));
+    setEditingRow(row);
+    setDraft({ name: row.name ?? "", email: row.email ?? "", password: "" });
   }
 
-  function cancelEdit(row) {
-    const key = getRowKey(row);
-    setEditingKey("");
-    setDrafts((current) => {
-      const next = { ...current };
-      delete next[key];
-      return next;
-    });
+  function cancelEdit() {
+    setEditingRow(null);
+    setDraft({ name: "", email: "", password: "" });
   }
 
-  function updateDraft(key, field, value) {
-    setDrafts((current) => ({
-      ...current,
-      [key]: { ...current[key], [field]: value }
-    }));
+  async function saveEdit(event) {
+    event.preventDefault();
+    const name = draft.name.trim();
+    const email = draft.email.trim().toLowerCase();
+    const password = draft.password.trim();
+    if (name && name !== editingRow.name) onChange(editingRow, "name", name);
+    if (email && email !== editingRow.email) onChange(editingRow, "email", email);
+    if (editingRow.linkedUser && password) await onResetPassword(editingRow.userId, password);
+    cancelEdit();
   }
 
-  async function saveEdit(row) {
-    const key = getRowKey(row);
-    const draft = drafts[key] ?? {};
-    const name = (draft.name ?? "").trim();
-    const email = (draft.email ?? "").trim().toLowerCase();
-    const password = (draft.password ?? "").trim();
-    if (name && name !== row.name) onChange(row, "name", name);
-    if (email && email !== row.email) onChange(row, "email", email);
-    if (row.linkedUser && password) await onResetPassword(row.userId, password);
-    cancelEdit(row);
-  }
+  const isProtected = editingRow && editingRow.userId && editingRow.userId === protectedUserId;
 
   return (
     <section className="participant-section">
@@ -1425,68 +1406,86 @@ function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, on
             <span>Ações</span>
           </div>
           {rows.map((row) => {
-            const key = getRowKey(row);
-            const isEditing = editingKey === key;
-            const draft = drafts[key] ?? { name: row.name ?? "", email: row.email ?? "", password: "" };
+            const key = `${row.userId || "orphan"}-${row.participantId || row.id}`;
+            const isCurrentUser = row.userId && row.userId === protectedUserId;
             return (
-              <React.Fragment key={key}>
-                <div className={`participant-grid-row${row.orphan ? " orphan" : ""}`}>
-                  <div className="participant-grid-cell">
-                    <strong>{row.name || "Sem nome"}</strong>
-                  </div>
-                  <div className="participant-grid-cell">
-                    <span>{row.email || "Sem e-mail vinculado"}</span>
-                  </div>
-                  <div className="participant-grid-cell">
-                    {row.userId && row.userId === protectedUserId ? (
-                      <span className="current-user-pill">Usuário atual</span>
-                    ) : (
-                      <span className="participant-role-pill">{row.linkedUser ? "Participante" : "Sem acesso"}</span>
-                    )}
-                  </div>
-                  <div className="list-row-actions">
-                    <button type="button" className="ghost subtle" onClick={() => (isEditing ? cancelEdit(row) : startEdit(row))}>
-                      {isEditing ? "Fechar" : "Editar"}
-                    </button>
-                  </div>
+              <div className={`participant-grid-row${row.orphan ? " orphan" : ""}`} key={key}>
+                <div className="participant-grid-cell">
+                  <strong>{row.name || "Sem nome"}</strong>
                 </div>
-                {isEditing && (
-                  <div className="participant-edit-panel">
-                    <label>
-                      Nome
-                      <input value={draft.name} placeholder="Nome" onChange={(event) => updateDraft(key, "name", event.target.value)} />
-                    </label>
-                    <label>
-                      E-mail
-                      <input type="email" value={draft.email} placeholder="E-mail" onChange={(event) => updateDraft(key, "email", event.target.value)} />
-                    </label>
-                    <label>
-                      Nova senha
-                      <input
-                        type="password"
-                        value={draft.password}
-                        disabled={!row.linkedUser}
-                        placeholder={row.linkedUser ? "Preencha para alterar" : "Sem usuário vinculado"}
-                        onChange={(event) => updateDraft(key, "password", event.target.value)}
-                      />
-                    </label>
-                    <div className="participant-edit-actions">
-                      <button type="button" onClick={() => saveEdit(row)}>Salvar alterações</button>
-                      <button type="button" className="ghost" onClick={() => cancelEdit(row)}>Cancelar</button>
-                      {row.userId && row.userId === protectedUserId ? (
-                        <span className="current-user-pill">Usuário atual</span>
-                      ) : canRemove && (
-                        <button type="button" className="danger" onClick={() => onRemove(row)}>{removeLabel}</button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </React.Fragment>
+                <div className="participant-grid-cell">
+                  <span>{row.email || "Sem e-mail vinculado"}</span>
+                </div>
+                <div className="participant-grid-cell">
+                  {isCurrentUser ? (
+                    <span className="current-user-pill">Usuário atual</span>
+                  ) : (
+                    <span className="participant-role-pill">{row.linkedUser ? "Participante" : "Sem acesso"}</span>
+                  )}
+                </div>
+                <div className="list-row-actions">
+                  <button type="button" className="ghost subtle" onClick={() => startEdit(row)}>Editar</button>
+                  {canRemove && !isCurrentUser && (
+                    <button
+                      type="button"
+                      className="ghost subtle icon-btn"
+                      aria-label={removeLabel}
+                      title={removeLabel}
+                      onClick={() => onRemove(row)}
+                    >
+                      <FontAwesomeIcon icon={faTrash} />
+                    </button>
+                  )}
+                </div>
+              </div>
             );
           })}
         </div>
       ) : (
         <EmptyState text={emptyText} />
+      )}
+
+      {editingRow && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={cancelEdit}>
+          <section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="participant-edit-title" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <p className="eyebrow">Participantes</p>
+                <h2 id="participant-edit-title">Editar contato</h2>
+              </div>
+              <button type="button" className="modal-close" aria-label="Fechar modal" onClick={cancelEdit}>×</button>
+            </div>
+            <form className="modal-form" onSubmit={saveEdit}>
+              <label className="form-field">
+                Nome
+                <input value={draft.name} placeholder="Nome" onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />
+              </label>
+              <label className="form-field">
+                E-mail
+                <input type="email" value={draft.email} placeholder="E-mail" onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))} />
+              </label>
+              <label className="form-field">
+                Nova senha
+                <input
+                  type="password"
+                  value={draft.password}
+                  disabled={!editingRow.linkedUser}
+                  placeholder={editingRow.linkedUser ? "Preencha para alterar" : "Sem usuário vinculado"}
+                  onChange={(e) => setDraft((d) => ({ ...d, password: e.target.value }))}
+                />
+              </label>
+              <div className="modal-actions">
+                {!isProtected && canRemove && (
+                  <button type="button" className="ghost danger subtle icon-btn" aria-label={removeLabel} title={removeLabel} onClick={() => { onRemove(editingRow); cancelEdit(); }}>
+                    <FontAwesomeIcon icon={faTrash} />
+                  </button>
+                )}
+                <button type="button" className="ghost" onClick={cancelEdit}>Cancelar</button>
+                <button type="submit">Salvar alterações</button>
+              </div>
+            </form>
+          </section>
+        </div>
       )}
     </section>
   );
