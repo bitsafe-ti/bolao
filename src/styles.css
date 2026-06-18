@@ -177,6 +177,7 @@ select:focus {
   margin: 0 auto;
   overflow: hidden;
   padding: 0;
+  background: #061830;
 }
 
 .auth-visual {
