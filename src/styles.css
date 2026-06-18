@@ -1368,17 +1368,23 @@ h3 {
   min-width: 0;
 }
 
+.result-card-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
 .result-card-aside {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 8px;
   flex: 0 0 auto;
 }
 
 .result-card-meta {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-top: 8px;

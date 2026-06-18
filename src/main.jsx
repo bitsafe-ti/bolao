@@ -1610,7 +1610,10 @@ function ResultCard({ match, isOpen, onToggle }) {
       <button type="button" className="result-accordion-toggle" onClick={onToggle} aria-expanded={isOpen}>
         <div className="result-card-header">
           <div className="result-card-info">
-            <span className="badge">{match.phase}</span>
+            <div className="result-card-tags">
+              <span className="badge">{match.phase}</span>
+              <span className={`result-status ${statusClass}`}>{statusLabel}</span>
+            </div>
             <h3 className="teams-versus">
               <TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span>{" "}
               <TeamName teamId={match.awayTeamId} fallback={match.away} />
@@ -1622,7 +1625,6 @@ function ResultCard({ match, isOpen, onToggle }) {
               <span>x</span>
               <strong>{awayScore === null ? "-" : awayScore}</strong>
             </div>
-            <span className="result-accordion-icon" aria-hidden="true">{isOpen ? "-" : "+"}</span>
           </div>
         </div>
         <div className="result-card-meta">
@@ -1630,7 +1632,7 @@ function ResultCard({ match, isOpen, onToggle }) {
             <p>{formatDate(match.date)}</p>
             <p className="match-location">{formatVenue(match)}</p>
           </div>
-          <span className={`result-status ${statusClass}`}>{statusLabel}</span>
+          <span className="result-accordion-icon" aria-hidden="true">{isOpen ? "−" : "+"}</span>
         </div>
       </button>
       {isOpen && (
