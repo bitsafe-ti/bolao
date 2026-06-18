@@ -1627,13 +1627,9 @@ function ResultCard({ match, isOpen, onToggle }) {
             <strong>{awayScore === null ? "-" : awayScore}</strong>
           </div>
         </div>
-        <div className="result-card-meta">
-          <div>
-            <p>{formatDate(match.date)}</p>
-            <p className="match-location">{formatVenue(match)}</p>
-          </div>
-          <span className="result-accordion-icon" aria-hidden="true">{isOpen ? "−" : "+"}</span>
-        </div>
+        <p className="result-card-date">{formatDate(match.date)}</p>
+        <p className="result-card-venue">{formatVenue(match)}</p>
+        <span className="result-accordion-icon" aria-hidden="true">{isOpen ? "−" : "+"}</span>
       </button>
       {isOpen && (
         <div className="result-accordion-body">

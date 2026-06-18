@@ -1333,7 +1333,11 @@ h3 {
   background: transparent;
   color: var(--text);
   padding: 18px;
-  text-align: left;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 
 .result-accordion-toggle:hover {
@@ -1359,9 +1363,9 @@ h3 {
 .result-card-tags {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 6px;
 }
 
 .result-card-teams {
@@ -1369,7 +1373,7 @@ h3 {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
+  width: 100%;
 }
 
 .result-card-team {
@@ -1380,37 +1384,29 @@ h3 {
   overflow-wrap: break-word;
 }
 
-.result-card-team.away {
+.result-card-team.home {
   text-align: right;
+}
+
+.result-card-team.away {
+  text-align: left;
 }
 
 .result-card-score-row {
   display: flex;
   justify-content: center;
-  margin-bottom: 8px;
 }
 
-.result-card-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.result-card-meta > div {
-  min-width: 0;
-  flex: 1;
-}
-
-.result-card-meta p {
+.result-card-date {
   color: var(--muted);
-  margin-bottom: 0;
+  margin: 0;
+  font-size: 0.88rem;
 }
 
-.result-card-meta .match-location {
-  color: var(--text);
+.result-card-venue {
   font-weight: 700;
-  margin-top: 2px;
+  margin: 0;
+  font-size: 0.88rem;
 }
 
 .result-status {
@@ -1445,13 +1441,15 @@ h3 {
 .result-accordion-score {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 12px;
   border-radius: 999px;
   background: var(--soft);
   color: var(--text);
   font-size: 1rem;
   font-weight: 900;
-  padding: 6px 10px;
+  padding: 7px 28px;
+  min-width: 110px;
 }
 
 .result-accordion-icon {
@@ -2286,19 +2284,17 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 
-  .result-card-meta {
-    flex-wrap: wrap;
-  }
-
-  .result-card-meta .match-location {
+  .result-card-venue {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 100%;
   }
 
   .result-accordion-score {
     font-size: 0.9rem;
-    padding: 5px 9px;
+    padding: 6px 20px;
+    min-width: 90px;
   }
 
   .result-team.right {
