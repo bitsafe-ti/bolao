@@ -215,6 +215,7 @@ select:focus {
   display: grid;
   gap: 8px;
   margin-bottom: 24px;
+  text-align: center;
 }
 
 .auth-logo {
@@ -298,6 +299,7 @@ select:focus {
 
 .auth-card .auth-note {
   color: rgba(255, 255, 255, 0.60);
+  text-align: center;
 }
 
 .form-error {
@@ -1912,13 +1914,6 @@ tr:last-child td {
     display: none;
   }
 
-  .auth-card-header {
-    text-align: center;
-  }
-
-  .auth-note {
-    text-align: center;
-  }
 
   .two-columns,
   .stats,
