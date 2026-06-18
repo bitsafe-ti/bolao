@@ -2516,10 +2516,37 @@ tr:last-child td {
     width: calc(100% - 32px);
   }
 
-  .ranking-summary,
-  .scoring-examples,
   .groups-standings-layout {
     grid-template-columns: 1fr;
+  }
+
+  .ranking-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .ranking-summary div {
+    padding: 10px;
+  }
+
+  .ranking-summary span {
+    font-size: 0.7rem;
+  }
+
+  .ranking-summary strong {
+    font-size: 1rem;
+    margin-top: 3px;
+  }
+
+  .scoring-examples {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .scoring-card {
+    min-height: auto;
+    padding: 10px;
+    gap: 8px;
   }
 
   .inline-form,
