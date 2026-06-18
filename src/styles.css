@@ -199,7 +199,8 @@ select:focus {
 
 .auth-card {
   align-self: center;
-  background: var(--surface);
+  background: #0f3470;
+  color: #ffffff;
   border: 0;
   border-radius: 0;
   width: min(100%, 520px);
@@ -224,7 +225,7 @@ select:focus {
 }
 
 .auth-card-header span {
-  color: var(--primary);
+  color: rgba(255, 255, 255, 0.75);
   font-size: 0.78rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -241,7 +242,7 @@ select:focus {
 }
 
 .auth-card-header p {
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.65);
   margin-bottom: 0;
 }
 
@@ -253,15 +254,19 @@ select:focus {
 }
 
 .mode-switch button {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.mode-switch button:hover {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .mode-switch button.active {
   background: var(--primary);
   border-color: var(--primary);
-  color: var(--surface);
+  color: #ffffff;
 }
 
 .auth-form {
@@ -269,11 +274,30 @@ select:focus {
   gap: 12px;
 }
 
+.auth-form input {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.auth-form input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.auth-form input:focus {
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.10);
+}
+
 .auth-note,
 .form-error {
   margin: 14px 0 0;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.auth-card .auth-note {
+  color: rgba(255, 255, 255, 0.60);
 }
 
 .form-error {
