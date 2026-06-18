@@ -962,7 +962,7 @@ h3 {
   display: inline-flex;
   font-size: 0.82rem;
   font-weight: 900;
-  justify-self: center;
+  justify-self: start;
   min-height: 34px;
   padding: 0 12px;
   white-space: nowrap;
@@ -976,7 +976,7 @@ h3 {
   display: inline-flex;
   font-size: 0.82rem;
   font-weight: 800;
-  justify-self: center;
+  justify-self: start;
   min-height: 34px;
   padding: 0 12px;
   white-space: nowrap;
