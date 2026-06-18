@@ -1430,11 +1430,11 @@ function RankingTable({ ranking, compact = false }) {
       {ranking.length ? (
         <div className="table-wrap">
           <table className="ranking-table">
-            <thead><tr><th>#</th><th>Participante</th><th>Pontos</th><th>Cravados</th><th>Acertos 1 pt</th><th>Jogos pontuados</th></tr></thead>
+            <thead><tr><th>Colocação</th><th>Participante</th><th>Pontos</th><th>Cravados</th><th>Acertos 1 pt</th><th>Jogos pontuados</th></tr></thead>
             <tbody>
               {ranking.map((participant, index) => (
                 <tr key={participant.id}>
-                  <td><span className="rank-position">{index + 1}</span></td>
+                  <td><span className="rank-position">{index === 0 ? "🏆" : index + 1}</span></td>
                   <td className="participant-cell">{participant.name}</td>
                   <td><strong className="points-pill">{participant.total}</strong></td>
                   <td>{participant.exactScores}</td>
