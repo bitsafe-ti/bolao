@@ -1307,7 +1307,6 @@ function AuthScreen({ error, onLogin, onRegister }) {
         <div className="auth-card-header">
           <img src={SIDEMENU_LOGO_URL} alt="Bolão da Copa" className="auth-logo" />
           <span>Copa do Mundo 2026</span>
-          <h1>Bolão da Copa</h1>
           <h2>{mode === "register" ? "Criar sua conta" : "Entrar no bolão"}</h2>
           <p>{mode === "register" ? "Seu cadastro já entra como participante." : "Use seu e-mail e senha cadastrados."}</p>
         </div>

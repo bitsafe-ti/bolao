@@ -1887,6 +1887,14 @@ tr:last-child td {
     display: none;
   }
 
+  .auth-card-header {
+    text-align: center;
+  }
+
+  .auth-note {
+    text-align: center;
+  }
+
   .two-columns,
   .stats,
   .match-form,
