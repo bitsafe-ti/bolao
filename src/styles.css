@@ -2130,8 +2130,8 @@ tr:last-child td {
   }
 
   .brand-block img {
-    width: min(150px, 100%);
-    height: 56px;
+    width: min(300px, 100%);
+    height: 112px;
   }
 
   .topbar {
