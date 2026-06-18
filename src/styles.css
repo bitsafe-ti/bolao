@@ -1411,6 +1411,11 @@ h3 {
   font-weight: 700;
   margin: 0;
   font-size: 0.88rem;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
 }
 
 .result-status {
@@ -2286,13 +2291,6 @@ tr:last-child td {
   .result-goals,
   .prediction-card {
     grid-template-columns: 1fr;
-  }
-
-  .result-card-venue {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
   }
 
   .result-accordion-score {
