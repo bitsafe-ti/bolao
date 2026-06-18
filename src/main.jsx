@@ -1451,6 +1451,7 @@ function RankingTable({ ranking, matches = [], compact = false }) {
       )}
       {!compact && <ScoringExamples />}
       {!compact && <RankingInfoCard />}
+      {!compact && <TiebreakerCard />}
       {!compact && (
         <div className="podium-card">
           <div className="podium-trophy">🏆</div>
@@ -1852,6 +1853,19 @@ function RankingInfoCard() {
     <div className="ranking-info-card">
       <strong>Empate também pontua</strong>
       <span>Se o palpite e o resultado forem empate, soma 1 ponto mesmo sem cravar o placar. Exemplo: palpite 2 x 2, resultado 1 x 1.</span>
+    </div>
+  );
+}
+
+function TiebreakerCard() {
+  return (
+    <div className="tiebreaker-card">
+      <strong>Critérios de desempate</strong>
+      <ol>
+        <li><span className="tb-label">Placares exatos</span><span className="tb-desc">Quem cravou mais resultados (3 pts) vai na frente</span></li>
+        <li><span className="tb-label">Acertos de resultado</span><span className="tb-desc">Quem acertou mais vencedores ou empates (1 pt) desempata</span></li>
+        <li><span className="tb-label">Ordem alfabética</span><span className="tb-desc">Critério final para garantir ordenação determinística</span></li>
+      </ol>
     </div>
   );
 }

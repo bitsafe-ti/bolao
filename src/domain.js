@@ -112,7 +112,7 @@ export function calculateRanking(participants, matches, predictions) {
         predictedMatches: matches.filter((match) => hasSavedPrediction(participantPredictions?.[match.id])).length
       };
     })
-    .sort((a, b) => b.total - a.total || b.exactScores - a.exactScores || a.name.localeCompare(b.name));
+    .sort((a, b) => b.total - a.total || b.exactScores - a.exactScores || b.winnerHits - a.winnerHits || a.name.localeCompare(b.name));
 }
 
 export function normalizeUsers(users, superAdminEmails = new Set()) {

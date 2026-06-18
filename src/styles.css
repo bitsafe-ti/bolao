@@ -1660,12 +1660,53 @@ h3 {
   color: var(--muted);
 }
 
+.tiebreaker-card {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  border-left: 4px solid var(--secondary);
+  border-radius: 8px;
+  background: var(--primary-soft);
+  padding: 12px 14px;
+}
+
+.tiebreaker-card strong {
+  display: block;
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.tiebreaker-card ol {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.tiebreaker-card li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tiebreaker-card .tb-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tiebreaker-card .tb-desc {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 .podium-card {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 20px;
-  margin-bottom: 16px;
+  width: 50%;
+  margin: 0 auto 16px;
   padding: 20px 24px;
   border-radius: 12px;
   background: linear-gradient(135deg, #1a3a6b 0%, #0f2a55 100%);
