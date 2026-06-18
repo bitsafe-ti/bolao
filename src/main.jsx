@@ -857,7 +857,7 @@ function App() {
     const key = getPredictionKey(participantId, matchId);
     const match = state.matches.find((item) => item.id === matchId);
     const currentPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
-    if (getMatchRound(match) !== activeRound || isMatchClosed(match)) return;
+    if (getMatchRound(match) > activeRound || isMatchClosed(match)) return;
 
     const draft = getDraftPrediction(participantId, matchId, currentPrediction);
     // Treat blank input as 0 — user leaving the field empty means "zero gols"
@@ -1017,6 +1017,7 @@ function App() {
           <div className="topbar-left">
             <button type="button" className="hamburger" aria-label="Abrir menu" onClick={() => setMobileMenuOpen(true)}>☰</button>
             <div>
+              <img src={SIDEMENU_LOGO_URL} alt="Bolão da Copa" className="topbar-logo" />
               <p className="eyebrow">Copa do Mundo 2026</p>
               <h1>{visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
             </div>
@@ -1305,6 +1306,7 @@ function AuthScreen({ error, onLogin, onRegister }) {
       </section>
       <section className="auth-card">
         <div className="auth-card-header">
+          <img src={SIDEMENU_LOGO_URL} alt="Bolão da Copa" className="auth-logo" />
           <span>Copa do Mundo 2026</span>
           <h1>Bolão da Copa</h1>
           <h2>{mode === "register" ? "Criar sua conta" : "Entrar no bolão"}</h2>

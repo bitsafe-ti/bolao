@@ -215,6 +215,13 @@ select:focus {
   margin-bottom: 24px;
 }
 
+.auth-logo {
+  height: 80px;
+  width: auto;
+  object-fit: contain;
+  justify-self: start;
+}
+
 .auth-card-header span {
   color: var(--primary);
   font-size: 0.78rem;
@@ -381,6 +388,10 @@ select:focus {
   box-shadow: 0 1px 0 rgba(20, 20, 19, 0.04);
   margin-bottom: 18px;
   padding: 16px 18px;
+}
+
+.topbar-logo {
+  display: none;
 }
 
 .topbar-user {
@@ -1797,6 +1808,13 @@ tr:last-child td {
     align-items: center;
     gap: 10px;
     flex: 1;
+  }
+
+  .topbar-logo {
+    display: block;
+    height: 36px;
+    width: auto;
+    object-fit: contain;
   }
 
   .topbar-user {
