@@ -348,6 +348,24 @@ select:focus {
   padding: 22px;
   height: 100vh;
   overflow-y: auto;
+  background: #061830;
+  color: #ffffff;
+  /* Tema escuro: redefine tokens para cascatear em todos os filhos */
+  --surface: #0f3470;
+  --bg: #061830;
+  --text: #ffffff;
+  --muted: rgba(255, 255, 255, 0.60);
+  --muted-light: rgba(255, 255, 255, 0.40);
+  --charcoal: rgba(255, 255, 255, 0.80);
+  --warm-silver: rgba(255, 255, 255, 0.50);
+  --line: rgba(255, 255, 255, 0.12);
+  --line-warm: rgba(255, 255, 255, 0.12);
+  --line-dark: rgba(255, 255, 255, 0.20);
+  --warm-sand: rgba(255, 255, 255, 0.08);
+  --soft: rgba(255, 255, 255, 0.06);
+  --primary-soft: rgba(201, 100, 66, 0.20);
+  --secondary-soft: rgba(217, 119, 87, 0.20);
+  --success-soft: rgba(22, 163, 74, 0.20);
 }
 
 .hamburger,
@@ -871,6 +889,7 @@ h3 {
 .match-card {
   display: grid;
   gap: 16px;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: rgba(0, 0, 0, 0.05) 0px 4px 24px;
