@@ -177,7 +177,7 @@ select:focus {
   margin: 0 auto;
   overflow: hidden;
   padding: 0;
-  background: #061830;
+  background: #ffffff;
 }
 
 .auth-visual {
@@ -199,8 +199,8 @@ select:focus {
 
 .auth-card {
   align-self: center;
-  background: #0f3470;
-  color: #ffffff;
+  background: #f0f4f8;
+  color: var(--text);
   border: 0;
   border-radius: 0;
   width: min(100%, 520px);
@@ -226,7 +226,7 @@ select:focus {
 }
 
 .auth-card-header span {
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--primary);
   font-size: 0.78rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -243,7 +243,7 @@ select:focus {
 }
 
 .auth-card-header p {
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--muted);
   margin-bottom: 0;
 }
 
@@ -255,19 +255,15 @@ select:focus {
 }
 
 .mode-switch button {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #ffffff;
-}
-
-.mode-switch button:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
 }
 
 .mode-switch button.active {
   background: var(--primary);
   border-color: var(--primary);
-  color: #ffffff;
+  color: var(--ivory);
 }
 
 .auth-form {
@@ -275,20 +271,6 @@ select:focus {
   gap: 12px;
 }
 
-.auth-form input {
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  color: #ffffff;
-}
-
-.auth-form input::placeholder {
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.auth-form input:focus {
-  border-color: rgba(255, 255, 255, 0.55);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.10);
-}
 
 .auth-note,
 .form-error {
@@ -298,7 +280,7 @@ select:focus {
 }
 
 .auth-card .auth-note {
-  color: rgba(255, 255, 255, 0.60);
+  color: var(--muted);
   text-align: center;
 }
 
@@ -322,8 +304,8 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  background: #061830;
-  color: var(--surface);
+  background: #ffffff;
+  color: var(--text);
   height: 100vh;
   overflow-y: auto;
   padding: 22px 14px;
@@ -332,7 +314,7 @@ select:focus {
 .brand-block {
   display: grid;
   justify-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 1px solid var(--line);
   padding: 4px 8px 12px;
 }
 
@@ -366,7 +348,7 @@ select:focus {
 
 .sidebar-footer {
   margin-top: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1px solid var(--line);
   padding-top: 16px;
   display: flex;
   flex-direction: column;
@@ -383,7 +365,7 @@ select:focus {
   justify-content: flex-start;
   background: transparent;
   border: 1px solid transparent;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--charcoal);
   text-align: left;
   font-size: 0.88rem;
   min-height: 38px;
@@ -391,17 +373,17 @@ select:focus {
 }
 
 .sidebar-actions button:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  background: var(--soft);
+  color: var(--text);
 }
 
 .sidebar-actions button.danger {
-  color: #fca5a5;
+  color: var(--danger);
 }
 
 .sidebar-actions button.danger:hover {
-  background: rgba(220, 38, 38, 0.18);
-  color: #fca5a5;
+  background: rgba(181, 51, 51, 0.08);
+  color: var(--danger);
 }
 
 .topbar {
