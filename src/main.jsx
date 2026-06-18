@@ -592,11 +592,11 @@ function App() {
     }
   }
 
-  async function registerUser({ name, email, password }) {
-    const cleanName = name.trim();
+  async function registerUser({ firstName, lastName, email, password }) {
+    const cleanName = `${(firstName || "").trim()} ${(lastName || "").trim()}`.trim();
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanName || !cleanEmail || !password) {
-      setAuthError("Preencha nome, e-mail e senha para criar sua conta.");
+      setAuthError("Preencha nome, sobrenome, e-mail e senha para criar sua conta.");
       return;
     }
     if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
@@ -1315,7 +1315,8 @@ function AuthScreen({ error, onLogin, onRegister }) {
           <button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Entrar</button>
         </div>
         <form className="auth-form" onSubmit={handleSubmit}>
-          {mode === "register" && <input name="name" placeholder="Seu nome" autoComplete="name" />}
+          {mode === "register" && <input name="firstName" placeholder="Nome" autoComplete="given-name" />}
+          {mode === "register" && <input name="lastName" placeholder="Sobrenome" autoComplete="family-name" />}
           <input name="email" type="email" placeholder="E-mail" autoComplete="email" />
           <input name="password" type="password" placeholder="Senha" autoComplete="current-password" />
           {error && <p className="form-error">{error}</p>}
