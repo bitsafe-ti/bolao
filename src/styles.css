@@ -370,8 +370,8 @@ select:focus {
 }
 
 .brand-block img {
-  width: min(90px, 100%);
-  height: 80px;
+  width: min(160px, 100%);
+  height: 140px;
   object-fit: contain;
   object-position: center;
 }
@@ -2469,8 +2469,6 @@ tr:last-child td {
   .inline-form,
   .inline-form.participant-form,
   .participant-row,
-  .participant-grid-header,
-  .participant-grid-row,
   .list-row {
     grid-template-columns: 1fr;
   }
@@ -2479,7 +2477,37 @@ tr:last-child td {
     display: none;
   }
 
-  .participant-grid .list-row-actions {
-    justify-content: flex-start;
+  .participant-grid-row {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto auto;
+    align-items: start;
+    gap: 3px 10px;
+  }
+
+  .participant-grid-row .participant-grid-cell:nth-child(1) {
+    grid-area: 1 / 1;
+  }
+
+  .participant-grid-row .participant-grid-cell:nth-child(2) {
+    grid-area: 2 / 1;
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+
+  .participant-grid-row .participant-grid-cell:nth-child(3) {
+    grid-area: 3 / 1;
+  }
+
+  .participant-grid-row .list-row-actions {
+    grid-area: 1 / 2 / 4 / 3;
+    align-self: center;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .participant-grid-row .list-row-actions .icon-btn {
+    width: 100%;
   }
 }
