@@ -2346,10 +2346,15 @@ tr:last-child td {
     min-width: 0;
   }
 
-  /* prediction inputs: collapse to single column on very narrow */
+  /* prediction inputs: smaller on mobile */
   .prediction-inputs {
-    grid-template-columns: 70px auto 70px;
-    gap: 6px;
+    grid-template-columns: 54px auto 54px;
+    gap: 4px;
+    padding: 7px;
+  }
+
+  .prediction-inputs .score-input {
+    font-size: 1rem;
   }
 
   /* section header caption wraps */
