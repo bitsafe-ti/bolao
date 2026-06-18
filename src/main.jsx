@@ -137,7 +137,7 @@ const adminTabs = [
 
 const defaultRounds = [1, 2, 3];
 const AUDIT_LOG_LIMIT = 1000;
-const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
+
 const RESULT_SYNC_IDLE_MS = 5 * 60 * 1000;
 const RESULT_SYNC_LIVE_MS = 30 * 1000;
 const RESULT_SYNC_LIVE_BEFORE_MS = 30 * 60 * 1000;
@@ -207,7 +207,6 @@ function App() {
   const [historyTeamId, setHistoryTeamId] = useState("");
   const [clockNow, setClockNow] = useState(() => new Date());
   const workspaceRef = useRef(null);
-  const lastActivityRef = useRef(Date.now());
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAdmin = currentUser?.role === "admin";
@@ -450,31 +449,6 @@ function App() {
     }
   }, [tab, visibleTabs]);
 
-  useEffect(() => {
-    if (!currentUser?.id) return;
-
-    function onActivity() {
-      lastActivityRef.current = Date.now();
-    }
-
-    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
-    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
-    lastActivityRef.current = Date.now();
-
-    const interval = setInterval(() => {
-      if (Date.now() - lastActivityRef.current >= INACTIVITY_TIMEOUT_MS) {
-        clearInterval(interval);
-        saveSession({ currentUserId: "", activeParticipantId: "" });
-        setState((s) => ({ ...s, currentUserId: "", activeParticipantId: "" }));
-        setAuthError("Sessão encerrada por inatividade.");
-      }
-    }, 10000);
-
-    return () => {
-      events.forEach((e) => window.removeEventListener(e, onActivity));
-      clearInterval(interval);
-    };
-  }, [currentUser?.id]);
 
   function handleTabClick(tabId) {
     setTab(tabId);
