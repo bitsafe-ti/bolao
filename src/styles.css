@@ -322,7 +322,7 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  background: var(--dark-bg);
+  background: #061830;
   color: var(--surface);
   height: 100vh;
   overflow-y: auto;
