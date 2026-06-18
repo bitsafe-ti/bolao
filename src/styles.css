@@ -1356,30 +1356,38 @@ h3 {
   border-left-color: var(--warning);
 }
 
-.result-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.result-card-info {
-  flex: 1;
-  min-width: 0;
-}
-
 .result-card-tags {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
-.result-card-aside {
+.result-card-teams {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  flex: 0 0 auto;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.result-card-team {
+  font-weight: 700;
+  font-size: 0.95rem;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.result-card-team.away {
+  text-align: right;
+}
+
+.result-card-score-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
 }
 
 .result-card-meta {
@@ -1387,7 +1395,6 @@ h3 {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 8px;
 }
 
 .result-card-meta > div {
@@ -1539,12 +1546,13 @@ h3 {
 
 .goal-list-title {
   font-weight: 900;
-  margin-bottom: 10px;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
 }
 
 .goal-list ul {
   display: grid;
-  gap: 8px;
+  gap: 4px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1554,11 +1562,11 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  border-radius: 8px;
+  gap: 6px;
+  border-radius: 6px;
   background: var(--soft);
-  min-height: 38px;
-  padding: 8px 10px;
+  min-height: 30px;
+  padding: 4px 8px;
 }
 
 .goal-player,
@@ -1591,10 +1599,11 @@ h3 {
   color: var(--primary);
   display: inline-flex;
   flex: 0 0 auto;
+  font-size: 0.78rem;
   font-weight: 900;
   justify-content: center;
-  min-width: 44px;
-  padding: 4px 8px;
+  min-width: 36px;
+  padding: 2px 6px;
 }
 
 .goal-tag {

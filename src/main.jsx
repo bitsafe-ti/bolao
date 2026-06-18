@@ -1608,23 +1608,23 @@ function ResultCard({ match, isOpen, onToggle }) {
       className={`match-card result-card result-accordion ${statusClass} ${isOpen ? "open" : ""}`}
     >
       <button type="button" className="result-accordion-toggle" onClick={onToggle} aria-expanded={isOpen}>
-        <div className="result-card-header">
-          <div className="result-card-info">
-            <div className="result-card-tags">
-              <span className="badge">{match.phase}</span>
-              <span className={`result-status ${statusClass}`}>{statusLabel}</span>
-            </div>
-            <h3 className="teams-versus">
-              <TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span>{" "}
-              <TeamName teamId={match.awayTeamId} fallback={match.away} />
-            </h3>
-          </div>
-          <div className="result-card-aside">
-            <div className="result-accordion-score">
-              <strong>{homeScore === null ? "-" : homeScore}</strong>
-              <span>x</span>
-              <strong>{awayScore === null ? "-" : awayScore}</strong>
-            </div>
+        <div className="result-card-tags">
+          <span className="badge">{match.phase}</span>
+          <span className={`result-status ${statusClass}`}>{statusLabel}</span>
+        </div>
+        <div className="result-card-teams">
+          <span className="result-card-team home">
+            <TeamName teamId={match.homeTeamId} fallback={match.home} />
+          </span>
+          <span className="result-card-team away">
+            <TeamName teamId={match.awayTeamId} fallback={match.away} />
+          </span>
+        </div>
+        <div className="result-card-score-row">
+          <div className="result-accordion-score">
+            <strong>{homeScore === null ? "-" : homeScore}</strong>
+            <span>x</span>
+            <strong>{awayScore === null ? "-" : awayScore}</strong>
           </div>
         </div>
         <div className="result-card-meta">
