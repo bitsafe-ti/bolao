@@ -2160,14 +2160,18 @@ tr:last-child td {
     overflow-x: hidden;
   }
 
+  .topbar-title {
+    display: none;
+  }
+
   .hamburger {
     display: flex;
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
-    background: transparent;
-    border: 1px solid var(--line);
-    color: var(--text);
+    background: var(--secondary);
+    border: none;
+    color: #ffffff;
     min-height: 38px;
     width: 38px;
     padding: 0;
@@ -2176,7 +2180,7 @@ tr:last-child td {
   }
 
   .hamburger:hover {
-    background: var(--soft);
+    background: #111318;
   }
 
   .menu-close {

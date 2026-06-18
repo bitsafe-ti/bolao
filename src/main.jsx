@@ -985,8 +985,8 @@ function App() {
         <header className="topbar">
           <div className="topbar-left">
             <button type="button" className="hamburger" aria-label="Abrir menu" onClick={() => setMobileMenuOpen(true)}>☰</button>
-            <div>
-<p className="eyebrow">Copa do Mundo 2026</p>
+            <div className="topbar-title">
+              <p className="eyebrow">Copa do Mundo 2026</p>
               <h1>{visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
             </div>
           </div>
