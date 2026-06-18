@@ -1399,6 +1399,7 @@ h3 {
 .result-card-score-row {
   display: flex;
   justify-content: center;
+  margin-top: 6px;
 }
 
 .result-card-date {
@@ -1451,13 +1452,13 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 16px;
   border-radius: 999px;
   background: var(--soft);
   color: var(--text);
-  font-size: 1rem;
+  font-size: 2rem;
   font-weight: 900;
-  padding: 7px 16px;
+  padding: 14px 16px;
   width: 50%;
 }
 
@@ -2294,8 +2295,8 @@ tr:last-child td {
   }
 
   .result-accordion-score {
-    font-size: 0.9rem;
-    width: 60%;
+    font-size: 1.6rem;
+    width: 65%;
   }
 
   .result-team.right {
