@@ -1609,26 +1609,28 @@ function ResultCard({ match, isOpen, onToggle }) {
     >
       <button type="button" className="result-accordion-toggle" onClick={onToggle} aria-expanded={isOpen}>
         <div className="result-card-header">
-          <div>
+          <div className="result-card-info">
             <span className="badge">{match.phase}</span>
             <h3 className="teams-versus">
               <TeamName teamId={match.homeTeamId} fallback={match.home} /> <span>x</span>{" "}
               <TeamName teamId={match.awayTeamId} fallback={match.away} />
             </h3>
-            <p>{formatDate(match.date)}</p>
-            <p className="match-location">{formatVenue(match)}</p>
           </div>
-          <div className="result-card-summary">
+          <div className="result-card-aside">
             <div className="result-accordion-score">
               <strong>{homeScore === null ? "-" : homeScore}</strong>
               <span>x</span>
               <strong>{awayScore === null ? "-" : awayScore}</strong>
             </div>
-            <span className={`result-status ${statusClass}`}>
-              {statusLabel}
-            </span>
             <span className="result-accordion-icon" aria-hidden="true">{isOpen ? "-" : "+"}</span>
           </div>
+        </div>
+        <div className="result-card-meta">
+          <div>
+            <p>{formatDate(match.date)}</p>
+            <p className="match-location">{formatVenue(match)}</p>
+          </div>
+          <span className={`result-status ${statusClass}`}>{statusLabel}</span>
         </div>
       </button>
       {isOpen && (

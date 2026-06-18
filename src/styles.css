@@ -1360,24 +1360,44 @@ h3 {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
 }
 
-.result-card-summary {
-  display: grid;
-  justify-items: end;
-  gap: 10px;
+.result-card-info {
+  flex: 1;
+  min-width: 0;
 }
 
-.result-card-header p {
+.result-card-aside {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.result-card-meta {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.result-card-meta > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.result-card-meta p {
   color: var(--muted);
   margin-bottom: 0;
 }
 
-.result-card-header .match-location {
+.result-card-meta .match-location {
   color: var(--text);
   font-weight: 700;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .result-status {
@@ -2251,39 +2271,19 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 
-  .result-card-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
+  .result-card-meta {
+    flex-wrap: wrap;
   }
 
-  .result-card-header > div:first-child {
-    min-width: 0;
-    flex: 1;
-  }
-
-  .result-card-header .match-location {
-    font-size: 0.76rem;
-    font-weight: 600;
+  .result-card-meta .match-location {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .result-card-summary {
-    flex: 0 0 auto;
-    justify-items: end;
-  }
-
   .result-accordion-score {
-    font-size: 0.88rem;
-    padding: 4px 8px;
-  }
-
-  .result-status {
-    font-size: 0.72rem;
-    padding: 4px 8px;
-    justify-self: end;
+    font-size: 0.9rem;
+    padding: 5px 9px;
   }
 
   .result-team.right {
