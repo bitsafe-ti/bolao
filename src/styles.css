@@ -376,6 +376,7 @@ select:focus {
   height: 140px;
   object-fit: contain;
   object-position: center;
+  filter: grayscale(1) contrast(1.2) brightness(0.72);
 }
 
 .workspace {
@@ -2218,7 +2219,7 @@ h3 {
 
 .ranking-prize-note {
   display: grid;
-  align-content: center;
+  align-content: start;
   gap: 8px;
   margin: 0;
   border: 1px solid var(--line);

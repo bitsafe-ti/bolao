@@ -51,7 +51,6 @@ const PRIZE_DISTRIBUTION = [
   { label: "2º lugar", percent: 30 },
   { label: "3º lugar", percent: 20 }
 ];
-const SIDEMENU_LOGO_URL = `${import.meta.env.BASE_URL}sidemenu-logo.png`;
 const AUTH_LOGO_URL = `${import.meta.env.BASE_URL}logo_bolao_transparente.png`;
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
@@ -913,7 +912,7 @@ function App() {
       {mobileMenuOpen && <div className="menu-overlay" onClick={() => setMobileMenuOpen(false)} />}
       <aside className={`sidebar${mobileMenuOpen ? " open" : ""}`}>
         <div className="brand-block">
-          <img src={SIDEMENU_LOGO_URL} alt="Logo FIFA World Cup 2026" fetchPriority="high" />
+          <img src={AUTH_LOGO_URL} alt="Bolão Grupo Bit" fetchPriority="high" />
           <button type="button" className="menu-close" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>×</button>
         </div>
         <nav className="tabs" aria-label="Seções do bolão">
