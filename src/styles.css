@@ -1364,6 +1364,15 @@ h3 {
   gap: 8px;
 }
 
+.team-history-tags .badge,
+.team-history-tags .result-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  margin-bottom: 0;
+  line-height: 1;
+}
+
 .team-history-teams {
   display: grid;
   align-items: center;
