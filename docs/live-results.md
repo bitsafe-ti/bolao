@@ -51,4 +51,4 @@ npx wrangler dev --config workers/live-results/wrangler.jsonc --test-scheduled
 
 Em outro terminal, acione `http://localhost:8787/__scheduled`.
 
-O endpoint publico `/health` informa se o Worker esta ativo e se o provedor ao vivo esta configurado, sem expor a chave.
+No desenvolvimento local, o endpoint `/health` informa se o Worker esta ativo e se o provedor ao vivo esta configurado, sem expor a chave. Em producao, o Worker nao possui rota publica e executa somente pelo cron.
