@@ -1275,16 +1275,61 @@ h3 {
 }
 
 .prediction-card-overview .table-wrap {
+  overflow-x: visible;
   width: 100%;
+}
+
+.prediction-card-overview .compact-table {
+  min-width: 0;
+  table-layout: fixed;
 }
 
 .prediction-card-overview .compact-table th,
 .prediction-card-overview .compact-table td {
+  padding: 10px 6px;
   text-align: center;
+}
+
+.prediction-card-overview .compact-table th:nth-child(1),
+.prediction-card-overview .compact-table td:nth-child(1) {
+  width: 44%;
+  overflow-wrap: anywhere;
+}
+
+.prediction-card-overview .compact-table th:nth-child(2),
+.prediction-card-overview .compact-table td:nth-child(2) {
+  width: 30%;
+}
+
+.prediction-card-overview .compact-table th:nth-child(3),
+.prediction-card-overview .compact-table td:nth-child(3) {
+  width: 26%;
 }
 
 .prediction-card-overview .prediction-pill {
   margin: 0 auto;
+  padding: 5px 8px;
+}
+
+.prediction-card-overview .prediction-feedback-pill.compact {
+  min-height: 28px;
+  min-width: 34px;
+  padding: 5px 8px;
+  white-space: nowrap;
+}
+
+.prediction-feedback-muted {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 5px 10px;
+  white-space: nowrap;
 }
 
 .prediction-card-overview .empty {
@@ -1428,6 +1473,29 @@ h3 {
   display: flex;
   justify-content: center;
   margin-top: 14px;
+}
+
+.result-user-prediction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 7px 12px;
+}
+
+.result-user-prediction span {
+  color: inherit;
+  opacity: 0.78;
+}
+
+.result-user-prediction strong {
+  color: inherit;
+  font-size: 0.9rem;
 }
 
 .result-card-date {
@@ -1732,6 +1800,33 @@ h3 {
   white-space: nowrap;
 }
 
+.prediction-feedback-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  min-height: 34px;
+  padding: 6px 14px;
+  text-align: center;
+}
+
+.prediction-feedback-pill.exact {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.prediction-feedback-pill.hit {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.prediction-feedback-pill.miss {
+  background: rgba(181, 51, 51, 0.10);
+  color: var(--danger);
+}
+
 .badge {
   display: inline-flex;
   border-radius: 999px;
@@ -1884,15 +1979,156 @@ h3 {
   font-weight: 700;
 }
 
-.ranking-summary p {
-  grid-column: 1 / -1;
-  margin: 0;
-  border-left: 4px solid var(--primary);
+.prize-podium {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--success);
   border-radius: 8px;
-  background: var(--primary-soft);
+  background: var(--surface);
+}
+
+.prize-podium-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.prize-podium-heading span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.podium-stage {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  min-height: 280px;
+}
+
+.podium-place {
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  gap: 8px;
+  min-width: 0;
+  text-align: center;
+}
+
+.podium-medal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #f5f7fb 0%, #c9d1dc 48%, #8f9aaa 100%);
+  color: #eef3f8;
+  font-weight: 900;
+  box-shadow:
+    inset 0 2px 4px rgba(255, 255, 255, 0.7),
+    inset 0 -5px 8px rgba(48, 57, 72, 0.22),
+    0 8px 14px rgba(30, 32, 38, 0.16);
+  text-shadow: 0 2px 2px rgba(30, 32, 38, 0.25);
+}
+
+.podium-place-1 .podium-medal {
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(145deg, #fff4a6 0%, #f3c84f 45%, #b78310 100%);
+  color: #fff7bf;
+  font-size: 1.2rem;
+}
+
+.podium-place-2 .podium-medal {
+  background: linear-gradient(145deg, #f6f8fb 0%, #c8d0dc 48%, #8b96a5 100%);
+  color: #f8fbff;
+}
+
+.podium-place-3 .podium-medal {
+  background: linear-gradient(145deg, #ffd2a1 0%, #c9823b 48%, #835022 100%);
+  color: #ffe0bd;
+}
+
+.podium-person {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+}
+
+.podium-person strong {
   color: var(--text);
+  font-size: 0.98rem;
+  font-weight: 900;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.podium-person span {
+  color: var(--muted);
+  font-size: 0.82rem;
   font-weight: 700;
-  padding: 12px 14px;
+}
+
+.podium-prize {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.podium-prize strong {
+  color: var(--success);
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.18rem;
+  font-weight: 800;
+}
+
+.podium-prize span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.podium-step {
+  display: grid;
+  align-content: center;
+  width: 100%;
+  min-height: 88px;
+  padding: 14px 10px;
+  border: 1px solid var(--line);
+  border-bottom-width: 4px;
+  border-radius: 8px 8px 4px 4px;
+  background: var(--bg);
+}
+
+.podium-step span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.podium-place-1 .podium-step {
+  min-height: 132px;
+  border-bottom-color: var(--success);
+  background: var(--success-soft);
+}
+
+.podium-place-2 .podium-step {
+  min-height: 104px;
+  border-bottom-color: var(--primary);
+}
+
+.podium-place-3 .podium-step {
+  min-height: 76px;
+  border-bottom-color: var(--muted);
 }
 
 .scoring-examples {
@@ -1965,6 +2201,46 @@ h3 {
 
 .scoring-card-copy span {
   color: var(--muted);
+  line-height: 1.45;
+}
+
+.ranking-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.ranking-info-grid .ranking-tiebreaker-card {
+  grid-template-columns: 1fr;
+  margin: 0;
+}
+
+.ranking-prize-note {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--primary);
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--text);
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(30, 32, 38, 0.04);
+}
+
+.ranking-prize-note span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ranking-prize-note strong {
+  color: var(--text);
+  font-size: 1rem;
   line-height: 1.45;
 }
 
@@ -2513,6 +2789,11 @@ tr:last-child td {
 }
 
 @media (max-width: 620px) {
+  .ranking-info-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
   .ranking-tiebreaker-card {
     grid-template-columns: 1fr;
   }
@@ -2590,6 +2871,59 @@ tr:last-child td {
   .ranking-summary strong {
     font-size: 1rem;
     margin-top: 3px;
+  }
+
+  .prize-podium {
+    padding: 12px;
+  }
+
+  .podium-stage {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .podium-place {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    justify-items: start;
+    gap: 10px;
+    text-align: left;
+  }
+
+  .podium-place-1 {
+    order: 1;
+  }
+
+  .podium-place-2 {
+    order: 2;
+  }
+
+  .podium-place-3 {
+    order: 3;
+  }
+
+  .podium-medal,
+  .podium-place-1 .podium-medal {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .podium-person {
+    width: auto;
+  }
+
+  .podium-prize {
+    justify-items: end;
+    text-align: right;
+  }
+
+  .podium-prize strong {
+    font-size: 1rem;
+  }
+
+  .podium-step {
+    display: none;
   }
 
   .scoring-examples {

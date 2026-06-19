@@ -14,7 +14,8 @@ import {
   normalizeUsers,
   purgeClearedOpeningPredictions,
   purgeExpiredPredictions,
-  purgeFutureRoundPredictions
+  purgeFutureRoundPredictions,
+  scorePrediction
 } from "./domain.js";
 import { getFlagUrl, getTeamsByGroup, teamsById } from "./teams.js";
 import { attachPasswordCredential, hasLegacyPassword, verifyPassword } from "./passwords.js";
@@ -45,6 +46,11 @@ const DEV_POOL_SEEDED_KEY = `bolao-copa-2026${STORAGE_SCOPE}:seeded`;
 const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
 const DATA_LOAD_TIMEOUT_MS = 7000;
 const ENTRY_FEE = 20;
+const PRIZE_DISTRIBUTION = [
+  { label: "1º lugar", percent: 50 },
+  { label: "2º lugar", percent: 30 },
+  { label: "3º lugar", percent: 20 }
+];
 const SIDEMENU_LOGO_URL = `${import.meta.env.BASE_URL}sidemenu-logo.png`;
 const AUTH_LOGO_URL = `${import.meta.env.BASE_URL}logo_bolao_transparente.png`;
 const WORLD_CUP_LOGO_URL =
@@ -125,7 +131,8 @@ const userTabs = [
   { id: "predictions", label: "Palpites" },
   { id: "results", label: "Resultados" },
   { id: "groups", label: "Grupos" },
-  { id: "ranking", label: "Ranking" }
+  { id: "ranking", label: "Ranking" },
+  { id: "audit", label: "Auditoria" }
 ];
 
 const adminTabs = [
@@ -1121,6 +1128,7 @@ function App() {
                   const isRoundLocked = activePredictionRound > activeRound;
                   const isKickoffLocked = isMatchClosed(match, clockNow);
                   const isLocked = isRoundLocked || isKickoffLocked;
+                  const predictionFeedback = getPredictionFeedback(storedPrediction, match);
                   return (
                     <article
                       className={`match-card prediction-card ${isLocked ? "locked" : ""}`}
@@ -1155,11 +1163,16 @@ function App() {
                             )}
                             {isSaved && !isLocked && <span className="saved-pill">Palpite salvo</span>}
                           </div>
+                          {predictionFeedback && (
+                            <span className={`prediction-feedback-pill ${predictionFeedback.className}`}>
+                              {predictionFeedback.label}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <MatchPredictionOverview
                         match={match}
-                        participants={contestParticipants.filter((participant) => participant.id !== activeParticipant.id)}
+                        participants={contestParticipants}
                         predictions={state.predictions}
                       />
                     </article>
@@ -1198,7 +1211,11 @@ function App() {
                 </select>
               </label>
             </div>
-            <ResultsList matches={resultMatches} />
+            <ResultsList
+              activeParticipant={activeParticipant}
+              matches={resultMatches}
+              predictions={state.predictions}
+            />
           </section>
         )}
 
@@ -1467,6 +1484,8 @@ function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, on
 function RankingTable({ ranking, matches = [], compact = false }) {
   const paidParticipants = ranking.length;
   const totalPoolValue = paidParticipants * ENTRY_FEE;
+  const displayedRanking = compact ? ranking : ranking.slice(3);
+  const rankOffset = compact ? 0 : 3;
 
   return (
     <section className="panel table-panel">
@@ -1485,21 +1504,26 @@ function RankingTable({ ranking, matches = [], compact = false }) {
             <span>Apostadores</span>
             <strong>{paidParticipants}</strong>
           </div>
-          <p>O valor acumulado será debitado para o ganhador ao final do campeonato.</p>
         </div>
       )}
       {!compact && <ScoringExamples />}
-      {!compact && <RankingTiebreakerCard />}
-      {ranking.length ? (
+      {!compact && (
+        <div className="ranking-info-grid">
+          <RankingTiebreakerCard />
+          <RankingPrizeNote />
+        </div>
+      )}
+      {!compact && <PrizePodium ranking={ranking} totalPoolValue={totalPoolValue} />}
+      {displayedRanking.length ? (
         <div className="table-wrap">
           <table className="ranking-table">
             <thead><tr><th>Colocação</th><th>Participante</th><th>Pontos</th><th>Cravados</th><th>Acertos 1 pt</th><th>Jogos pontuados</th></tr></thead>
             <tbody>
-              {ranking.map((participant, index) => (
+              {displayedRanking.map((participant, index) => (
                 <tr key={participant.id}>
                   <td>
-                    <span className={`rank-position ${index === 0 ? "rank-position-leader" : ""}`}>
-                      {index === 0 ? <FontAwesomeIcon icon={faTrophy} title="Primeiro colocado" /> : index + 1}
+                    <span className={`rank-position ${compact && index === 0 ? "rank-position-leader" : ""}`}>
+                      {compact && index === 0 ? <FontAwesomeIcon icon={faTrophy} title="Primeiro colocado" /> : rankOffset + index + 1}
                     </span>
                   </td>
                   <td className="participant-cell">{participant.name}</td>
@@ -1512,12 +1536,12 @@ function RankingTable({ ranking, matches = [], compact = false }) {
             </tbody>
           </table>
         </div>
-      ) : <EmptyState text="O ranking aparece quando houver participantes cadastrados." />}
+      ) : <EmptyState text={ranking.length ? "Os três primeiros colocados aparecem no pódio." : "O ranking aparece quando houver participantes cadastrados."} />}
     </section>
   );
 }
 
-function ResultsList({ matches }) {
+function ResultsList({ activeParticipant, matches, predictions }) {
   if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
   const [openMatchId, setOpenMatchId] = useState("");
 
@@ -1535,10 +1559,12 @@ function ResultsList({ matches }) {
     <div className="match-list results-list">
       {matches.map((match) => (
         <ResultCard
+          activeParticipant={activeParticipant}
           key={match.id}
           match={match}
           isOpen={openMatchId === match.id}
           onToggle={() => setOpenMatchId((current) => current === match.id ? "" : match.id)}
+          predictions={predictions}
         />
       ))}
     </div>
@@ -1564,13 +1590,14 @@ function getResultMeta(match) {
   };
 }
 
-function ResultCard({ match, isOpen, onToggle }) {
+function ResultCard({ activeParticipant, match, isOpen, onToggle, predictions }) {
   const {
     homeScore,
     awayScore,
     statusLabel,
     statusClass
   } = getResultMeta(match);
+  const userPrediction = activeParticipant ? predictions?.[activeParticipant.id]?.[match.id] : null;
 
   return (
     <article
@@ -1596,6 +1623,10 @@ function ResultCard({ match, isOpen, onToggle }) {
             <span>x</span>
             <strong>{awayScore === null ? "-" : awayScore}</strong>
           </div>
+        </div>
+        <div className="result-user-prediction">
+          <span>Seu palpite</span>
+          <strong>{hasPrediction(userPrediction) ? formatPrediction(userPrediction) : "Sem palpite"}</strong>
         </div>
         <p className="result-card-date">{formatDate(match.date)}</p>
         <p className="result-card-venue">{formatVenue(match)}</p>
@@ -1733,14 +1764,26 @@ function MatchPredictionOverview({ match, participants, predictions }) {
       {offeredPredictions.length ? (
         <div className="table-wrap">
           <table className="compact-table">
-            <thead><tr><th>Participante</th><th>Palpite</th></tr></thead>
+            <thead><tr><th>Participante</th><th>Palpite</th><th>Acerto</th></tr></thead>
             <tbody>
-              {offeredPredictions.map(({ participant, prediction }) => (
-                <tr key={participant.id}>
-                  <td>{participant.name}</td>
-                  <td><span className="prediction-pill">{formatPrediction(prediction)}</span></td>
-                </tr>
-              ))}
+              {offeredPredictions.map(({ participant, prediction }) => {
+                const feedback = getPredictionFeedback(prediction, match, { compact: true });
+                return (
+                  <tr key={participant.id}>
+                    <td>{participant.name}</td>
+                    <td><span className="prediction-pill">{formatPrediction(prediction)}</span></td>
+                    <td>
+                      {feedback ? (
+                        <span className={`prediction-feedback-pill compact ${feedback.className}`} title={feedback.description ?? feedback.label}>
+                          {feedback.label}
+                        </span>
+                      ) : (
+                        <span className="prediction-feedback-muted">Aguardando</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1753,6 +1796,39 @@ function MatchPredictionOverview({ match, participants, predictions }) {
 
 function hasPrediction(prediction) {
   return Boolean(prediction && prediction.home !== "" && prediction.away !== "");
+}
+
+function getPredictionFeedback(prediction, match, options = {}) {
+  if (!hasPrediction(prediction)) return null;
+  const actualHome = parseScoreValue(match?.homeScore);
+  const actualAway = parseScoreValue(match?.awayScore);
+  if (actualHome === null || actualAway === null) return null;
+
+  const points = scorePrediction(prediction, match);
+  if (points === 3) {
+    return {
+      label: options.compact ? "+3" : "Você cravou +3 pts",
+      description: "Cravou o placar",
+      className: "exact"
+    };
+  }
+  if (points === 1) {
+    const predictedHome = parseScoreValue(prediction.home);
+    const predictedAway = parseScoreValue(prediction.away);
+    const isDrawHit = predictedHome === predictedAway && actualHome === actualAway;
+    return {
+      label: options.compact
+        ? "+1"
+        : (isDrawHit ? "Você acertou o empate +1 pt" : "Você acertou o vencedor +1 pt"),
+      description: isDrawHit ? "Acertou o empate" : "Acertou o vencedor",
+      className: "hit"
+    };
+  }
+  return {
+    label: options.compact ? "0" : "Você não pontuou",
+    description: "Não pontuou",
+    className: "miss"
+  };
 }
 
 function formatPrediction(prediction) {
@@ -1769,6 +1845,51 @@ function formatMatchScore(match) {
 function formatGoalMinute(goal) {
   if (goal.minute === "" || goal.minute === null || goal.minute === undefined) return "-";
   return goal.offset ? `${goal.minute}+${goal.offset}'` : `${goal.minute}'`;
+}
+
+function PrizePodium({ ranking, totalPoolValue }) {
+  const podium = [
+    { rank: 2, participant: ranking[1], prize: PRIZE_DISTRIBUTION[1] },
+    { rank: 1, participant: ranking[0], prize: PRIZE_DISTRIBUTION[0] },
+    { rank: 3, participant: ranking[2], prize: PRIZE_DISTRIBUTION[2] }
+  ];
+
+  return (
+    <div className="prize-podium" aria-label="Pódio da premiação">
+      <div className="prize-podium-heading">
+        <span>Premiação</span>
+      </div>
+      <div className="podium-stage">
+        {podium.map(({ rank, participant, prize }) => (
+          <article className={`podium-place podium-place-${rank}`} key={prize.label}>
+            <div className="podium-medal" aria-label={`${rank}º lugar`}>
+              <FontAwesomeIcon icon={faTrophy} title={`${rank}º lugar`} />
+            </div>
+            <div className="podium-person">
+              <strong>{participant?.name ?? "Aguardando participante"}</strong>
+              <span>{participant ? `${participant.total} ponto${participant.total === 1 ? "" : "s"}` : "Sem pontuação"}</span>
+            </div>
+            <div className="podium-prize">
+              <strong>{formatCurrency(totalPoolValue * prize.percent / 100)}</strong>
+              <span>{prize.percent}% do total</span>
+            </div>
+            <div className="podium-step">
+              <span>{prize.label}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RankingPrizeNote() {
+  return (
+    <div className="ranking-prize-note">
+      <span>Premiação final</span>
+      <strong>O valor acumulado será dividido entre os três primeiros colocados ao final do campeonato.</strong>
+    </div>
+  );
 }
 
 function ScoringExamples() {
