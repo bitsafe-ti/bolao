@@ -1317,21 +1317,35 @@ function TeamHistoryModal({ team, matches, onClose }) {
         </div>
         {teamMatches.length ? (
           <div className="team-history-list">
-            {teamMatches.map((match) => (
-              <article className="team-history-item" key={match.id}>
-                <div>
-                  <span className="badge">{match.phase}</span>
-                  <h3 className="teams-versus">
-                    <TeamName teamId={match.homeTeamId} fallback={match.home} />
+            {teamMatches.map((match) => {
+              const { homeScore, awayScore, statusLabel, statusClass } = getResultMeta(match);
+              return (
+                <article className="team-history-item" key={match.id}>
+                  <div className="team-history-tags">
+                    <span className="badge">{match.phase}</span>
+                    <span className={`result-status ${statusClass}`}>{statusLabel}</span>
+                  </div>
+                  <div className="team-history-teams">
+                    <span className="team-history-team home">
+                      <TeamName teamId={match.homeTeamId} fallback={match.home} />
+                    </span>
+                    <span className="team-history-versus">x</span>
+                    <span className="team-history-team away">
+                      <TeamName teamId={match.awayTeamId} fallback={match.away} />
+                    </span>
+                  </div>
+                  <div className="team-history-score">
+                    <strong>{homeScore ?? "-"}</strong>
                     <span>x</span>
-                    <TeamName teamId={match.awayTeamId} fallback={match.away} />
-                  </h3>
-                  <p>{formatDate(match.date)}</p>
-                  <p className="match-location">{formatVenue(match)}</p>
-                </div>
-                <strong className="team-history-score">{formatMatchScore(match)}</strong>
-              </article>
-            ))}
+                    <strong>{awayScore ?? "-"}</strong>
+                  </div>
+                  <div className="team-history-details">
+                    <span>{formatDate(match.date)}</span>
+                    <strong>{formatVenue(match)}</strong>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         ) : (
           <EmptyState text="Nenhum jogo encontrado para esta seleção." />
@@ -1833,12 +1847,6 @@ function getPredictionFeedback(prediction, match, options = {}) {
 function formatPrediction(prediction) {
   if (!prediction || prediction.home === "" || prediction.away === "") return "Sem palpite";
   return `${prediction.home} x ${prediction.away}`;
-}
-
-function formatMatchScore(match) {
-  const home = parseScoreValue(match?.homeScore);
-  const away = parseScoreValue(match?.awayScore);
-  return home === null || away === null ? "Aguardando" : `${home} x ${away}`;
 }
 
 function formatGoalMinute(goal) {
