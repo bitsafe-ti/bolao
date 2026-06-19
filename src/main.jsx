@@ -938,10 +938,6 @@ function App() {
                 <strong>Atualizar resultados</strong>
                 <span>Sincronizar os placares mais recentes da Copa.</span>
               </button>
-              <button type="button" className="danger" onClick={() => { resetData(); setAdminMenuOpen(false); setMobileMenuOpen(false); }}>
-                <strong>Reiniciar dados</strong>
-                <span>Apagar dados do bolão e voltar ao estado inicial.</span>
-              </button>
             </div>
           </section>
         </div>
