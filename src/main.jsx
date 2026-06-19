@@ -1134,9 +1134,9 @@ function App() {
                         <div className="prediction-match-info">
                           <span className="badge">{match.phase}</span>
                           <div className="prediction-teams-grid">
-                            <PredictionTeamColumn teamId={match.homeTeamId} fallback={match.home} onHistory={setHistoryTeamId} />
+                            <PredictionTeamColumn side="home" teamId={match.homeTeamId} fallback={match.home} onHistory={setHistoryTeamId} />
                             <span className="prediction-versus">x</span>
-                            <PredictionTeamColumn teamId={match.awayTeamId} fallback={match.away} onHistory={setHistoryTeamId} />
+                            <PredictionTeamColumn side="away" teamId={match.awayTeamId} fallback={match.away} onHistory={setHistoryTeamId} />
                           </div>
                           <p>{formatDate(match.date)}</p>
                           <p className="match-location">{formatVenue(match)}</p>
@@ -1275,10 +1275,10 @@ function TeamName({ teamId, fallback }) {
   return <span className="team-name"><Flag team={team} />{team.name}</span>;
 }
 
-function PredictionTeamColumn({ teamId, fallback, onHistory }) {
+function PredictionTeamColumn({ side = "", teamId, fallback, onHistory }) {
   const team = teamsById[teamId];
   return (
-    <div className="prediction-team-column">
+    <div className={`prediction-team-column ${side}`}>
       <TeamName teamId={teamId} fallback={fallback} />
       {team && (
         <button type="button" className="ghost history-button" onClick={() => onHistory(teamId)}>
@@ -1590,6 +1590,7 @@ function ResultCard({ match, isOpen, onToggle }) {
           <span className="result-card-team home">
             <TeamName teamId={match.homeTeamId} fallback={match.home} />
           </span>
+          <span className="result-card-versus">x</span>
           <span className="result-card-team away">
             <TeamName teamId={match.awayTeamId} fallback={match.away} />
           </span>
