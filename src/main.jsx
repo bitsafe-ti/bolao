@@ -1249,7 +1249,6 @@ function AuthScreen({ error, onLogin, onRegister }) {
           {error && <p className="form-error">{error}</p>}
           <button type="submit">{mode === "register" ? "Cadastrar e entrar" : "Entrar"}</button>
         </form>
-        <p className="auth-note">Dados sincronizados entre todos os participantes em tempo real.</p>
       </section>
     </main>
   );
@@ -1483,12 +1482,12 @@ function RankingTable({ ranking, matches = [], compact = false }) {
             <strong>{formatCurrency(ENTRY_FEE)}</strong>
           </div>
           <div>
-            <span>Apostadores</span>
-            <strong>{paidParticipants}</strong>
-          </div>
-          <div>
             <span>Total arrecadado</span>
             <strong>{formatCurrency(totalPoolValue)}</strong>
+          </div>
+          <div>
+            <span>Apostadores</span>
+            <strong>{paidParticipants}</strong>
           </div>
           <p>O valor acumulado será debitado para o ganhador ao final do campeonato.</p>
         </div>

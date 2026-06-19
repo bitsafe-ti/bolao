@@ -253,6 +253,8 @@ select:focus {
   width: auto;
   object-fit: contain;
   justify-self: center;
+  filter: grayscale(1) contrast(1.2) brightness(0.72);
+  opacity: 0.95;
 }
 
 .auth-card-header span {
