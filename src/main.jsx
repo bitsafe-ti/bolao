@@ -10,6 +10,7 @@ import {
   getMatchRound,
   getReleasedPredictionRound,
   isMatchClosed,
+  isMatchResultFinal,
   makeId,
   normalizeUsers,
   purgeClearedOpeningPredictions,
@@ -19,7 +20,6 @@ import {
 } from "./domain.js";
 import { getFlagUrl, getTeamsByGroup, teamsById } from "./teams.js";
 import { attachPasswordCredential, hasLegacyPassword, verifyPassword } from "./passwords.js";
-import { applyResultUpdates, fetchWorldCupResults } from "./resultsSync.js";
 import {
   fetchPoolState,
   fetchPoolStateFromPool,
@@ -88,6 +88,7 @@ function saveCachedPoolState(state) {
       auditLogs: state.auditLogs ?? [],
       matches: state.matches ?? [],
       lastResultSyncAt: state.lastResultSyncAt ?? "",
+      lastResultSyncSource: state.lastResultSyncSource ?? "",
       releasedPredictionRound: Number(state.releasedPredictionRound) || 1,
       deletedUserIds: state.deletedUserIds ?? [],
       deletedParticipantIds: state.deletedParticipantIds ?? []
@@ -144,11 +145,6 @@ const adminTabs = [
 const defaultRounds = [1, 2, 3];
 const AUDIT_LOG_LIMIT = 1000;
 
-const RESULT_SYNC_IDLE_MS = 5 * 60 * 1000;
-const RESULT_SYNC_LIVE_MS = 30 * 1000;
-const RESULT_SYNC_LIVE_BEFORE_MS = 30 * 60 * 1000;
-const RESULT_SYNC_LIVE_AFTER_MS = 4 * 60 * 60 * 1000;
-
 function applyRemoteData(current, remoteData, { prefer = "shared" } = {}) {
   const merged = mergePublicPoolState(current, remoteData, { prefer });
   return cleanPoolState({
@@ -167,16 +163,6 @@ function parseScoreValue(value) {
   if (value === "" || value === null || value === undefined) return null;
   const score = Number(value);
   return Number.isInteger(score) ? score : null;
-}
-
-function shouldUseFastResultSync(matches, now = new Date()) {
-  const nowTime = now.getTime();
-  return matches.some((match) => {
-    if (parseScoreValue(match.homeScore) !== null && parseScoreValue(match.awayScore) !== null) return false;
-    const kickoffTime = Date.parse(match.date || "");
-    if (Number.isNaN(kickoffTime)) return false;
-    return nowTime >= kickoffTime - RESULT_SYNC_LIVE_BEFORE_MS && nowTime <= kickoffTime + RESULT_SYNC_LIVE_AFTER_MS;
-  });
 }
 
 function maskEmail(email = "") {
@@ -202,7 +188,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState("predictions");
   const [authError, setAuthError] = useState("");
-  const [syncStatus, setSyncStatus] = useState({ state: "idle", message: "Resultados automáticos ativos." });
+  const [syncStatus, setSyncStatus] = useState({ state: "idle", message: "Placares automáticos ativos." });
   const [sharedStatus, setSharedStatus] = useState({ state: "idle", message: "Carregando dados do bolão..." });
   const [selectedPredictionRound, setSelectedPredictionRound] = useState(null);
   const [selectedResultRound, setSelectedResultRound] = useState(null);
@@ -242,14 +228,7 @@ function App() {
   const resultMatches = state.matches
     .filter((match) => getMatchRound(match) === activeResultRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  const resultSyncIntervalMs = useMemo(
-    () => shouldUseFastResultSync(state.matches, clockNow) ? RESULT_SYNC_LIVE_MS : RESULT_SYNC_IDLE_MS,
-    [state.matches, clockNow]
-  );
-  const resultSyncIntervalText =
-    resultSyncIntervalMs === RESULT_SYNC_LIVE_MS
-      ? "Atualização em tempo quase real: checagem a cada 30 segundos durante jogos próximos ou em andamento."
-      : "A atualização roda ao entrar e a cada 5 minutos fora de jogos próximos ou em andamento.";
+  const resultSyncIntervalText = "O servidor verifica os jogos a cada minuto e esta tela recebe os dados em até 30 segundos.";
   const userRows = useMemo(() => {
     const participantById = new Map(state.participants.map((participant) => [participant.id, participant]));
     const linkedParticipantIds = new Set(state.users.map((user) => user.participantId).filter(Boolean));
@@ -390,7 +369,7 @@ function App() {
         // Only persist when migrating legacy localStorage data.
         // Purge-only changes are intentionally skipped here to avoid a race condition where
         // this write (with auditLogs from the initial D1 fetch) races against a concurrent
-        // syncResults write and overwrites audit log entries that syncResults just persisted.
+        // server update and overwrites audit log entries that were just persisted.
         // Purge is idempotent - expired predictions are removed on every client load, and the
         // next user action will persist the cleaned state via persistAndSync anyway.
         if (legacyData) {
@@ -441,14 +420,6 @@ function App() {
     return () => window.clearInterval(intervalId);
   }, []);
 
-  // Auto-sync results when logged in
-  useEffect(() => {
-    if (!currentUser) return undefined;
-    syncResults("auto");
-    const intervalId = window.setInterval(() => syncResults("auto"), resultSyncIntervalMs);
-    return () => window.clearInterval(intervalId);
-  }, [currentUser?.id, resultSyncIntervalMs]);
-
   useEffect(() => {
     if (!visibleTabs.some((item) => item.id === tab)) {
       setTab("predictions");
@@ -470,8 +441,7 @@ function App() {
     // available synchronously - React 19 batches setState callbacks lazily
     // and the updater may not run before persistAndSync needs the value.
     const nextState = typeof recipe === "function" ? recipe(state) : recipe;
-    // Skip persist when the recipe returned the same reference (e.g. syncResults
-    // with 0 changed matches). An extra write would race with concurrent writes
+    // Skip persist when the recipe returned the same reference. An extra write would race with concurrent writes
     // and could overwrite audit logs written by those concurrent calls.
     if (nextState === state) return;
     setState(nextState);
@@ -491,45 +461,16 @@ function App() {
     }
   }
 
-  async function syncResults(mode = "manual") {
-    setSyncStatus({ state: "loading", message: "Atualizando resultados..." });
+  async function refreshResults() {
+    setSyncStatus({ state: "loading", message: "Buscando placares mais recentes..." });
     try {
-      const sourceMatches = await fetchWorldCupResults();
-      // Compute against current closure state to know whether a D1 write is needed.
-      const preview = applyResultUpdates(state.matches, sourceMatches);
-      const changed = preview.changed;
-      const now = new Date().toISOString();
-
-      if (changed > 0) {
-        // Real changes: write to D1 and append audit log.
-        // The recipe re-runs against the latest state snapshot to avoid stale data.
-        updateState((current) => {
-          const update = applyResultUpdates(current.matches, sourceMatches);
-          return appendAuditLog(
-            { ...current, matches: update.matches, lastResultSyncAt: now },
-            makeAuditEntry(
-              currentUser?.name ?? "Sistema",
-              "results_synced",
-              `${update.changed} jogo${update.changed === 1 ? "" : "s"} atualizado${update.changed === 1 ? "" : "s"}`
-            )
-          );
-        });
-      } else {
-        // No changes: update lastResultSyncAt locally only - no D1 write.
-        // Writing to D1 here with auditLogs from a potentially stale local state
-        // would race with concurrent persistAndSync calls and overwrite audit logs.
-        setState((current) => ({ ...current, lastResultSyncAt: now }));
-      }
-
-      setSyncStatus({
-        state: "success",
-        message:
-          changed > 0
-            ? `${changed} jogos sincronizados.`
-            : `Sem novos resultados. Última verificação ${formatShortTime(new Date())}.`
-      });
+      const remote = await withTimeout(fetchPoolState(), DATA_LOAD_TIMEOUT_MS, "Tempo excedido ao buscar os placares.");
+      const cleanedRemote = cleanPoolState(remote);
+      saveCachedPoolState(cleanedRemote);
+      setState((current) => applyRemoteData(current, cleanedRemote));
+      setSyncStatus({ state: "success", message: "Placares mais recentes carregados." });
     } catch (error) {
-      setSyncStatus({ state: "error", message: `Não consegui atualizar agora. ${error.message}` });
+      setSyncStatus({ state: "error", message: `Não consegui buscar os placares agora. ${error.message}` });
     }
   }
 
@@ -940,9 +881,9 @@ function App() {
               <button type="button" className="modal-close" aria-label="Fechar modal" onClick={() => setAdminMenuOpen(false)}>×</button>
             </div>
             <div className="admin-modal-actions">
-              <button type="button" onClick={() => { syncResults("manual"); setAdminMenuOpen(false); setMobileMenuOpen(false); }}>
+              <button type="button" onClick={() => { refreshResults(); setAdminMenuOpen(false); setMobileMenuOpen(false); }}>
                 <strong>Atualizar resultados</strong>
-                <span>Sincronizar os placares mais recentes da Copa.</span>
+                <span>Buscar os placares mais recentes do servidor.</span>
               </button>
             </div>
           </section>
@@ -1190,7 +1131,7 @@ function App() {
             <SectionHeader title="Resultados dos Jogos" />
             <div className={`sync-strip ${syncStatus.state}`}>
               <strong>{syncStatus.message}</strong>
-              <span>{state.lastResultSyncAt ? `Última checagem: ${formatDate(state.lastResultSyncAt)}. ${resultSyncIntervalText}` : resultSyncIntervalText}</span>
+              <span>{state.lastResultSyncAt ? `Última checagem do servidor: ${formatDate(state.lastResultSyncAt)}. ${resultSyncIntervalText}` : resultSyncIntervalText}</span>
             </div>
             <div className="prediction-toolbar">
               <label className="select-label">
@@ -1497,8 +1438,8 @@ function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, on
 function RankingTable({ ranking, matches = [], compact = false }) {
   const paidParticipants = ranking.length;
   const totalPoolValue = paidParticipants * ENTRY_FEE;
-  const displayedRanking = compact ? ranking : ranking.slice(3);
-  const rankOffset = compact ? 0 : 3;
+  const displayedRanking = ranking;
+  const rankOffset = 0;
 
   return (
     <section className="panel table-panel">
@@ -1585,21 +1526,38 @@ function ResultsList({ activeParticipant, matches, predictions }) {
 }
 
 function getResultMeta(match) {
-  const homeScore = match.homeScore === "" || match.homeScore === undefined ? null : Number(match.homeScore);
-  const awayScore = match.awayScore === "" || match.awayScore === undefined ? null : Number(match.awayScore);
+  const homeScore = parseScoreValue(match.homeScore);
+  const awayScore = parseScoreValue(match.awayScore);
   const hasResult = Number.isInteger(homeScore) && Number.isInteger(awayScore);
   const homeWon = hasResult && homeScore > awayScore;
   const awayWon = hasResult && awayScore > homeScore;
-  const isLive = !hasResult && isMatchClosed(match);
+  const rawStatus = String(match.status || match.statusShort || "").toLowerCase();
+  const isLive = rawStatus === "live" || ["1h", "ht", "2h", "et", "bt", "p", "int"].includes(rawStatus);
+  const isFinished = isMatchResultFinal(match);
+  const isPostponed = rawStatus === "postponed" || rawStatus === "pst" || rawStatus === "susp";
+  const isCancelled = rawStatus === "cancelled" || rawStatus === "canc" || rawStatus === "abd";
+  const inferredLive = !rawStatus && !hasResult && isMatchClosed(match);
+  const statusClass = isFinished ? "finished" : isLive || inferredLive ? "live" : "pending";
+  const statusLabel = isFinished
+    ? "Resultado atualizado"
+    : isLive
+      ? (match.elapsed ? `Ao vivo - ${match.elapsed}'` : "Ao vivo")
+      : isPostponed
+        ? "Jogo adiado"
+        : isCancelled
+          ? "Jogo cancelado"
+          : inferredLive
+            ? "Em andamento"
+            : "Aguardando resultado";
   return {
     homeScore,
     awayScore,
     hasResult,
     homeWon,
     awayWon,
-    isLive,
-    statusLabel: hasResult ? "Resultado atualizado" : isLive ? "Em andamento" : "Aguardando resultado",
-    statusClass: hasResult ? "finished" : isLive ? "live" : "pending"
+    isLive: isLive || inferredLive,
+    statusLabel,
+    statusClass
   };
 }
 
@@ -1813,6 +1771,7 @@ function hasPrediction(prediction) {
 
 function getPredictionFeedback(prediction, match, options = {}) {
   if (!hasPrediction(prediction)) return null;
+  if (!isMatchResultFinal(match)) return null;
   const actualHome = parseScoreValue(match?.homeScore);
   const actualAway = parseScoreValue(match?.awayScore);
   if (actualHome === null || actualAway === null) return null;
@@ -2118,10 +2077,6 @@ function formatVenue(match) {
   if (!city) return stadium;
   if (!stadium) return city;
   return `${stadium} - ${city}`;
-}
-
-function formatShortTime(value) {
-  return new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(value);
 }
 
 const rootElement = document.getElementById("root");

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   calculateRanking,
   createGroupStageMatches,
+  getActiveRound,
   getReleasedPredictionRound,
   normalizeUsers,
   purgeClearedOpeningPredictions,
@@ -48,6 +49,26 @@ test("scores wrong outcome with zero points", () => {
 
 test("scores no points before actual result exists", () => {
   assert.equal(scorePrediction({ home: 1, away: 0 }, { homeScore: "", awayScore: "" }), 0);
+});
+
+test("does not score a prediction while the match is live", () => {
+  assert.equal(
+    scorePrediction(
+      { home: 1, away: 0 },
+      { homeScore: 1, awayScore: 0, status: "live" }
+    ),
+    0
+  );
+});
+
+test("keeps the current round active until every result is final", () => {
+  const matches = [
+    { id: "r1-live", round: 1, homeScore: 1, awayScore: 0, status: "live" },
+    { id: "r2", round: 2, homeScore: "", awayScore: "", status: "scheduled" }
+  ];
+  assert.equal(getActiveRound(matches), 1);
+  matches[0].status = "finished";
+  assert.equal(getActiveRound(matches), 2);
 });
 
 test("orders ranking by total, exact scores, then name", () => {
@@ -182,6 +203,10 @@ test("syncs result goals with minute and scorer name", () => {
       homeTeamId: "mexico",
       awayTeamId: "south-africa",
       score: [2, 0],
+      status: "live",
+      statusShort: "2H",
+      elapsed: 67,
+      resultSource: "api-football",
       homeGoals: [
         { name: "Raul Jimenez", minute: 90, offset: 2, penalty: true, ownGoal: false }
       ],
@@ -192,9 +217,57 @@ test("syncs result goals with minute and scorer name", () => {
   const update = applyResultUpdates(matches, sourceMatches);
 
   assert.equal(update.matches[0].homeScore, "2");
+  assert.equal(update.matches[0].status, "live");
+  assert.equal(update.matches[0].elapsed, 67);
   assert.deepEqual(update.matches[0].homeGoals, [
     { name: "Raul Jimenez", minute: 90, offset: 2, penalty: true, ownGoal: false }
   ]);
+});
+
+test("does not regress a live match when the fallback only has the schedule", () => {
+  const matches = [{
+    id: "m1",
+    homeTeamId: "mexico",
+    awayTeamId: "south-africa",
+    homeScore: "1",
+    awayScore: "0",
+    status: "live",
+    statusShort: "2H",
+    elapsed: 70,
+    resultSource: "api-football"
+  }];
+  const sourceMatches = [{
+    homeTeamId: "mexico",
+    awayTeamId: "south-africa",
+    status: "scheduled",
+    statusShort: "NS",
+    resultSource: "openfootball"
+  }];
+
+  const update = applyResultUpdates(matches, sourceMatches);
+  assert.equal(update.matches[0].status, "live");
+  assert.equal(update.matches[0].elapsed, 70);
+  assert.equal(update.matches[0].resultSource, "api-football");
+});
+
+test("does not change a finished score during later syncs", () => {
+  const matches = [{
+    id: "m1",
+    homeTeamId: "mexico",
+    awayTeamId: "south-africa",
+    homeScore: "2",
+    awayScore: "1",
+    status: "finished"
+  }];
+  const sourceMatches = [{
+    homeTeamId: "mexico",
+    awayTeamId: "south-africa",
+    score: [3, 1],
+    status: "finished"
+  }];
+
+  const update = applyResultUpdates(matches, sourceMatches);
+  assert.equal(update.matches[0].homeScore, "2");
 });
 
 test("public shared state includes predictions, participants and match results", () => {
@@ -203,6 +276,7 @@ test("public shared state includes predictions, participants and match results",
     predictions: { p1: { m1: { home: "2", away: "1" } } },
     matches: [{ id: "m1", homeScore: "2", awayScore: "1" }],
     lastResultSyncAt: "2026-06-12T12:00:00.000Z",
+    lastResultSyncSource: "api-football",
     users: [{ id: "u1", password: "secret" }],
     deletedUserIds: ["u9"],
     deletedParticipantIds: ["p9"]
@@ -215,6 +289,7 @@ test("public shared state includes predictions, participants and match results",
     auditLogs: [],
     matches: state.matches,
     lastResultSyncAt: state.lastResultSyncAt,
+    lastResultSyncSource: state.lastResultSyncSource,
     releasedPredictionRound: 1,
     deletedUserIds: state.deletedUserIds,
     deletedParticipantIds: state.deletedParticipantIds

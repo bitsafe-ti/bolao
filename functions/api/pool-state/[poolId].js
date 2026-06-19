@@ -5,10 +5,12 @@ const EMPTY_STATE = {
   auditLogs: [],
   matches: [],
   lastResultSyncAt: "",
+  lastResultSyncSource: "",
   releasedPredictionRound: 1,
   deletedUserIds: [],
   deletedParticipantIds: []
 };
+const MAX_WRITE_ATTEMPTS = 3;
 
 function mergeAuditLogs(currentLogs, incomingLogs) {
   const logsById = new Map();
@@ -19,13 +21,6 @@ function mergeAuditLogs(currentLogs, incomingLogs) {
   return [...logsById.values()]
     .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""))
     .slice(0, 1000);
-}
-
-class LockedResultError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "LockedResultError";
-  }
 }
 
 function jsonResponse(body, init = {}) {
@@ -46,15 +41,19 @@ function getDb(context) {
   return db;
 }
 
-async function readPoolState(db, poolId) {
+async function readPoolStateRecord(db, poolId) {
   await ensureSchema(db);
   const row = await db
-    .prepare("select data from pool_state where id = ?")
+    .prepare("select data, updated_at from pool_state where id = ?")
     .bind(poolId)
     .first();
 
-  if (!row?.data) return { ...EMPTY_STATE };
-  return { ...EMPTY_STATE, ...JSON.parse(row.data) };
+  if (!row?.data) return { state: { ...EMPTY_STATE }, version: null };
+  return { state: { ...EMPTY_STATE, ...JSON.parse(row.data) }, version: row.updated_at };
+}
+
+async function readPoolState(db, poolId) {
+  return (await readPoolStateRecord(db, poolId)).state;
 }
 
 function parseScore(value) {
@@ -63,33 +62,61 @@ function parseScore(value) {
   return Number.isInteger(score) && score >= 0 ? String(score) : null;
 }
 
-function getLockedScore(match) {
+function getStoredScore(match) {
   const home = parseScore(match?.homeScore);
   const away = parseScore(match?.awayScore);
   if (home === null || away === null) return null;
   return { home, away };
 }
 
-function assertLockedResultsAreUnchanged(currentState, nextState) {
-  const nextMatchesById = new Map((nextState.matches ?? []).map((match) => [match.id, match]));
+function isFinishedResult(match) {
+  if (!getStoredScore(match)) return false;
+  const status = String(match?.status || match?.statusShort || "").toLowerCase();
+  if (!status) return true;
+  return ["finished", "ft", "aet", "pen", "awd", "wo"].includes(status);
+}
 
-  for (const currentMatch of currentState.matches ?? []) {
-    const lockedScore = getLockedScore(currentMatch);
-    if (!lockedScore) continue;
+function getResultTimestamp(match) {
+  const time = Date.parse(match?.resultUpdatedAt || "");
+  return Number.isNaN(time) ? 0 : time;
+}
 
-    const nextMatch = nextMatchesById.get(currentMatch.id);
-    const nextScore = getLockedScore(nextMatch);
-    const changed =
-      !nextScore ||
-      nextScore.home !== lockedScore.home ||
-      nextScore.away !== lockedScore.away;
+const RESULT_FIELDS = [
+  "homeScore",
+  "awayScore",
+  "homeGoals",
+  "awayGoals",
+  "status",
+  "statusShort",
+  "elapsed",
+  "resultSource",
+  "sourceFixtureId",
+  "resultUpdatedAt"
+];
 
-    if (changed) {
-      throw new LockedResultError(
-        `Resultado bloqueado para ${currentMatch.id}: ${lockedScore.home} x ${lockedScore.away}.`
-      );
-    }
+function preserveResultFields(target, source) {
+  const merged = { ...target };
+  for (const field of RESULT_FIELDS) {
+    if (source[field] !== undefined) merged[field] = source[field];
   }
+  return merged;
+}
+
+export function mergeMatchesPreservingResults(currentMatches = [], nextMatches = []) {
+  const currentById = new Map(currentMatches.map((match) => [match.id, match]));
+  const nextById = new Map(nextMatches.map((match) => [match.id, match]));
+  const ids = new Set([...currentById.keys(), ...nextById.keys()]);
+
+  return [...ids].map((id) => {
+    const current = currentById.get(id);
+    const next = nextById.get(id);
+    if (!current) return next;
+    if (!next) return current;
+
+    const keepCurrentResult =
+      isFinishedResult(current) || getResultTimestamp(current) > getResultTimestamp(next);
+    return keepCurrentResult ? preserveResultFields(next, current) : next;
+  }).filter(Boolean);
 }
 
 async function ensureSchema(db) {
@@ -120,42 +147,47 @@ export async function onRequestPut(context) {
     const poolId = context.params.poolId || "copa-2026";
     const body = await context.request.json();
     const nextState = { ...EMPTY_STATE, ...body };
-    const now = new Date().toISOString();
     const db = getDb(context);
 
     await ensureSchema(db);
-    const currentState = await readPoolState(db, poolId);
-    assertLockedResultsAreUnchanged(currentState, nextState);
-
-    // Server-side merge of critical fields to prevent lost updates from concurrent writes.
-    // The D1 read above and the write below are serialized by SQLite, so merging here is
-    // safe against race conditions that the client-side merge cannot fully prevent.
-    const finalState = {
-      ...nextState,
-      releasedPredictionRound: Math.max(
-        Number(currentState.releasedPredictionRound) || 1,
-        Number(nextState.releasedPredictionRound) || 1
-      ),
-      auditLogs: mergeAuditLogs(currentState.auditLogs, nextState.auditLogs)
-    };
-
-    const data = JSON.stringify(finalState);
-    await db
-      .prepare(`
+    for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt += 1) {
+      const snapshot = await readPoolStateRecord(db, poolId);
+      const currentState = snapshot.state;
+      const currentSyncTime = Date.parse(currentState.lastResultSyncAt || "");
+      const nextSyncTime = Date.parse(nextState.lastResultSyncAt || "");
+      const keepCurrentSync =
+        (Number.isNaN(nextSyncTime) ? 0 : nextSyncTime) < (Number.isNaN(currentSyncTime) ? 0 : currentSyncTime);
+      const finalState = {
+        ...nextState,
+        matches: mergeMatchesPreservingResults(currentState.matches, nextState.matches),
+        lastResultSyncAt: keepCurrentSync
+          ? currentState.lastResultSyncAt
+          : nextState.lastResultSyncAt,
+        lastResultSyncSource: keepCurrentSync
+          ? currentState.lastResultSyncSource
+          : nextState.lastResultSyncSource,
+        releasedPredictionRound: Math.max(
+          Number(currentState.releasedPredictionRound) || 1,
+          Number(nextState.releasedPredictionRound) || 1
+        ),
+        auditLogs: mergeAuditLogs(currentState.auditLogs, nextState.auditLogs)
+      };
+      const now = new Date().toISOString();
+      const data = JSON.stringify(finalState);
+      const write = await db.prepare(`
         insert into pool_state (id, data, created_at, updated_at)
         values (?, ?, ?, ?)
         on conflict(id) do update set
           data = excluded.data,
           updated_at = excluded.updated_at
-      `)
-      .bind(poolId, data, now, now)
-      .run();
+        where pool_state.updated_at = ?
+      `).bind(poolId, data, now, now, snapshot.version).run();
 
-    return jsonResponse(JSON.parse(data));
-  } catch (error) {
-    if (error instanceof LockedResultError) {
-      return jsonResponse({ error: error.message }, { status: 409 });
+      if ((write.meta?.changes ?? 0) > 0) return jsonResponse(finalState);
     }
+
+    throw new Error("Nao foi possivel salvar devido a atualizacoes concorrentes.");
+  } catch (error) {
     return jsonResponse({ error: error.message }, { status: 500 });
   }
 }

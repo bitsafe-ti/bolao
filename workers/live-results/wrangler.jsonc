@@ -1,0 +1,30 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "bolao-copa2026-results-sync",
+  "main": "./index.js",
+  "compatibility_date": "2026-06-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bolao-copa2026",
+      "database_id": "3cddae90-3152-4d45-90a0-c928495278af"
+    }
+  ],
+  "vars": {
+    "POOL_ID": "copa-2026",
+    "API_FOOTBALL_BASE_URL": "https://v3.football.api-sports.io",
+    "API_FOOTBALL_LEAGUE_ID": "1",
+    "API_FOOTBALL_SEASON": "2026"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "head_sampling_rate": 1
+    }
+  }
+}

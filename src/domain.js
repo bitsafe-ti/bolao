@@ -30,13 +30,23 @@ export function getOutcome(home, away) {
   return "draw";
 }
 
+export function isMatchResultFinal(match) {
+  const actualHome = parseScore(match?.homeScore);
+  const actualAway = parseScore(match?.awayScore);
+  if (actualHome === null || actualAway === null) return false;
+
+  const status = String(match?.status || match?.statusShort || "").toLowerCase();
+  if (!status) return true;
+  return ["finished", "ft", "aet", "pen", "awd", "wo"].includes(status);
+}
+
 export function scorePrediction(prediction, match) {
   const predictedHome = parseScore(prediction?.home);
   const predictedAway = parseScore(prediction?.away);
   const actualHome = parseScore(match?.homeScore);
   const actualAway = parseScore(match?.awayScore);
 
-  if ([predictedHome, predictedAway, actualHome, actualAway].some((score) => score === null)) {
+  if (!isMatchResultFinal(match) || [predictedHome, predictedAway, actualHome, actualAway].some((score) => score === null)) {
     return 0;
   }
 
@@ -235,11 +245,7 @@ export function getActiveRound(matches) {
     const roundMatches = matches.filter((m) => getMatchRound(m) === round);
     const allComplete =
       roundMatches.length > 0 &&
-      roundMatches.every(
-        (m) =>
-          m.homeScore !== "" && m.homeScore !== null && m.homeScore !== undefined &&
-          m.awayScore !== "" && m.awayScore !== null && m.awayScore !== undefined
-      );
+      roundMatches.every(isMatchResultFinal);
     if (!allComplete) return round;
   }
 

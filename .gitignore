@@ -4,3 +4,5 @@ dist
 .wrangler
 *.local
 coverage
+.dev.vars*
+!.dev.vars.example

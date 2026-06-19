@@ -9,7 +9,9 @@ npm run dev                  # Vite dev server on 127.0.0.1
 npm run build                # Production build to /dist (GitHub Pages, base /bolao/)
 npm run build:cloudflare     # Production build for Cloudflare (base /, VITE_POOL_ID=copa-2026)
 npm run pages:dev            # Build + local Cloudflare Pages with D1 binding (.wrangler/state)
-npm run deploy:cloudflare    # Build + deploy to Cloudflare Pages via wrangler
+npm run deploy:pages         # Build + deploy to Cloudflare Pages via wrangler
+npm run deploy:results-worker # Deploy the scheduled live-results Worker
+npm run deploy:cloudflare    # Deploy Pages and the scheduled results Worker
 npm run preview              # Serve the built /dist locally
 npm test                     # Node.js built-in test runner (test/domain.test.js)
 node --test --test-name-pattern "scores" # Run a single test by name pattern
@@ -28,14 +30,15 @@ Single-file React app (`src/main.jsx`) with no routing — all views are rendere
 **Core modules:**
 - `src/domain.js` — Scoring (3 pts exact / 1 pt correct winner / 0), ranking, group-stage match generation, user normalization, and prediction-purge helpers. Tests cover this file (and `resultsSync.js`/`sharedState.js`) exclusively.
 - `src/sharedState.js` — Cloudflare API read/write with timestamp-based merge (`mergePublicPoolState`), email deduplication across merged states, and deleted-ID tombstone propagation.
-- `src/resultsSync.js` — Fetches official results from `openfootball/worldcup.json` on GitHub; auto-runs on login and every 5 min; also patches match metadata (dates, grounds, goalscorers).
+- `src/resultsSync.js` — Normalizes result sources and applies score, status, minute and goalscorer updates.
+- `workers/live-results/` — Scheduled Worker that checks matches every minute, uses API-Football when its secret is configured, falls back to OpenFootball, and writes into the shared D1 state.
 - `src/passwords.js` — Browser-native PBKDF2-SHA-256 (150 k iterations) for password hashing. `verifyPassword` falls back to plain-text comparison to migrate legacy accounts on first sign-in.
 - `src/teams.js` — Team registry with ISO 3166-1 alpha-2 codes; `getFlagUrl` returns flagcdn.com URLs.
 - `src/venues.js` — Venue lookup by ground name string (city, stadium, country).
 
 **API layer (`functions/api/pool-state/[poolId].js`):**
 - `GET` — returns current D1 state (or empty shell).
-- `PUT`/`PATCH` — idempotent upsert; throws 409 (`LockedResultError`) if any match that already has a score in DB would have that score changed. Schema is created lazily with `ensureSchema`.
+- `PUT`/`PATCH` — idempotent upsert; preserves the newest live result and never lets a stale client overwrite a finished result. Schema is created lazily with `ensureSchema`.
 
 **Prediction-round gating:**
 - `releasedPredictionRound` in state controls which round participants may submit. It advances automatically via `getActiveRound` (first round not fully scored) and can be bumped manually by admins.

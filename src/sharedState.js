@@ -10,6 +10,7 @@ const EMPTY_STATE = {
   auditLogs: [],
   matches: [],
   lastResultSyncAt: "",
+  lastResultSyncSource: "",
   releasedPredictionRound: 1,
   deletedUserIds: [],
   deletedParticipantIds: []
@@ -48,6 +49,7 @@ export function getPublicPoolState(state) {
     auditLogs: state.auditLogs ?? [],
     matches: state.matches ?? [],
     lastResultSyncAt: state.lastResultSyncAt ?? "",
+    lastResultSyncSource: state.lastResultSyncSource ?? "",
     releasedPredictionRound: Number(state.releasedPredictionRound) || 1,
     deletedUserIds: state.deletedUserIds ?? [],
     deletedParticipantIds: state.deletedParticipantIds ?? []
@@ -55,9 +57,12 @@ export function getPublicPoolState(state) {
 }
 
 function getTimestamp(item = {}) {
-  const value = item.updatedAt || item.resultUpdatedAt || item.createdAt || "";
-  const time = Date.parse(value);
-  return Number.isNaN(time) ? 0 : time;
+  return Math.max(
+    ...[item.updatedAt, item.resultUpdatedAt, item.createdAt].map((value) => {
+      const time = Date.parse(value || "");
+      return Number.isNaN(time) ? 0 : time;
+    })
+  );
 }
 
 function pickNewest(currentItem, sharedItem, prefer = "shared") {
@@ -228,7 +233,11 @@ export function mergePublicPoolState(current, shared = {}, options = {}) {
     lastResultSyncAt:
       (Number.isNaN(sharedSyncTime) ? 0 : sharedSyncTime) > (Number.isNaN(currentSyncTime) ? 0 : currentSyncTime)
         ? shared.lastResultSyncAt
-        : current.lastResultSyncAt
+        : current.lastResultSyncAt,
+    lastResultSyncSource:
+      (Number.isNaN(sharedSyncTime) ? 0 : sharedSyncTime) > (Number.isNaN(currentSyncTime) ? 0 : currentSyncTime)
+        ? shared.lastResultSyncSource
+        : current.lastResultSyncSource
   });
 }
 

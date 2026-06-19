@@ -1,0 +1,2 @@
+# Local-only secret for the scheduled results Worker.
+API_FOOTBALL_KEY=replace-with-your-api-football-key
