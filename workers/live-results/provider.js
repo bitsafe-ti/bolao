@@ -94,40 +94,52 @@ function getProviderError(payload) {
   return String(errors);
 }
 
-export async function fetchApiFootballResults(env, now = new Date()) {
-  const baseUrl = env.API_FOOTBALL_BASE_URL || "https://v3.football.api-sports.io";
+async function callApiFootball(baseUrl, apiKey, params) {
   const url = new URL("fixtures", `${baseUrl.replace(/\/$/, "")}/`);
-  url.search = new URLSearchParams({
-    league: env.API_FOOTBALL_LEAGUE_ID || "1",
-    season: env.API_FOOTBALL_SEASON || "2026",
-    date: formatSaoPauloDate(now),
-    timezone: "America/Sao_Paulo"
-  }).toString();
-
+  url.search = new URLSearchParams(params).toString();
   const response = await fetch(url, {
-    headers: { "x-apisports-key": env.API_FOOTBALL_KEY },
+    headers: { "x-apisports-key": apiKey },
     signal: AbortSignal.timeout(10_000)
   });
   if (!response.ok) throw new Error(`API-Football indisponivel (${response.status})`);
-
   const payload = await response.json();
   const providerError = getProviderError(payload);
   if (providerError) throw new Error(`API-Football: ${providerError}`);
-
   return (payload.response ?? []).map(normalizeApiFootballFixture).filter(Boolean);
+}
+
+export async function fetchApiFootballResults(env, now = new Date()) {
+  const baseUrl = env.API_FOOTBALL_BASE_URL || "https://v3.football.api-sports.io";
+  const league = env.API_FOOTBALL_LEAGUE_ID || "1";
+  const season = env.API_FOOTBALL_SEASON || "2026";
+  const date = formatSaoPauloDate(now);
+  const apiKey = env.API_FOOTBALL_KEY;
+
+  // Try with season first; if rejected (400), retry without it
+  try {
+    return await callApiFootball(baseUrl, apiKey, { league, season, date, timezone: "America/Sao_Paulo" });
+  } catch (firstError) {
+    if (!String(firstError?.message).includes("(400)")) throw firstError;
+    console.warn(JSON.stringify({ message: "api-football 400 com season, retentando sem season", season }));
+    return await callApiFootball(baseUrl, apiKey, { league, date, timezone: "America/Sao_Paulo" });
+  }
 }
 
 export async function fetchResultSource(env, now = new Date()) {
   if (env.API_FOOTBALL_KEY) {
+    let fallbackReason;
     try {
       const matches = await fetchApiFootballResults(env, now);
       if (matches.length) return { matches, source: "api-football" };
+      fallbackReason = `api-football retornou 0 partidas para ${formatSaoPauloDate(now)}`;
     } catch (error) {
-      console.error(JSON.stringify({
-        message: "live results provider failed; using fallback",
-        error: error instanceof Error ? error.message : String(error)
-      }));
+      fallbackReason = error instanceof Error ? error.message : String(error);
     }
+    console.warn(JSON.stringify({
+      message: "api-football indisponivel; usando openfootball como fallback",
+      fallbackReason
+    }));
+    return { matches: await fetchWorldCupResults(), source: "openfootball", fallbackReason };
   }
 
   return { matches: await fetchWorldCupResults(), source: "openfootball" };

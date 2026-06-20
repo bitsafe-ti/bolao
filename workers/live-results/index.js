@@ -1,4 +1,4 @@
-import { syncPoolResults } from "./sync.js";
+import { syncPoolResults, readPoolStateForHealth } from "./sync.js";
 
 export default {
   async fetch(request, env) {
@@ -6,10 +6,15 @@ export default {
     if (request.method !== "GET" || url.pathname !== "/health") {
       return new Response("Not Found", { status: 404 });
     }
+    const poolId = env.POOL_ID || "copa-2026";
+    const snapshot = env.DB ? await readPoolStateForHealth(env.DB, poolId) : null;
     return Response.json({
       ok: true,
       service: "bolao-copa2026-results-sync",
-      liveProviderConfigured: Boolean(env.API_FOOTBALL_KEY)
+      liveProviderConfigured: Boolean(env.API_FOOTBALL_KEY),
+      lastResultSyncAt: snapshot?.lastResultSyncAt ?? null,
+      lastResultSyncSource: snapshot?.lastResultSyncSource ?? null,
+      lastApiFallbackReason: snapshot?.lastApiFallbackReason ?? null
     });
   },
 

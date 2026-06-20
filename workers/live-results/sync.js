@@ -47,14 +47,26 @@ async function readPoolState(db, poolId) {
   return { state: JSON.parse(row.data), version: row.updated_at };
 }
 
-function appendSyncAudit(state, changed, source, now) {
+export async function readPoolStateForHealth(db, poolId) {
+  try {
+    const snapshot = await readPoolState(db, poolId);
+    if (!snapshot) return null;
+    const { lastResultSyncAt, lastResultSyncSource, lastApiFallbackReason } = snapshot.state;
+    return { lastResultSyncAt, lastResultSyncSource, lastApiFallbackReason };
+  } catch {
+    return null;
+  }
+}
+
+function appendSyncAudit(state, changed, source, now, fallbackReason) {
   if (!changed) return state.auditLogs ?? [];
+  const fallback = fallbackReason ? ` (fallback: ${fallbackReason})` : "";
   const entry = {
     id: `audit-results-${crypto.randomUUID()}`,
     createdAt: now,
     actor: "Sistema",
     action: "results_synced",
-    details: `${changed} jogo${changed === 1 ? "" : "s"} atualizado${changed === 1 ? "" : "s"} via ${source}`
+    details: `${changed} jogo${changed === 1 ? "" : "s"} atualizado${changed === 1 ? "" : "s"} via ${source}${fallback}`
   };
   return [entry, ...(state.auditLogs ?? [])].slice(0, 1000);
 }
@@ -85,9 +97,10 @@ export async function syncPoolResults(env, scheduledTime = Date.now(), options =
     const nextState = {
       ...snapshot.state,
       matches: update.matches,
-      auditLogs: appendSyncAudit(snapshot.state, update.changed, source.source, syncedAt),
+      auditLogs: appendSyncAudit(snapshot.state, update.changed, source.source, syncedAt, source.fallbackReason),
       lastResultSyncAt: syncedAt,
-      lastResultSyncSource: source.source
+      lastResultSyncSource: source.source,
+      lastApiFallbackReason: source.fallbackReason ?? null
     };
     const write = await writePoolState(env.DB, poolId, snapshot.version, nextState, syncedAt);
     if ((write.meta?.changes ?? 0) > 0) {
