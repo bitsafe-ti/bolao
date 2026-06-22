@@ -1569,13 +1569,13 @@ function getResultMeta(match) {
   const statusLabel = isFinished
     ? "Resultado atualizado"
     : isLive
-      ? (match.elapsed ? `Ao vivo - ${match.elapsed}'` : "Ao vivo")
+      ? "Em execução"
       : isPostponed
         ? "Jogo adiado"
         : isCancelled
           ? "Jogo cancelado"
           : inferredLive
-            ? "Em andamento"
+            ? "Em execução"
             : "Aguardando resultado";
   return {
     homeScore,
