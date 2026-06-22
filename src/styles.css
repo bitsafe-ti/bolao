@@ -2091,6 +2091,7 @@ h3 {
 /* ── Auditoria ── */
 .audit-cell {
   text-align: center;
+  vertical-align: middle;
 }
 
 .audit-eye-btn {
@@ -2203,28 +2204,44 @@ h3 {
 .audit-row-exact { background: rgba(34,197,94,0.06); }
 .audit-row-winner { background: rgba(59,130,246,0.05); }
 
-.audit-teams { min-width: 180px; }
+.audit-teams { min-width: 160px; }
 
 .audit-team-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.audit-team-score {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  min-width: 18px;
-  text-align: right;
-  flex-shrink: 0;
+  gap: 6px;
+  min-height: 26px;
 }
 
 .audit-versus {
   display: block;
   color: var(--muted);
   font-size: 0.75rem;
-  padding: 2px 0;
+  padding: 1px 0;
+  line-height: 1;
+}
+
+.audit-score {
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.audit-score-line {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.audit-score-sep {
+  color: var(--muted);
+  font-size: 0.75rem;
+  padding: 1px 0;
+  line-height: 1;
+  text-align: center;
 }
 
 .audit-prediction { text-align: center; white-space: nowrap; }

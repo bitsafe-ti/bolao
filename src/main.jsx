@@ -1588,6 +1588,7 @@ function AuditModal({ participant, matches, predictions, onClose }) {
               <thead>
                 <tr>
                   <th>Jogo</th>
+                  <th>Resultado</th>
                   <th>Palpite</th>
                   <th>Pts</th>
                 </tr>
@@ -1598,15 +1599,32 @@ function AuditModal({ participant, matches, predictions, onClose }) {
                     <td className="audit-teams">
                       <div className="audit-team-row">
                         <TeamName teamId={match.homeTeamId} fallback={match.home} />
-                        <span className="audit-team-score">{match.homeScore}</span>
                       </div>
                       <span className="audit-versus">×</span>
                       <div className="audit-team-row">
                         <TeamName teamId={match.awayTeamId} fallback={match.away} />
-                        <span className="audit-team-score">{match.awayScore}</span>
                       </div>
                     </td>
-                    <td className="audit-prediction">{hasPrediction(prediction) ? formatPrediction(prediction) : <span className="audit-no-prediction">—</span>}</td>
+                    <td className="audit-score">
+                      <div className="audit-score-line">{match.homeScore}</div>
+                      <div className="audit-score-sep">×</div>
+                      <div className="audit-score-line">{match.awayScore}</div>
+                    </td>
+                    <td className="audit-prediction">
+                      {hasPrediction(prediction) ? (
+                        <>
+                          <div className="audit-score-line">{prediction.home}</div>
+                          <div className="audit-score-sep">×</div>
+                          <div className="audit-score-line">{prediction.away}</div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="audit-score-line audit-no-prediction">—</div>
+                          <div className="audit-score-sep"> </div>
+                          <div className="audit-score-line audit-no-prediction">—</div>
+                        </>
+                      )}
+                    </td>
                     <td className="audit-points">
                       <strong className={`points-pill ${points === 3 ? "exact" : points === 1 ? "winner" : ""}`}>{points}</strong>
                     </td>
@@ -1615,7 +1633,7 @@ function AuditModal({ participant, matches, predictions, onClose }) {
               </tbody>
               <tfoot>
                 <tr className="audit-total-row">
-                  <td colSpan="2">Total</td>
+                  <td colSpan="3">Total</td>
                   <td><strong className="points-pill">{total}</strong></td>
                 </tr>
               </tfoot>
