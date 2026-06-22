@@ -40,13 +40,24 @@ export function isMatchResultFinal(match) {
   return ["finished", "ft", "aet", "pen", "awd", "wo"].includes(status);
 }
 
+export function isMatchLive(match) {
+  const actualHome = parseScore(match?.homeScore);
+  const actualAway = parseScore(match?.awayScore);
+  if (actualHome === null || actualAway === null) return false;
+  const status = String(match?.status || match?.statusShort || "").toLowerCase();
+  return ["live", "1h", "ht", "2h", "et", "bt", "p", "int"].includes(status);
+}
+
 export function scorePrediction(prediction, match) {
   const predictedHome = parseScore(prediction?.home);
   const predictedAway = parseScore(prediction?.away);
   const actualHome = parseScore(match?.homeScore);
   const actualAway = parseScore(match?.awayScore);
 
-  if (!isMatchResultFinal(match) || [predictedHome, predictedAway, actualHome, actualAway].some((score) => score === null)) {
+  if (
+    (!isMatchResultFinal(match) && !isMatchLive(match)) ||
+    [predictedHome, predictedAway, actualHome, actualAway].some((score) => score === null)
+  ) {
     return 0;
   }
 

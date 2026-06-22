@@ -11,6 +11,7 @@ import {
   getReleasedPredictionRound,
   hasMatchStarted,
   isMatchClosed,
+  isMatchLive,
   isMatchResultFinal,
   makeId,
   normalizeUsers,
@@ -1468,10 +1469,16 @@ function RankingTable({ ranking, matches = [], compact = false }) {
   const totalPoolValue = paidParticipants * ENTRY_FEE;
   const displayedRanking = ranking;
   const rankOffset = 0;
+  const hasLiveMatches = matches.some(isMatchLive);
 
   return (
     <section className="panel table-panel">
       <SectionHeader title={compact ? "Top 5" : "Ranking"} />
+      {hasLiveMatches && (
+        <div className="live-ranking-notice">
+          <span className="live-dot" /> Pontuação parcial ao vivo — atualiza a cada 30s
+        </div>
+      )}
       {!compact && (
         <div className="ranking-summary">
           <div>

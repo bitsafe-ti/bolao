@@ -52,10 +52,24 @@ test("scores no points before actual result exists", () => {
   assert.equal(scorePrediction({ home: 1, away: 0 }, { homeScore: "", awayScore: "" }), 0);
 });
 
-test("does not score a prediction while the match is live", () => {
+test("scores a prediction while the match is live using current score", () => {
   assert.equal(
     scorePrediction(
       { home: 1, away: 0 },
+      { homeScore: 1, awayScore: 0, status: "live" }
+    ),
+    3
+  );
+  assert.equal(
+    scorePrediction(
+      { home: 2, away: 1 },
+      { homeScore: 1, awayScore: 0, status: "1h" }
+    ),
+    1
+  );
+  assert.equal(
+    scorePrediction(
+      { home: 0, away: 1 },
       { homeScore: 1, awayScore: 0, status: "live" }
     ),
     0
