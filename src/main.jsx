@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrophy, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faEye, faTrophy, faTrash } from "@fortawesome/free-solid-svg-icons";
 import {
   calculateRanking,
   createInitialState,
@@ -201,6 +201,7 @@ function App() {
   const [historyTeamId, setHistoryTeamId] = useState("");
   const [clockNow, setClockNow] = useState(() => new Date());
   const workspaceRef = useRef(null);
+  const livePredictionRef = useRef(null);
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAdmin = currentUser?.role === "admin";
@@ -227,6 +228,10 @@ function App() {
   const predictionMatches = state.matches
     .filter((match) => getMatchRound(match) === activePredictionRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const lastLivePredictionMatchId = useMemo(() => {
+    const live = predictionMatches.filter(isMatchLive);
+    return live.length ? live[live.length - 1].id : null;
+  }, [predictionMatches]);
   const resultMatches = state.matches
     .filter((match) => getMatchRound(match) === activeResultRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
@@ -435,6 +440,11 @@ function App() {
       setTab("predictions");
     }
   }, [tab, visibleTabs]);
+
+  useEffect(() => {
+    if (tab !== "predictions" || !lastLivePredictionMatchId) return;
+    livePredictionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [tab, lastLivePredictionMatchId]);
 
 
   function handleTabClick(tabId) {
@@ -1093,6 +1103,7 @@ function App() {
                     <article
                       className={`match-card prediction-card ${isLocked ? "locked" : ""}`}
                       key={match.id}
+                      ref={match.id === lastLivePredictionMatchId ? livePredictionRef : null}
                     >
                       <div className="prediction-card-vote">
                         <div className="prediction-match-info">
@@ -1190,7 +1201,7 @@ function App() {
 
         {tab === "groups" && <GroupStandingsBoard groups={groupStandings} />}
 
-        {tab === "ranking" && <RankingTable ranking={ranking} matches={state.matches} />}
+        {tab === "ranking" && <RankingTable ranking={ranking} matches={state.matches} predictions={state.predictions} />}
       </section>
     </main>
   );
@@ -1464,12 +1475,13 @@ function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, on
   );
 }
 
-function RankingTable({ ranking, matches = [], compact = false }) {
+function RankingTable({ ranking, matches = [], predictions = {}, compact = false }) {
   const paidParticipants = ranking.length;
   const totalPoolValue = paidParticipants * ENTRY_FEE;
   const displayedRanking = ranking;
   const rankOffset = 0;
   const hasLiveMatches = matches.some(isMatchLive);
+  const [auditParticipant, setAuditParticipant] = useState(null);
 
   return (
     <section className="panel table-panel">
@@ -1506,7 +1518,7 @@ function RankingTable({ ranking, matches = [], compact = false }) {
       {displayedRanking.length ? (
         <div className="table-wrap">
           <table className="ranking-table">
-            <thead><tr><th>Colocação</th><th>Participante</th><th>Pontos</th><th>Cravados</th><th>Acertos 1 pt</th><th>Jogos pontuados</th></tr></thead>
+            <thead><tr><th>Colocação</th><th>Participante</th><th>Pontos</th><th>Cravados</th><th>Acertos 1 pt</th><th>Jogos pontuados</th>{!compact && <th>Auditoria</th>}</tr></thead>
             <tbody>
               {displayedRanking.map((participant, index) => (
                 <tr key={participant.id}>
@@ -1520,19 +1532,107 @@ function RankingTable({ ranking, matches = [], compact = false }) {
                   <td>{participant.exactScores}</td>
                   <td>{participant.winnerHits}</td>
                   <td>{participant.scoredMatches}</td>
+                  {!compact && (
+                    <td className="audit-cell">
+                      <button type="button" className="audit-eye-btn" onClick={() => setAuditParticipant(participant)} title={`Ver auditoria de ${participant.name}`}>
+                        <FontAwesomeIcon icon={faEye} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : <EmptyState text={ranking.length ? "Os três primeiros colocados aparecem no pódio." : "O ranking aparece quando houver participantes cadastrados."} />}
+      {auditParticipant && (
+        <AuditModal
+          participant={auditParticipant}
+          matches={matches}
+          predictions={predictions}
+          onClose={() => setAuditParticipant(null)}
+        />
+      )}
     </section>
   );
 }
 
+function AuditModal({ participant, matches, predictions, onClose }) {
+  const participantPredictions = predictions[participant.id] ?? {};
+  const scoredMatches = matches
+    .filter((match) => isMatchResultFinal(match) || isMatchLive(match))
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
+    .map((match) => {
+      const prediction = participantPredictions[match.id];
+      const points = scorePrediction(prediction, match);
+      return { match, prediction, points };
+    });
+  const total = scoredMatches.reduce((sum, r) => sum + r.points, 0);
+
+  useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-panel audit-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 className="modal-title">Auditoria — {participant.name}</h2>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Fechar">×</button>
+        </div>
+        {scoredMatches.length ? (
+          <div className="audit-table-wrap">
+            <table className="audit-table">
+              <thead>
+                <tr>
+                  <th>Jogo</th>
+                  <th>Resultado</th>
+                  <th>Palpite</th>
+                  <th>Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scoredMatches.map(({ match, prediction, points }) => (
+                  <tr key={match.id} className={`audit-row audit-row-${points === 3 ? "exact" : points === 1 ? "winner" : "miss"}`}>
+                    <td className="audit-teams">
+                      <TeamName teamId={match.homeTeamId} fallback={match.home} />
+                      <span className="audit-versus"> x </span>
+                      <TeamName teamId={match.awayTeamId} fallback={match.away} />
+                    </td>
+                    <td className="audit-score">{match.homeScore} x {match.awayScore}</td>
+                    <td className="audit-prediction">{hasPrediction(prediction) ? formatPrediction(prediction) : <span className="audit-no-prediction">—</span>}</td>
+                    <td className="audit-points">
+                      <strong className={`points-pill ${points === 3 ? "exact" : points === 1 ? "winner" : ""}`}>{points}</strong>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="audit-total-row">
+                  <td colSpan="3">Total</td>
+                  <td><strong className="points-pill">{total}</strong></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        ) : (
+          <p className="audit-empty">Nenhuma partida pontuada ainda.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ResultsList({ activeParticipant, matches, predictions }) {
-  if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
   const [openMatchId, setOpenMatchId] = useState("");
+  const liveCardRef = useRef(null);
+
+  const lastLiveMatchId = useMemo(() => {
+    const live = matches.filter(isMatchLive);
+    return live.length ? live[live.length - 1].id : null;
+  }, [matches]);
 
   useEffect(() => {
     if (!matches.length) {
@@ -1544,12 +1644,20 @@ function ResultsList({ activeParticipant, matches, predictions }) {
     setOpenMatchId("");
   }, [matches, openMatchId]);
 
+  useEffect(() => {
+    if (!lastLiveMatchId) return;
+    liveCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [lastLiveMatchId]);
+
+  if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
+
   return (
     <div className="match-list results-list">
       {matches.map((match) => (
         <ResultCard
           activeParticipant={activeParticipant}
           key={match.id}
+          ref={match.id === lastLiveMatchId ? liveCardRef : null}
           match={match}
           isOpen={openMatchId === match.id}
           onToggle={() => setOpenMatchId((current) => current === match.id ? "" : match.id)}
@@ -1596,7 +1704,7 @@ function getResultMeta(match) {
   };
 }
 
-function ResultCard({ activeParticipant, match, isOpen, onToggle, predictions }) {
+const ResultCard = React.forwardRef(function ResultCard({ activeParticipant, match, isOpen, onToggle, predictions }, ref) {
   const {
     homeScore,
     awayScore,
@@ -1607,6 +1715,7 @@ function ResultCard({ activeParticipant, match, isOpen, onToggle, predictions })
 
   return (
     <article
+      ref={ref}
       className={`match-card result-card result-accordion ${statusClass} ${isOpen ? "open" : ""}`}
     >
       <button type="button" className="result-accordion-toggle" onClick={onToggle} aria-expanded={isOpen}>
@@ -1645,7 +1754,7 @@ function ResultCard({ activeParticipant, match, isOpen, onToggle, predictions })
       )}
     </article>
   );
-}
+});
 
 function ResultGoals({ match }) {
   const homeGoals = match.homeGoals ?? [];
