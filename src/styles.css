@@ -2244,7 +2244,13 @@ h3 {
   text-align: center;
 }
 
-.audit-prediction { text-align: center; white-space: nowrap; }
+.audit-prediction {
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.audit-points { vertical-align: middle; }
 .audit-points { text-align: center; }
 .audit-no-prediction { color: var(--muted); }
 .audit-total-row td { text-align: right; }

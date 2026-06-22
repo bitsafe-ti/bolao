@@ -1626,11 +1626,7 @@ function AuditModal({ participant, matches, predictions, onClose }) {
                           <div className="audit-score-line">{prediction.away}</div>
                         </>
                       ) : (
-                        <>
-                          <div className="audit-score-line audit-no-prediction">—</div>
-                          <div className="audit-score-sep"> </div>
-                          <div className="audit-score-line audit-no-prediction">—</div>
-                        </>
+                        <span className="audit-no-prediction">—</span>
                       )}
                     </td>
                     <td className="audit-points">
