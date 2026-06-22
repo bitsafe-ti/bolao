@@ -1588,7 +1588,6 @@ function AuditModal({ participant, matches, predictions, onClose }) {
               <thead>
                 <tr>
                   <th>Jogo</th>
-                  <th>Resultado</th>
                   <th>Palpite</th>
                   <th>Pts</th>
                 </tr>
@@ -1597,11 +1596,16 @@ function AuditModal({ participant, matches, predictions, onClose }) {
                 {scoredMatches.map(({ match, prediction, points }) => (
                   <tr key={match.id} className={`audit-row audit-row-${points === 3 ? "exact" : points === 1 ? "winner" : "miss"}`}>
                     <td className="audit-teams">
-                      <TeamName teamId={match.homeTeamId} fallback={match.home} />
-                      <span className="audit-versus"> x </span>
-                      <TeamName teamId={match.awayTeamId} fallback={match.away} />
+                      <div className="audit-team-row">
+                        <TeamName teamId={match.homeTeamId} fallback={match.home} />
+                        <span className="audit-team-score">{match.homeScore}</span>
+                      </div>
+                      <span className="audit-versus">×</span>
+                      <div className="audit-team-row">
+                        <TeamName teamId={match.awayTeamId} fallback={match.away} />
+                        <span className="audit-team-score">{match.awayScore}</span>
+                      </div>
                     </td>
-                    <td className="audit-score">{match.homeScore} x {match.awayScore}</td>
                     <td className="audit-prediction">{hasPrediction(prediction) ? formatPrediction(prediction) : <span className="audit-no-prediction">—</span>}</td>
                     <td className="audit-points">
                       <strong className={`points-pill ${points === 3 ? "exact" : points === 1 ? "winner" : ""}`}>{points}</strong>
@@ -1611,7 +1615,7 @@ function AuditModal({ participant, matches, predictions, onClose }) {
               </tbody>
               <tfoot>
                 <tr className="audit-total-row">
-                  <td colSpan="3">Total</td>
+                  <td colSpan="2">Total</td>
                   <td><strong className="points-pill">{total}</strong></td>
                 </tr>
               </tfoot>
