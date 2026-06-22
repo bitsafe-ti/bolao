@@ -86,6 +86,69 @@ export function normalizeApiFootballFixture(item) {
   };
 }
 
+function normalizeEspnStatus(type = {}) {
+  const name = String(type.name || "").toUpperCase();
+  if (type.completed) return "finished";
+  if (type.state === "in") return "live";
+  if (name.includes("POSTPONED")) return "postponed";
+  if (name.includes("CANCELED") || name.includes("CANCELLED") || name.includes("ABANDONED")) return "cancelled";
+  return "scheduled";
+}
+
+function normalizeEspnGoalEvents(details, homeProviderId, awayProviderId) {
+  const goals = { home: [], away: [] };
+  for (const detail of details ?? []) {
+    if (!detail?.scoringPlay) continue;
+    const teamId = String(detail.team?.id || "");
+    const side = teamId === String(homeProviderId) ? "home" : teamId === String(awayProviderId) ? "away" : null;
+    const scorer = detail.athletesInvolved?.[0]?.displayName;
+    if (!side || !scorer) continue;
+    const clockParts = String(detail.clock?.displayValue || "").match(/(\d+)(?:'\+(\d+))?/);
+    goals[side].push({
+      name: scorer,
+      minute: clockParts ? Number(clockParts[1]) : "",
+      offset: clockParts?.[2] ? Number(clockParts[2]) : "",
+      penalty: Boolean(detail.penaltyKick),
+      ownGoal: Boolean(detail.ownGoal)
+    });
+  }
+  return goals;
+}
+
+export function normalizeEspnEvent(event) {
+  const competition = event?.competitions?.[0];
+  const home = competition?.competitors?.find((competitor) => competitor.homeAway === "home");
+  const away = competition?.competitors?.find((competitor) => competitor.homeAway === "away");
+  const homeTeamId = getSourceTeamId(home?.team?.displayName || home?.team?.name);
+  const awayTeamId = getSourceTeamId(away?.team?.displayName || away?.team?.name);
+  if (!homeTeamId || !awayTeamId) return null;
+
+  const statusType = event.status?.type ?? {};
+  const status = normalizeEspnStatus(statusType);
+  const homeScore = Number(home.score);
+  const awayScore = Number(away.score);
+  const hasScore = [homeScore, awayScore].every(Number.isInteger) && ["live", "finished"].includes(status);
+  const goals = normalizeEspnGoalEvents(competition.details, home.team?.id, away.team?.id);
+
+  return {
+    homeTeamId,
+    awayTeamId,
+    sourceFixtureId: event.id ? String(event.id) : undefined,
+    date: toSaoPauloDateTime(event.date),
+    ground: competition.venue?.fullName || "",
+    city: competition.venue?.address?.city || "",
+    score: hasScore ? [homeScore, awayScore] : undefined,
+    status,
+    statusShort: statusType.shortDetail || statusType.detail || statusType.name || "",
+    elapsed: status === "live" && Number.isFinite(event.status?.clock)
+      ? Math.floor(event.status.clock / 60)
+      : null,
+    resultSource: "espn",
+    homeGoals: goals.home,
+    awayGoals: goals.away
+  };
+}
+
 function getProviderError(payload) {
   const errors = payload?.errors;
   if (!errors) return "";
@@ -168,9 +231,19 @@ export async function fetchApiFootballResults(env, now = new Date()) {
   return callApiFootball(baseUrl, apiKey, { league, season, date, timezone: "America/Sao_Paulo" });
 }
 
+export async function fetchEspnResults(now = new Date()) {
+  const date = formatSaoPauloDate(now).replaceAll("-", "");
+  const url = new URL("https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard");
+  url.searchParams.set("dates", date);
+  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  if (!response.ok) throw new Error(`ESPN indisponivel (${response.status})`);
+  const payload = await response.json();
+  return (payload.events ?? []).map(normalizeEspnEvent).filter(Boolean);
+}
+
 export async function fetchResultSource(env, now = new Date()) {
+  let fallbackReason;
   if (env.API_FOOTBALL_KEY) {
-    let fallbackReason;
     try {
       const matches = await fetchApiFootballResults(env, now);
       if (matches.length) return { matches, source: "api-football" };
@@ -182,8 +255,20 @@ export async function fetchResultSource(env, now = new Date()) {
       message: "api-football indisponivel; usando openfootball como fallback",
       fallbackReason
     }));
-    return { matches: await fetchWorldCupResults(), source: "openfootball", fallbackReason };
   }
 
-  return { matches: await fetchWorldCupResults(), source: "openfootball" };
+  try {
+    const matches = await fetchEspnResults(now);
+    if (matches.length) return { matches, source: "espn", fallbackReason };
+    fallbackReason = [fallbackReason, `espn retornou 0 partidas para ${formatSaoPauloDate(now)}`].filter(Boolean).join("; ");
+  } catch (error) {
+    const espnReason = error instanceof Error ? error.message : String(error);
+    fallbackReason = [fallbackReason, espnReason].filter(Boolean).join("; ");
+  }
+
+  console.warn(JSON.stringify({
+    message: "provedores ao vivo indisponiveis; usando openfootball como fallback",
+    fallbackReason
+  }));
+  return { matches: await fetchWorldCupResults(), source: "openfootball", fallbackReason };
 }

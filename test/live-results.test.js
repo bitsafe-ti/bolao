@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fetchApiFootballResults, normalizeApiFootballFixture, normalizeFixtureStatus } from "../workers/live-results/provider.js";
+import { fetchApiFootballResults, normalizeApiFootballFixture, normalizeEspnEvent, normalizeFixtureStatus } from "../workers/live-results/provider.js";
 import { shouldSyncLiveResults } from "../workers/live-results/sync.js";
 import { mergeMatchesPreservingResults } from "../functions/api/pool-state/[poolId].js";
 
@@ -109,6 +109,42 @@ test("falls back to league and season when the date-only query is rejected", asy
   assert.equal(calls.length, 2);
   assert.equal(calls[1].searchParams.get("league"), "1");
   assert.equal(calls[1].searchParams.get("season"), "2026");
+});
+
+test("normalizes ESPN live score and goal events", () => {
+  const match = normalizeEspnEvent({
+    id: "760456",
+    date: "2026-06-22T17:00Z",
+    status: {
+      clock: 2700,
+      type: { name: "STATUS_HALFTIME", state: "in", completed: false, shortDetail: "HT" }
+    },
+    competitions: [{
+      venue: { fullName: "AT&T Stadium", address: { city: "Arlington, Texas" } },
+      competitors: [
+        { homeAway: "home", score: "1", team: { id: "202", displayName: "Argentina" } },
+        { homeAway: "away", score: "0", team: { id: "474", displayName: "Austria" } }
+      ],
+      details: [{
+        scoringPlay: true,
+        clock: { displayValue: "38'" },
+        team: { id: "202" },
+        athletesInvolved: [{ displayName: "Lionel Messi" }],
+        penaltyKick: false,
+        ownGoal: false
+      }]
+    }]
+  });
+
+  assert.equal(match.homeTeamId, "argentina");
+  assert.equal(match.awayTeamId, "austria");
+  assert.deepEqual(match.score, [1, 0]);
+  assert.equal(match.status, "live");
+  assert.equal(match.statusShort, "HT");
+  assert.equal(match.elapsed, 45);
+  assert.equal(match.homeGoals[0].name, "Lionel Messi");
+  assert.equal(match.homeGoals[0].minute, 38);
+  assert.equal(match.resultSource, "espn");
 });
 
 test("sync window includes nearby and live matches but skips finished matches", () => {

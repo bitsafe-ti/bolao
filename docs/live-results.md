@@ -5,7 +5,8 @@ O projeto usa o Worker `bolao-copa2026-results-sync` para consultar placares uma
 ## Fontes
 
 - Com `API_FOOTBALL_KEY`: usa API-Football para placar, minuto, status e gols.
-- Sem a secret: usa automaticamente o JSON publico do OpenFootball como fallback. O fallback normalmente entrega apenas resultados finais.
+- Se a API-Football falhar: usa o placar publico da ESPN para placar, minuto, status e gols.
+- Se os provedores ao vivo falharem: usa o JSON publico do OpenFootball como ultimo fallback. O OpenFootball normalmente entrega apenas resultados finais.
 
 ## Configurar a API ao vivo
 
