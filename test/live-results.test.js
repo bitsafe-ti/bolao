@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { normalizeApiFootballFixture, normalizeFixtureStatus } from "../workers/live-results/provider.js";
+import { fetchApiFootballResults, normalizeApiFootballFixture, normalizeFixtureStatus } from "../workers/live-results/provider.js";
 import { shouldSyncLiveResults } from "../workers/live-results/sync.js";
 import { mergeMatchesPreservingResults } from "../functions/api/pool-state/[poolId].js";
 
@@ -42,6 +42,73 @@ test("maps provider statuses to application statuses", () => {
   assert.equal(normalizeFixtureStatus("HT"), "live");
   assert.equal(normalizeFixtureStatus("FT"), "finished");
   assert.equal(normalizeFixtureStatus("PST"), "postponed");
+});
+
+test("queries API-Football by date without the rejected league filter", async (context) => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  context.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (url) => {
+    calls.push(new URL(url));
+    return new Response(JSON.stringify({
+      response: [{
+        fixture: {
+          id: 456,
+          date: "2026-06-22T17:00:00+00:00",
+          status: { short: "1H", elapsed: 24 },
+          venue: { name: "AT&T Stadium", city: "Arlington" }
+        },
+        teams: {
+          home: { id: 1, name: "Argentina" },
+          away: { id: 2, name: "Austria" }
+        },
+        goals: { home: 1, away: 0 },
+        events: []
+      }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+
+  const matches = await fetchApiFootballResults({
+    API_FOOTBALL_KEY: "test-key",
+    API_FOOTBALL_LEAGUE_ID: "1",
+    API_FOOTBALL_SEASON: "2026"
+  }, new Date("2026-06-22T17:30:00.000Z"));
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].searchParams.get("date"), "2026-06-22");
+  assert.equal(calls[0].searchParams.has("league"), false);
+  assert.equal(calls[0].searchParams.has("season"), false);
+  assert.equal(matches[0].score[0], 1);
+  assert.equal(matches[0].status, "live");
+});
+
+test("falls back to league and season when the date-only query is rejected", async (context) => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  context.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (url) => {
+    calls.push(new URL(url));
+    if (calls.length === 1) {
+      return new Response(JSON.stringify({ errors: { request: "Invalid date query" } }), {
+        status: 400,
+        headers: { "content-type": "application/json" }
+      });
+    }
+    return new Response(JSON.stringify({ response: [] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+
+  await fetchApiFootballResults({
+    API_FOOTBALL_KEY: "test-key",
+    API_FOOTBALL_LEAGUE_ID: "1",
+    API_FOOTBALL_SEASON: "2026"
+  }, new Date("2026-06-22T17:30:00.000Z"));
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].searchParams.get("league"), "1");
+  assert.equal(calls[1].searchParams.get("season"), "2026");
 });
 
 test("sync window includes nearby and live matches but skips finished matches", () => {

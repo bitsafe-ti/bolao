@@ -94,6 +94,40 @@ function getProviderError(payload) {
   return String(errors);
 }
 
+async function getHttpErrorDetail(response) {
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  let done = false;
+
+  while (!done && total < 8_192) {
+    const part = await reader.read();
+    done = part.done;
+    if (!part.value) continue;
+    const remaining = 8_192 - total;
+    const chunk = part.value.subarray(0, remaining);
+    chunks.push(chunk);
+    total += chunk.byteLength;
+  }
+
+  if (!done) await reader.cancel();
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  try {
+    const payload = JSON.parse(new TextDecoder().decode(bytes));
+    return getProviderError(payload) || payload?.message || payload?.error || "";
+  } catch {
+    return "";
+  }
+}
+
 async function callApiFootball(baseUrl, apiKey, params) {
   const url = new URL("fixtures", `${baseUrl.replace(/\/$/, "")}/`);
   url.search = new URLSearchParams(params).toString();
@@ -101,7 +135,10 @@ async function callApiFootball(baseUrl, apiKey, params) {
     headers: { "x-apisports-key": apiKey },
     signal: AbortSignal.timeout(10_000)
   });
-  if (!response.ok) throw new Error(`API-Football indisponivel (${response.status})`);
+  if (!response.ok) {
+    const detail = await getHttpErrorDetail(response);
+    throw new Error(`API-Football indisponivel (${response.status})${detail ? `: ${detail}` : ""}`);
+  }
   const payload = await response.json();
   const providerError = getProviderError(payload);
   if (providerError) throw new Error(`API-Football: ${providerError}`);
@@ -115,14 +152,20 @@ export async function fetchApiFootballResults(env, now = new Date()) {
   const date = formatSaoPauloDate(now);
   const apiKey = env.API_FOOTBALL_KEY;
 
-  // Try with season first; if rejected (400), retry without it
+  // A date-only query is valid for fixtures and avoids the provider rejecting
+  // league/season combinations before a tournament is fully indexed.
   try {
-    return await callApiFootball(baseUrl, apiKey, { league, season, date, timezone: "America/Sao_Paulo" });
-  } catch (firstError) {
-    if (!String(firstError?.message).includes("(400)")) throw firstError;
-    console.warn(JSON.stringify({ message: "api-football 400 com season, retentando sem season", season }));
-    return await callApiFootball(baseUrl, apiKey, { league, date, timezone: "America/Sao_Paulo" });
+    const matches = await callApiFootball(baseUrl, apiKey, { date, timezone: "America/Sao_Paulo" });
+    if (matches.length) return matches;
+  } catch (dateError) {
+    if (!String(dateError?.message).includes("(400)")) throw dateError;
+    console.warn(JSON.stringify({
+      message: "api-football rejeitou consulta por data; tentando liga e temporada",
+      reason: dateError instanceof Error ? dateError.message : String(dateError)
+    }));
   }
+
+  return callApiFootball(baseUrl, apiKey, { league, season, date, timezone: "America/Sao_Paulo" });
 }
 
 export async function fetchResultSource(env, now = new Date()) {
