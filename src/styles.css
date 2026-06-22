@@ -697,11 +697,6 @@ h3 {
   border-left-color: var(--muted);
 }
 
-.sync-strip.privacy {
-  border-left-color: var(--secondary);
-  background: var(--secondary-soft);
-}
-
 .panel-actions {
   display: flex;
   justify-content: flex-end;
@@ -1158,10 +1153,6 @@ h3 {
   text-align: center;
 }
 
-.prediction-card.predictions-private {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 .prediction-card.locked {
   border-left-color: var(--success);
 }
@@ -1260,6 +1251,29 @@ h3 {
   min-width: 0;
   padding-left: 16px;
   text-align: center;
+}
+
+.prediction-card-overview.private {
+  align-content: center;
+  border-radius: 8px;
+  background: var(--secondary-soft);
+  padding: 24px;
+}
+
+.prediction-card-private-notice {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.prediction-card-private-notice strong {
+  color: var(--secondary);
+}
+
+.prediction-card-private-notice span {
+  max-width: 320px;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .prediction-card-overview-header {
