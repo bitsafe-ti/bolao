@@ -68,11 +68,22 @@ function getMatchKickoffTime(match) {
   return Number.isNaN(time) ? null : time;
 }
 
-export function isMatchClosed(match, now = new Date()) {
-  if (match?.locked) return true;
+export function hasMatchStarted(match, now = new Date()) {
+  const status = String(match?.status || match?.statusShort || "").toLowerCase();
+  const startedStatuses = new Set([
+    "live", "1h", "ht", "2h", "et", "bt", "p", "int", "suspended",
+    "finished", "ft", "aet", "pen", "awd", "wo"
+  ]);
+  if (startedStatuses.has(status)) return true;
+
   const kickoffTime = getMatchKickoffTime(match);
   if (kickoffTime === null) return false;
   return kickoffTime <= now.getTime();
+}
+
+export function isMatchClosed(match, now = new Date()) {
+  if (match?.locked) return true;
+  return hasMatchStarted(match, now);
 }
 
 function isLatePrediction(prediction, match, now = new Date()) {

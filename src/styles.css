@@ -1153,6 +1153,10 @@ h3 {
   text-align: center;
 }
 
+.prediction-card.predictions-private {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .prediction-card.locked {
   border-left-color: var(--success);
 }
@@ -1998,6 +2002,10 @@ h3 {
 
 .group-standings-table tbody tr.qualified {
   background: rgba(22, 163, 74, 0.06);
+}
+
+.group-standings-table tbody tr.eliminated {
+  background: rgba(220, 38, 38, 0.06);
 }
 
 .group-team-cell .team-name {

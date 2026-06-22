@@ -22,6 +22,7 @@ function getPoolStateUrl(documentId = DOCUMENT_ID) {
 
 async function requestJson(url, options = {}) {
   const response = await fetch(url, {
+    cache: "no-store",
     ...options,
     headers: {
       "Content-Type": "application/json",

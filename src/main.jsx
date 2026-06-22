@@ -9,6 +9,7 @@ import {
   getActiveRound,
   getMatchRound,
   getReleasedPredictionRound,
+  hasMatchStarted,
   isMatchClosed,
   isMatchResultFinal,
   makeId,
@@ -402,7 +403,7 @@ function App() {
 
   // Polling fallback every 30s in case Realtime misses an update
   useEffect(() => {
-    const intervalId = window.setInterval(async () => {
+    async function pollRemote() {
       try {
         const remote = await withTimeout(
           fetchPoolState(),
@@ -416,8 +417,16 @@ function App() {
         // concern as init(): a concurrent persistAndSync from a user action may have already
         // written audit logs that this stale-fetched state would overwrite.
       } catch {}
-    }, 30_000);
-    return () => window.clearInterval(intervalId);
+    }
+    const intervalId = window.setInterval(pollRemote, 30_000);
+    function handleVisibilityChange() {
+      if (!document.hidden) pollRemote();
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -433,6 +442,15 @@ function App() {
     window.requestAnimationFrame(() => {
       workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
     });
+    if (tabId === "groups" || tabId === "results") {
+      fetchPoolState()
+        .then((remote) => {
+          const cleanedRemote = cleanPoolState(remote);
+          saveCachedPoolState(cleanedRemote);
+          setState((current) => applyRemoteData(current, cleanedRemote));
+        })
+        .catch(() => {});
+    }
   }
 
   // Optimistically update state then persist to Cloudflare D1
@@ -1066,12 +1084,13 @@ function App() {
                   const prediction = getDraftPrediction(activeParticipant.id, match.id, storedPrediction);
                   const isSaved = hasPrediction(storedPrediction);
                   const isRoundLocked = activePredictionRound > activeRound;
+                  const matchHasStarted = hasMatchStarted(match, clockNow);
                   const isKickoffLocked = isMatchClosed(match, clockNow);
                   const isLocked = isRoundLocked || isKickoffLocked;
                   const predictionFeedback = getPredictionFeedback(storedPrediction, match);
                   return (
                     <article
-                      className={`match-card prediction-card ${isLocked ? "locked" : ""}`}
+                      className={`match-card prediction-card ${isLocked ? "locked" : ""} ${matchHasStarted ? "" : "predictions-private"}`}
                       key={match.id}
                     >
                       <div className="prediction-card-vote">
@@ -1110,11 +1129,13 @@ function App() {
                           )}
                         </div>
                       </div>
-                      <MatchPredictionOverview
-                        match={match}
-                        participants={contestParticipants}
-                        predictions={state.predictions}
-                      />
+                      {matchHasStarted && (
+                        <MatchPredictionOverview
+                          match={match}
+                          participants={contestParticipants}
+                          predictions={state.predictions}
+                        />
+                      )}
                     </article>
                   );
                 })}
@@ -1949,7 +1970,7 @@ function GroupStandingsBoard({ groups }) {
                 </thead>
                 <tbody>
                   {group.rows.map((row, index) => (
-                    <tr key={row.teamId} className={index < 2 ? "qualified" : ""}>
+                    <tr key={row.teamId} className={index < 2 ? "qualified" : (index > 2 && row.played >= 3) ? "eliminated" : ""}>
                       <td><span className="rank-position">{index + 1}</span></td>
                       <td className="group-team-cell"><TeamName teamId={row.teamId} fallback={row.name} /></td>
                       <td><strong>{row.points}</strong></td>

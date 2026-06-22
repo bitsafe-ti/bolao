@@ -136,7 +136,7 @@ export async function onRequestGet(context) {
   try {
     const poolId = context.params.poolId || "copa-2026";
     const state = await readPoolState(getDb(context), poolId);
-    return jsonResponse(state);
+    return jsonResponse(state, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return jsonResponse({ error: error.message }, { status: 500 });
   }

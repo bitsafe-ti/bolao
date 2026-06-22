@@ -5,6 +5,7 @@ import {
   createGroupStageMatches,
   getActiveRound,
   getReleasedPredictionRound,
+  hasMatchStarted,
   normalizeUsers,
   purgeClearedOpeningPredictions,
   purgeExpiredPredictions,
@@ -59,6 +60,25 @@ test("does not score a prediction while the match is live", () => {
     ),
     0
   );
+});
+
+test("keeps participant predictions private until kickoff", () => {
+  const match = { date: "2026-06-11T16:00:00.000Z", status: "scheduled" };
+
+  assert.equal(hasMatchStarted(match, new Date("2026-06-11T15:59:59.999Z")), false);
+  assert.equal(hasMatchStarted(match, new Date("2026-06-11T16:00:00.000Z")), true);
+});
+
+test("manual prediction lock does not reveal participant predictions early", () => {
+  const match = { date: "2026-06-11T16:00:00.000Z", status: "scheduled", locked: true };
+
+  assert.equal(hasMatchStarted(match, new Date("2026-06-11T15:00:00.000Z")), false);
+});
+
+test("live status reveals participant predictions even if kickoff time is stale", () => {
+  const match = { date: "2026-06-11T16:00:00.000Z", status: "live" };
+
+  assert.equal(hasMatchStarted(match, new Date("2026-06-11T15:00:00.000Z")), true);
 });
 
 test("keeps the current round active until every result is final", () => {
