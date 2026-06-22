@@ -442,17 +442,24 @@ function App() {
   }, [tab, visibleTabs]);
 
   useEffect(() => {
-    if (tab !== "predictions" || !lastLivePredictionMatchId) return;
-    livePredictionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (tab !== "predictions") return;
+    if (lastLivePredictionMatchId && livePredictionRef.current) {
+      livePredictionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
+    }
   }, [tab, lastLivePredictionMatchId]);
 
 
   function handleTabClick(tabId) {
     setTab(tabId);
     setMobileMenuOpen(false);
-    window.requestAnimationFrame(() => {
-      workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
-    });
+    // predictions and results handle scroll via their own useEffect (live → match, no live → top)
+    if (tabId !== "predictions" && tabId !== "results") {
+      window.requestAnimationFrame(() => {
+        workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
+      });
+    }
     if (tabId === "groups" || tabId === "results") {
       fetchPoolState()
         .then((remote) => {
@@ -1194,6 +1201,7 @@ function App() {
             <ResultsList
               activeParticipant={activeParticipant}
               matches={resultMatches}
+              workspaceRef={workspaceRef}
               predictions={state.predictions}
             />
           </section>
@@ -1647,7 +1655,7 @@ function AuditModal({ participant, matches, predictions, onClose }) {
   );
 }
 
-function ResultsList({ activeParticipant, matches, predictions }) {
+function ResultsList({ activeParticipant, matches, predictions, workspaceRef }) {
   const [openMatchId, setOpenMatchId] = useState("");
   const liveCardRef = useRef(null);
 
@@ -1667,8 +1675,11 @@ function ResultsList({ activeParticipant, matches, predictions }) {
   }, [matches, openMatchId]);
 
   useEffect(() => {
-    if (!lastLiveMatchId) return;
-    liveCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (lastLiveMatchId && liveCardRef.current) {
+      liveCardRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      workspaceRef?.current?.scrollTo({ top: 0, behavior: "auto" });
+    }
   }, [lastLiveMatchId]);
 
   if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
