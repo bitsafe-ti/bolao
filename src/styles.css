@@ -2609,11 +2609,13 @@ table {
 .ranking-table th:nth-child(4),
 .ranking-table th:nth-child(5),
 .ranking-table th:nth-child(6),
+.ranking-table th:nth-child(7),
 .ranking-table td:nth-child(1),
 .ranking-table td:nth-child(3),
 .ranking-table td:nth-child(4),
 .ranking-table td:nth-child(5),
-.ranking-table td:nth-child(6) {
+.ranking-table td:nth-child(6),
+.ranking-table td:nth-child(7) {
   text-align: center;
 }
 
