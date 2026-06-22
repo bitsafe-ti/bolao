@@ -1070,6 +1070,10 @@ function App() {
               <strong>Regra de votação</strong>
               <span>A votação fica aberta para a rodada liberada, e cada palpite pode ser alterado até o início do jogo. Quando todos os jogos da rodada forem finalizados, a próxima rodada será liberada automaticamente.</span>
             </div>
+            <div className="sync-strip privacy" role="note">
+              <strong>Palpites protegidos</strong>
+              <span>Os palpites dos outros participantes serão exibidos somente após o início do jogo em questão.</span>
+            </div>
             {activePredictionRound > activeRound && (
               <div className="sync-strip loading">
                 <strong>

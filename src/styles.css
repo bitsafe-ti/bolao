@@ -697,6 +697,11 @@ h3 {
   border-left-color: var(--muted);
 }
 
+.sync-strip.privacy {
+  border-left-color: var(--secondary);
+  background: var(--secondary-soft);
+}
+
 .panel-actions {
   display: flex;
   justify-content: flex-end;
