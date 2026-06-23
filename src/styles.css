@@ -2310,6 +2310,49 @@ h3 {
   gap: 14px;
 }
 
+.cannon-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 20px 0 12px;
+}
+
+.cannon-scene {
+  position: relative;
+  width: 140px;
+  height: 100px;
+  flex-shrink: 0;
+}
+
+.cannon-svg {
+  width: 140px;
+  height: 100px;
+  display: block;
+}
+
+.cannon-tip {
+  position: absolute;
+  left: 129px;
+  top: 23px;
+  width: 0;
+  height: 0;
+}
+
+.cannon-particle {
+  position: absolute;
+  border-radius: 2px;
+  transform: translate(-50%, -50%);
+  animation: cannon-shoot 2s ease-out infinite;
+}
+
+@keyframes cannon-shoot {
+  0%   { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 1; }
+  45%  { opacity: 1; }
+  55%  { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) rotate(600deg) scale(0.4); opacity: 0; }
+  99%  { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) rotate(600deg) scale(0.4); opacity: 0; }
+  100% { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 0; }
+}
+
 .confetti-wrap {
   position: absolute;
   inset: 0;
