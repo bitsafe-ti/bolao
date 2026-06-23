@@ -8,6 +8,7 @@
   --secondary: #1e2026;
   /* Semantic */
   --success: #0ecb81;
+  --info: #3b82f6;
   --warning: #d0980b;
   --danger: #bd2124;
   /* Surfaces */
@@ -2361,7 +2362,7 @@ h3 {
 }
 
 .audit-game-card-exact { border-top-color: var(--success); }
-.audit-game-card-winner { border-top-color: var(--primary); }
+.audit-game-card-winner { border-top-color: var(--info); }
 .audit-game-card-miss { border-top-color: var(--warning); }
 .audit-game-card-noprediction { border-top-color: var(--warning); }
 .audit-game-card-blocked { border-top-color: var(--danger); }
