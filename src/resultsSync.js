@@ -175,9 +175,13 @@ export function applyResultUpdates(matches, sourceMatches) {
     const source = sourceByTeams[`${match.homeTeamId}__${match.awayTeamId}`];
     if (!source) return match;
 
+    const hasCurrentScore =
+      (match.homeScore ?? "") !== "" && !Number.isNaN(Number(match.homeScore)) &&
+      (match.awayScore ?? "") !== "" && !Number.isNaN(Number(match.awayScore));
     const keepCurrentStatus =
       isFinishedStatus(match) ||
-      (match.status === "live" && source.status === "scheduled");
+      (match.status === "live" && source.status === "scheduled") ||
+      (hasCurrentScore && !Array.isArray(source.score) && source.status === "scheduled");
 
     const patch = {
       date: source.date || match.date,

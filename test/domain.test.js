@@ -4,7 +4,7 @@ import {
   calculateRanking,
   createGroupStageMatches,
   getActiveRound,
-  getLatestPredictionMatchId,
+  getPredictionScrollTargetId,
   getLatestResultMatchId,
   getReleasedPredictionRound,
   hasMatchStarted,
@@ -52,6 +52,19 @@ test("scores wrong outcome with zero points", () => {
 
 test("scores no points before actual result exists", () => {
   assert.equal(scorePrediction({ home: 1, away: 0 }, { homeScore: "", awayScore: "" }), 0);
+});
+
+test("scores a prediction when match has scores but status was not updated to finished", () => {
+  const pastMatch = { homeScore: 1, awayScore: 2, status: "scheduled", date: "2026-06-23T00:00" };
+  assert.equal(scorePrediction({ home: 1, away: 2 }, pastMatch), 3);
+  assert.equal(scorePrediction({ home: 2, away: 0 }, pastMatch), 0);
+});
+
+test("does not score a future match with unexpected status and no result", () => {
+  assert.equal(
+    scorePrediction({ home: 1, away: 0 }, { homeScore: "", awayScore: "", status: "scheduled", date: "2099-01-01T00:00" }),
+    0
+  );
 });
 
 test("scores a prediction while the match is live using current score", () => {
@@ -143,15 +156,32 @@ test("counts participants with saved predictions for pool value", () => {
   assert.equal(ranking.find((participant) => participant.id === "c").predictedMatches, 0);
 });
 
-test("finds the most recently configured prediction", () => {
-  const matches = [{ id: "m1" }, { id: "m2" }, { id: "m3" }];
-  const predictions = {
-    m1: { home: "1", away: "0", savedAt: "2026-06-22T12:00:00.000Z" },
-    m2: { home: "", away: "" },
-    m3: { home: "2", away: "1", savedAt: "2026-06-22T13:00:00.000Z" }
-  };
+test("positions predictions at the first live match while games are in progress", () => {
+  const matches = [
+    { id: "finished", date: "2026-06-22T12:00:00.000Z", homeScore: 2, awayScore: 0, status: "finished" },
+    { id: "live", date: "2026-06-22T14:00:00.000Z", homeScore: 1, awayScore: 0, status: "live" },
+    { id: "upcoming", date: "2026-06-22T16:00:00.000Z", status: "scheduled" }
+  ];
 
-  assert.equal(getLatestPredictionMatchId(matches, predictions), "m3");
+  assert.equal(getPredictionScrollTargetId(matches), "live");
+});
+
+test("returns predictions to the top when there is no live match", () => {
+  const matches = [
+    { id: "finished", homeScore: 2, awayScore: 0, status: "finished" },
+    { id: "upcoming", date: "2026-06-24T16:00:00.000Z", status: "scheduled" }
+  ];
+
+  assert.equal(getPredictionScrollTargetId(matches), null);
+});
+
+test("returns predictions to the top after the last match in the round finishes", () => {
+  const matches = [
+    { id: "m1", homeScore: 2, awayScore: 0, status: "finished" },
+    { id: "m2", homeScore: 1, awayScore: 1, status: "ft" }
+  ];
+
+  assert.equal(getPredictionScrollTargetId(matches), null);
 });
 
 test("prioritizes the latest live result", () => {

@@ -37,7 +37,21 @@ export function isMatchResultFinal(match) {
 
   const status = String(match?.status || match?.statusShort || "").toLowerCase();
   if (!status) return true;
-  return ["finished", "ft", "aet", "pen", "awd", "wo"].includes(status);
+  if (["finished", "ft", "aet", "pen", "awd", "wo"].includes(status)) return true;
+
+  // If the match has scores but the status wasn't updated to a finished value
+  // (e.g. sync worker stored scores while the provider returned an unexpected statusShort),
+  // infer finished when kickoff time has already passed and the match is not live/postponed/cancelled.
+  const notFinalStatuses = new Set([
+    "live", "1h", "ht", "2h", "et", "bt", "p", "int",
+    "postponed", "pst", "susp", "cancelled", "canc", "abd"
+  ]);
+  if (!notFinalStatuses.has(status)) {
+    const kickoffTime = getMatchKickoffTime(match);
+    if (kickoffTime !== null && kickoffTime <= Date.now()) return true;
+  }
+
+  return false;
 }
 
 export function isMatchLive(match) {
@@ -87,12 +101,9 @@ function getLatestMatchId(matches, getTimestamp) {
   return latestId;
 }
 
-export function getLatestPredictionMatchId(matches, participantPredictions = {}) {
-  const configuredMatches = (matches ?? []).filter((match) => hasSavedPrediction(participantPredictions?.[match.id]));
-  return getLatestMatchId(configuredMatches, (match) => {
-    const prediction = participantPredictions?.[match.id];
-    return prediction?.savedAt || prediction?.updatedAt;
-  });
+export function getPredictionScrollTargetId(matches) {
+  const orderedMatches = [...(matches ?? [])].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  return orderedMatches.find(isMatchLive)?.id ?? null;
 }
 
 export function getLatestResultMatchId(matches) {
