@@ -101,9 +101,13 @@ function getLatestMatchId(matches, getTimestamp) {
   return latestId;
 }
 
-export function getPredictionScrollTargetId(matches) {
+export function getPredictionScrollTargetId(matches, now = new Date()) {
   const orderedMatches = [...(matches ?? [])].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  return orderedMatches.find(isMatchLive)?.id ?? null;
+  return (
+    orderedMatches.find(isMatchLive)?.id ??
+    orderedMatches.find((m) => !hasMatchStarted(m, now))?.id ??
+    null
+  );
 }
 
 export function getLatestResultMatchId(matches) {
