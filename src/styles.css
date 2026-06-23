@@ -2323,6 +2323,7 @@ h3 {
 
 .audit-game-card-exact { border-top-color: var(--success); }
 .audit-game-card-winner { border-top-color: var(--primary); }
+.audit-game-card-blocked { border-top-color: var(--danger); background: var(--danger-soft); }
 
 .audit-game-card-header {
   display: flex;
