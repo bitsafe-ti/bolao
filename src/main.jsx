@@ -1172,6 +1172,7 @@ function App() {
                       ref={match.id === predictionScrollTargetId ? predictionTargetRef : null}
                     >
                         <div className="prediction-card-vote">
+                        {predictionFeedback?.className === "exact" && <Confetti />}
                         <div className="prediction-match-info">
                           <span className="badge">{match.phase}</span>
                           <div className="prediction-teams-grid">
@@ -1208,13 +1209,11 @@ function App() {
                         </div>
                       </div>
                       {matchHasStarted ? (
-                        predictionFeedback?.className === "exact"
-                          ? <ConfettiCannon />
-                          : <MatchPredictionOverview
-                              match={match}
-                              participants={contestParticipants}
-                              predictions={state.predictions}
-                            />
+                        <MatchPredictionOverview
+                          match={match}
+                          participants={contestParticipants}
+                          predictions={state.predictions}
+                        />
                       ) : (
                         <div className="prediction-card-overview private" role="note">
                           <div className="prediction-card-private-notice">
@@ -1728,60 +1727,6 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
   );
 }
 
-const CANNON_SHOTS = [
-  { tx:  18, ty: -66, color: "#bd2124", delay: 0.00, w: 7, h: 9  },
-  { tx:  50, ty: -60, color: "#0ecb81", delay: 0.06, w: 8, h: 6  },
-  { tx:   6, ty: -56, color: "#3B82F6", delay: 0.12, w: 6, h: 8  },
-  { tx:  58, ty: -42, color: "#d0980b", delay: 0.04, w: 9, h: 5  },
-  { tx:  34, ty: -78, color: "#8B5CF6", delay: 0.10, w: 5, h: 10 },
-  { tx:  42, ty: -50, color: "#bd2124", delay: 0.18, w: 7, h: 7  },
-  { tx:  14, ty: -72, color: "#0ecb81", delay: 0.08, w: 6, h: 6  },
-  { tx:  54, ty: -36, color: "#d0980b", delay: 0.14, w: 8, h: 8  },
-  { tx:  26, ty: -70, color: "#3B82F6", delay: 0.02, w: 5, h: 9  },
-  { tx:  46, ty: -54, color: "#8B5CF6", delay: 0.16, w: 7, h: 6  },
-];
-
-function ConfettiCannon() {
-  return (
-    <div className="cannon-wrap" aria-hidden="true">
-      <div className="cannon-scene">
-        <svg className="cannon-svg" viewBox="0 0 140 100" xmlns="http://www.w3.org/2000/svg">
-          {/* Wheel */}
-          <circle cx="32" cy="78" r="16" fill="none" stroke="#3a3a3a" strokeWidth="4.5"/>
-          <line x1="32" y1="62" x2="32" y2="94" stroke="#3a3a3a" strokeWidth="2.5" strokeLinecap="round"/>
-          <line x1="16" y1="78" x2="48" y2="78" stroke="#3a3a3a" strokeWidth="2.5" strokeLinecap="round"/>
-          <line x1="21" y1="67" x2="43" y2="89" stroke="#3a3a3a" strokeWidth="1.8" strokeLinecap="round"/>
-          <line x1="21" y1="89" x2="43" y2="67" stroke="#3a3a3a" strokeWidth="1.8" strokeLinecap="round"/>
-          <circle cx="32" cy="78" r="4.5" fill="#3a3a3a"/>
-          {/* Body */}
-          <circle cx="38" cy="60" r="12" fill="#2a2a2a"/>
-          {/* Barrel */}
-          <g transform="rotate(-22 38 60)">
-            <rect x="36" y="52" width="88" height="16" rx="8" fill="#2a2a2a"/>
-            <rect x="38" y="54" width="84" height="6" rx="3" fill="#4a4a4a"/>
-            <rect x="116" y="50" width="10" height="20" rx="5" fill="#1e1e1e"/>
-          </g>
-        </svg>
-        <div className="cannon-tip">
-          {CANNON_SHOTS.map((p, i) => (
-            <span
-              key={i}
-              className="cannon-particle"
-              style={{
-                "--tx": `${p.tx}px`,
-                "--ty": `${p.ty}px`,
-                width: p.w,
-                height: p.h,
-                background: p.color,
-                animationDelay: `${p.delay}s`,
-              }}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const CONFETTI_PIECES = [
   { left:  8, delay: 0.0, dur: 2.2, color: "#bd2124", w: 6,  h: 10 },
