@@ -1134,6 +1134,7 @@ function App() {
                       key={match.id}
                       ref={match.id === predictionScrollTargetId ? predictionTargetRef : null}
                     >
+                      {predictionFeedback?.className === "exact" && <Confetti />}
                       <div className="prediction-card-vote">
                         <div className="prediction-match-info">
                           <span className="badge">{match.phase}</span>
@@ -1796,12 +1797,14 @@ const ResultCard = React.forwardRef(function ResultCard({ activeParticipant, mat
     statusClass
   } = getResultMeta(match);
   const userPrediction = activeParticipant ? predictions?.[activeParticipant.id]?.[match.id] : null;
+  const isExactScore = hasPrediction(userPrediction) && scorePrediction(userPrediction, match) === 3;
 
   return (
     <article
       ref={ref}
       className={`match-card result-card result-accordion ${statusClass} ${isOpen ? "open" : ""}`}
     >
+      {isExactScore && <Confetti />}
       <button type="button" className="result-accordion-toggle" onClick={onToggle} aria-expanded={isOpen}>
         <div className="result-card-tags">
           <span className="badge">{match.phase}</span>
