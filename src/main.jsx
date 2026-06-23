@@ -7,7 +7,7 @@ import {
   createInitialState,
   emptyPrediction,
   getActiveRound,
-  getLatestPredictionMatchId,
+  getPredictionScrollTargetId,
   getLatestResultMatchId,
   getMatchRound,
   getReleasedPredictionRound,
@@ -139,10 +139,15 @@ const userTabs = [
 ];
 
 const adminTabs = [
+  ...userTabs,
+  { id: "settings", label: "Configurações" }
+];
+
+const settingsTabs = [
   { id: "participants", label: "Participantes" },
   { id: "rounds", label: "Rodadas" },
-  ...userTabs,
-  { id: "audit", label: "Logs do sistema" }
+  { id: "audit", label: "Logs do sistema" },
+  { id: "results", label: "Atualizar resultados" }
 ];
 
 const defaultRounds = [1, 2, 3];
@@ -198,7 +203,7 @@ function App() {
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
-  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("participants");
   const [historyTeamId, setHistoryTeamId] = useState("");
   const [clockNow, setClockNow] = useState(() => new Date());
   const [predictionScrollRequest, setPredictionScrollRequest] = useState(0);
@@ -240,12 +245,10 @@ function App() {
   const predictionMatches = state.matches
     .filter((match) => getMatchRound(match) === activePredictionRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  const predictionScrollTargetId = useMemo(() => {
-    const participantPredictions = activeParticipant ? state.predictions?.[activeParticipant.id] : null;
-    return getLatestPredictionMatchId(predictionMatches, participantPredictions) ??
-      predictionMatches.filter(isMatchLive).at(-1)?.id ??
-      null;
-  }, [activeParticipant, predictionMatches, state.predictions]);
+  const predictionScrollTargetId = useMemo(
+    () => getPredictionScrollTargetId(predictionMatches),
+    [predictionMatches]
+  );
   const resultMatches = state.matches
     .filter((match) => getMatchRound(match) === activeResultRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
@@ -458,7 +461,7 @@ function App() {
 
   useEffect(() => {
     if (tab !== "predictions" || isLoading || !currentUser || !workspaceRef.current) return undefined;
-    const requestKey = `${predictionScrollRequest}:${activePredictionRound}`;
+    const requestKey = `${predictionScrollRequest}:${activePredictionRound}:${predictionScrollTargetId ?? "top"}`;
     if (handledPredictionScrollRef.current === requestKey) return undefined;
     handledPredictionScrollRef.current = requestKey;
     const frameId = window.requestAnimationFrame(() => {
@@ -937,26 +940,6 @@ function App() {
         </div>
       </aside>
 
-      {adminMenuOpen && isAdmin && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => setAdminMenuOpen(false)}>
-          <section className="modal-card admin-menu-modal" role="dialog" aria-modal="true" aria-labelledby="admin-menu-title" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <p className="eyebrow">Administrador</p>
-                <h2 id="admin-menu-title">{currentUser.name}</h2>
-              </div>
-              <button type="button" className="modal-close" aria-label="Fechar modal" onClick={() => setAdminMenuOpen(false)}>×</button>
-            </div>
-            <div className="admin-modal-actions">
-              <button type="button" onClick={() => { refreshResults(); setAdminMenuOpen(false); setMobileMenuOpen(false); }}>
-                <strong>Atualizar resultados</strong>
-                <span>Buscar os placares mais recentes do servidor.</span>
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
       {historyTeam && (
         <TeamHistoryModal
           team={historyTeam}
@@ -975,12 +958,12 @@ function App() {
             </div>
           </div>
           {isAdmin ? (
-            <button type="button" className="topbar-user topbar-user-button" onClick={() => setAdminMenuOpen(true)}>
+            <div className="topbar-user">
               <div className="topbar-user-info">
                 <strong>{currentUser.name}</strong>
                 <small>Admin</small>
               </div>
-            </button>
+            </div>
           ) : (
             <div className="topbar-user">
               <div className="topbar-user-info">
@@ -990,7 +973,25 @@ function App() {
           )}
         </header>
 
-        {tab === "participants" && isAdmin && (
+        {tab === "settings" && isAdmin && (
+          <section className="panel settings-navigation-panel">
+            <SectionHeader title="Configurações" caption="Gerencie os recursos administrativos do bolão." />
+            <nav className="settings-tabs" aria-label="Seções de configurações">
+              {settingsTabs.map((item) => (
+                <button
+                  type="button"
+                  className={settingsTab === item.id ? "active" : ""}
+                  key={item.id}
+                  onClick={() => setSettingsTab(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </section>
+        )}
+
+        {tab === "settings" && settingsTab === "participants" && isAdmin && (
           <section className="panel">
             <SectionHeader title="Participantes" />
             <div className="panel-actions">
@@ -1041,7 +1042,7 @@ function App() {
           </section>
         )}
 
-        {tab === "rounds" && isAdmin && (
+        {tab === "settings" && settingsTab === "rounds" && isAdmin && (
           <section className="panel">
             <SectionHeader title="Rodadas" />
             <div className="round-management-list">
@@ -1087,10 +1088,33 @@ function App() {
           </section>
         )}
 
-        {tab === "audit" && isAdmin && (
+        {tab === "settings" && settingsTab === "audit" && isAdmin && (
           <section className="panel">
             <SectionHeader title="Logs do sistema" caption={`${state.auditLogs?.length ?? 0} / ${AUDIT_LOG_LIMIT} registros`} />
             <AuditLogPanel logs={state.auditLogs} />
+          </section>
+        )}
+
+        {tab === "settings" && settingsTab === "results" && isAdmin && (
+          <section className="panel">
+            <SectionHeader title="Atualizar resultados" caption="Sincroniza os placares mais recentes do servidor." />
+            <div className="settings-results-card">
+              <div>
+                <strong>Atualização manual dos placares</strong>
+                <span>Use esta ação para buscar imediatamente os resultados mais recentes. A sincronização automática continua ativa.</span>
+              </div>
+              <button type="button" onClick={refreshResults} disabled={syncStatus.state === "loading"}>
+                {syncStatus.state === "loading" ? "Atualizando..." : "Atualizar resultados agora"}
+              </button>
+            </div>
+            <div className={`sync-strip ${syncStatus.state}`}>
+              <strong>{syncStatus.message}</strong>
+              <span>
+                {state.lastResultSyncAt
+                  ? `Última checagem do servidor: ${formatDate(state.lastResultSyncAt)}. ${resultSyncIntervalText}`
+                  : resultSyncIntervalText}
+              </span>
+            </div>
           </section>
         )}
 
@@ -1610,12 +1634,6 @@ function AuditModal({ participant, matches, predictions, onClose }) {
       return { match, prediction, points };
     });
   const total = scoredMatches.reduce((sum, r) => sum + r.points, 0);
-  const auditRounds = [...new Set(
-    scoredMatches.map(({ match }) => getMatchRound(match)).filter((round) => round !== null && !Number.isNaN(round))
-  )].sort((a, b) => a - b);
-  const [selectedAuditRound, setSelectedAuditRound] = useState(() => auditRounds[auditRounds.length - 1] ?? 1);
-  const roundMatches = scoredMatches.filter(({ match }) => getMatchRound(match) === selectedAuditRound);
-  const roundTotal = roundMatches.reduce((sum, result) => sum + result.points, 0);
 
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape") onClose(); }
@@ -1633,22 +1651,13 @@ function AuditModal({ participant, matches, predictions, onClose }) {
         {scoredMatches.length ? (
           <div className="audit-cards-wrap">
             <div className="audit-cards-toolbar">
-              <label className="select-label audit-round-select">
-                Rodada
-                <select value={selectedAuditRound} onChange={(event) => setSelectedAuditRound(Number(event.target.value))}>
-                  {auditRounds.map((round) => (
-                    <option value={round} key={round}>Rodada {round}</option>
-                  ))}
-                </select>
-              </label>
               <div className="audit-cards-summary">
-                <span>{roundMatches.length} jogos analisados</span>
-                <strong>{roundTotal} pontos na rodada</strong>
-                <small>{total} pontos no total</small>
+                <span>{scoredMatches.length} jogos analisados</span>
+                <strong>{total} pontos no total</strong>
               </div>
             </div>
             <div className="audit-cards-grid">
-              {roundMatches.map(({ match, prediction, points }, index) => {
+              {scoredMatches.map(({ match, prediction, points }, index) => {
                 const hasParticipantPrediction = hasPrediction(prediction);
                 const resultLabel = points === 3
                   ? "Placar exato"
