@@ -146,8 +146,7 @@ const adminTabs = [
 const settingsTabs = [
   { id: "participants", label: "Participantes" },
   { id: "rounds", label: "Rodadas" },
-  { id: "audit", label: "Logs do sistema" },
-  { id: "results", label: "Atualizar resultados" }
+  { id: "audit", label: "Logs do sistema" }
 ];
 
 const defaultRounds = [1, 2, 3];
@@ -537,18 +536,6 @@ function App() {
     }
   }
 
-  async function refreshResults() {
-    setSyncStatus({ state: "loading", message: "Buscando placares mais recentes..." });
-    try {
-      const remote = await withTimeout(fetchPoolState(), DATA_LOAD_TIMEOUT_MS, "Tempo excedido ao buscar os placares.");
-      const cleanedRemote = cleanPoolState(remote);
-      saveCachedPoolState(cleanedRemote);
-      setState((current) => applyRemoteData(current, cleanedRemote));
-      setSyncStatus({ state: "success", message: "Placares mais recentes carregados." });
-    } catch (error) {
-      setSyncStatus({ state: "error", message: `Não consegui buscar os placares agora. ${error.message}` });
-    }
-  }
 
   async function registerUser({ firstName, lastName, email, password }) {
     const cleanName = `${(firstName || "").trim()} ${(lastName || "").trim()}`.trim();
@@ -1095,28 +1082,6 @@ function App() {
           </section>
         )}
 
-        {tab === "settings" && settingsTab === "results" && isAdmin && (
-          <section className="panel">
-            <SectionHeader title="Atualizar resultados" caption="Sincroniza os placares mais recentes do servidor." />
-            <div className="settings-results-card">
-              <div>
-                <strong>Atualização manual dos placares</strong>
-                <span>Use esta ação para buscar imediatamente os resultados mais recentes. A sincronização automática continua ativa.</span>
-              </div>
-              <button type="button" onClick={refreshResults} disabled={syncStatus.state === "loading"}>
-                {syncStatus.state === "loading" ? "Atualizando..." : "Atualizar resultados agora"}
-              </button>
-            </div>
-            <div className={`sync-strip ${syncStatus.state}`}>
-              <strong>{syncStatus.message}</strong>
-              <span>
-                {state.lastResultSyncAt
-                  ? `Última checagem do servidor: ${formatDate(state.lastResultSyncAt)}. ${resultSyncIntervalText}`
-                  : resultSyncIntervalText}
-              </span>
-            </div>
-          </section>
-        )}
 
         {tab === "predictions" && (
           <section className="panel">
