@@ -33,6 +33,7 @@ import {
   subscribeToPoolChanges,
   unsubscribeFromPoolChanges
 } from "./sharedState.js";
+import { TURNSTILE_SITE_KEY, verifyTurnstileToken } from "./turnstile.js";
 import "./styles.css";
 
 const ACTIVE_POOL_ID = import.meta.env.VITE_POOL_ID || "copa-2026";
@@ -1277,12 +1278,102 @@ function App() {
   );
 }
 
+function TurnstileWidget({ onToken, resetKey }) {
+  const containerRef = useRef(null);
+  const onTokenRef = useRef(onToken);
+
+  useEffect(() => {
+    onTokenRef.current = onToken;
+  }, [onToken]);
+
+  useEffect(() => {
+    let widgetId;
+    let cancelled = false;
+    const scriptId = "cloudflare-turnstile-script";
+
+    function renderWidget() {
+      if (cancelled || !containerRef.current || !window.turnstile) return;
+      widgetId = window.turnstile.render(containerRef.current, {
+        sitekey: TURNSTILE_SITE_KEY,
+        action: "turnstile-spin-v1",
+        callback: (token) => onTokenRef.current(token),
+        "expired-callback": () => onTokenRef.current(""),
+        "error-callback": () => onTokenRef.current("")
+      });
+    }
+
+    let script = document.getElementById(scriptId);
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      if (!script) {
+        script = document.createElement("script");
+        script.id = scriptId;
+        script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+      script.addEventListener("load", renderWidget);
+    }
+
+    return () => {
+      cancelled = true;
+      script?.removeEventListener("load", renderWidget);
+      if (widgetId !== undefined && window.turnstile) {
+        window.turnstile.remove(widgetId);
+      }
+    };
+  }, [resetKey]);
+
+  return (
+    <div className="turnstile-shell">
+      <div
+        ref={containerRef}
+        className="cf-turnstile"
+        data-sitekey={TURNSTILE_SITE_KEY}
+        data-action="turnstile-spin-v1"
+      />
+    </div>
+  );
+}
+
 function AuthScreen({ error, onLogin, onRegister }) {
   const [mode, setMode] = useState("login");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileError, setTurnstileError] = useState("");
+  const [turnstileChecking, setTurnstileChecking] = useState(false);
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+
+  function changeMode(nextMode) {
+    setMode(nextMode);
+    setTurnstileToken("");
+    setTurnstileError("");
+    setTurnstileResetKey((key) => key + 1);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
-    await (mode === "register" ? onRegister(payload) : onLogin(payload));
+    setTurnstileError("");
+    setTurnstileChecking(true);
+
+    const verification = await verifyTurnstileToken(turnstileToken);
+    if (!verification.success) {
+      setTurnstileError(verification.message);
+      setTurnstileToken("");
+      setTurnstileResetKey((key) => key + 1);
+      setTurnstileChecking(false);
+      return;
+    }
+
+    try {
+      await (mode === "register" ? onRegister(payload) : onLogin(payload));
+    } finally {
+      setTurnstileChecking(false);
+      setTurnstileToken("");
+      setTurnstileResetKey((key) => key + 1);
+    }
   }
   return (
     <main className="auth-page">
@@ -1301,16 +1392,26 @@ function AuthScreen({ error, onLogin, onRegister }) {
           <p>{mode === "register" ? "Seu cadastro já entra como participante." : "Use seu e-mail e senha cadastrados."}</p>
         </div>
         <div className="mode-switch" role="tablist" aria-label="Acesso">
-          <button type="button" className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>Criar conta</button>
-          <button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Entrar</button>
+          <button type="button" className={mode === "register" ? "active" : ""} onClick={() => changeMode("register")}>Criar conta</button>
+          <button type="button" className={mode === "login" ? "active" : ""} onClick={() => changeMode("login")}>Entrar</button>
         </div>
         <form className="auth-form" onSubmit={handleSubmit}>
           {mode === "register" && <input name="firstName" placeholder="Nome" autoComplete="given-name" />}
           {mode === "register" && <input name="lastName" placeholder="Sobrenome" autoComplete="family-name" />}
           <input name="email" type="email" placeholder="E-mail" autoComplete="email" />
           <input name="password" type="password" placeholder="Senha" autoComplete="current-password" />
+          <TurnstileWidget
+            resetKey={turnstileResetKey}
+            onToken={(token) => {
+              setTurnstileToken(token);
+              if (token) setTurnstileError("");
+            }}
+          />
+          {turnstileError && <p className="form-error">{turnstileError}</p>}
           {error && <p className="form-error">{error}</p>}
-          <button type="submit">{mode === "register" ? "Cadastrar e entrar" : "Entrar"}</button>
+          <button type="submit" disabled={turnstileChecking}>
+            {turnstileChecking ? "Verificando..." : mode === "register" ? "Cadastrar e entrar" : "Entrar"}
+          </button>
         </form>
       </section>
     </main>

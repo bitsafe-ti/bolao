@@ -308,6 +308,18 @@ select:focus {
   gap: 12px;
 }
 
+.turnstile-shell {
+  display: flex;
+  justify-content: center;
+  min-height: 65px;
+  overflow: hidden;
+}
+
+.auth-form button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .auth-form input {
   background: #ffffff;
   border: 1px solid var(--line);
