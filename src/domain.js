@@ -73,6 +73,37 @@ export function hasSavedPrediction(prediction) {
   return parseScore(prediction?.home) !== null && parseScore(prediction?.away) !== null;
 }
 
+function getLatestMatchId(matches, getTimestamp) {
+  let latestId = null;
+  let latestTimestamp = Number.NEGATIVE_INFINITY;
+  for (const match of matches) {
+    const timestamp = Date.parse(getTimestamp(match) || "");
+    const comparableTimestamp = Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp;
+    if (latestId === null || comparableTimestamp >= latestTimestamp) {
+      latestId = match.id;
+      latestTimestamp = comparableTimestamp;
+    }
+  }
+  return latestId;
+}
+
+export function getLatestPredictionMatchId(matches, participantPredictions = {}) {
+  const configuredMatches = (matches ?? []).filter((match) => hasSavedPrediction(participantPredictions?.[match.id]));
+  return getLatestMatchId(configuredMatches, (match) => {
+    const prediction = participantPredictions?.[match.id];
+    return prediction?.savedAt || prediction?.updatedAt;
+  });
+}
+
+export function getLatestResultMatchId(matches) {
+  const liveMatches = (matches ?? []).filter(isMatchLive);
+  const scoredMatches = (matches ?? []).filter((match) =>
+    parseScore(match?.homeScore) !== null && parseScore(match?.awayScore) !== null
+  );
+  const candidates = liveMatches.length ? liveMatches : scoredMatches;
+  return getLatestMatchId(candidates, (match) => match?.resultUpdatedAt || match?.updatedAt);
+}
+
 function getMatchKickoffTime(match) {
   if (!match?.date) return null;
   const time = Date.parse(match.date);

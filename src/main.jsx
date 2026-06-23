@@ -7,6 +7,8 @@ import {
   createInitialState,
   emptyPrediction,
   getActiveRound,
+  getLatestPredictionMatchId,
+  getLatestResultMatchId,
   getMatchRound,
   getReleasedPredictionRound,
   hasMatchStarted,
@@ -133,15 +135,14 @@ const userTabs = [
   { id: "predictions", label: "Palpites" },
   { id: "results", label: "Resultados" },
   { id: "groups", label: "Grupos" },
-  { id: "ranking", label: "Ranking" },
-  { id: "audit", label: "Auditoria" }
+  { id: "ranking", label: "Ranking" }
 ];
 
 const adminTabs = [
   { id: "participants", label: "Participantes" },
   { id: "rounds", label: "Rodadas" },
-  ...userTabs.filter((tab) => tab.id !== "audit"),
-  { id: "audit", label: "Auditoria" }
+  ...userTabs,
+  { id: "audit", label: "Logs do sistema" }
 ];
 
 const defaultRounds = [1, 2, 3];
@@ -200,11 +201,22 @@ function App() {
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const [historyTeamId, setHistoryTeamId] = useState("");
   const [clockNow, setClockNow] = useState(() => new Date());
+  const [predictionScrollRequest, setPredictionScrollRequest] = useState(0);
+  const [resultScrollRequest, setResultScrollRequest] = useState(0);
   const workspaceRef = useRef(null);
-  const livePredictionRef = useRef(null);
+  const predictionTargetRef = useRef(null);
+  const resultTargetRef = useRef(null);
+  const handledPredictionScrollRef = useRef("");
+  const handledResultScrollRef = useRef("");
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId);
   const isAdmin = currentUser?.role === "admin";
+  const userParticipant = state.participants.find((participant) => participant.id === currentUser?.participantId);
+  const activeParticipant = isAdmin
+    ? state.participants.find((participant) => participant.id === state.activeParticipantId) ??
+      userParticipant ??
+      state.participants[0]
+    : userParticipant;
   const visibleTabs = isAdmin ? adminTabs : userTabs;
   const adminParticipantIds = useMemo(
     () => new Set(state.users.filter((user) => user.role === "admin").map((user) => user.participantId).filter(Boolean)),
@@ -228,13 +240,16 @@ function App() {
   const predictionMatches = state.matches
     .filter((match) => getMatchRound(match) === activePredictionRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  const lastLivePredictionMatchId = useMemo(() => {
-    const live = predictionMatches.filter(isMatchLive);
-    return live.length ? live[live.length - 1].id : null;
-  }, [predictionMatches]);
+  const predictionScrollTargetId = useMemo(() => {
+    const participantPredictions = activeParticipant ? state.predictions?.[activeParticipant.id] : null;
+    return getLatestPredictionMatchId(predictionMatches, participantPredictions) ??
+      predictionMatches.filter(isMatchLive).at(-1)?.id ??
+      null;
+  }, [activeParticipant, predictionMatches, state.predictions]);
   const resultMatches = state.matches
     .filter((match) => getMatchRound(match) === activeResultRound)
     .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const resultScrollTargetId = useMemo(() => getLatestResultMatchId(resultMatches), [resultMatches]);
   const resultSyncIntervalText = "O servidor verifica os jogos a cada minuto e esta tela recebe os dados em até 30 segundos.";
   const userRows = useMemo(() => {
     const participantById = new Map(state.participants.map((participant) => [participant.id, participant]));
@@ -442,19 +457,41 @@ function App() {
   }, [tab, visibleTabs]);
 
   useEffect(() => {
-    if (tab !== "predictions") return;
-    if (lastLivePredictionMatchId && livePredictionRef.current) {
-      livePredictionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    } else {
-      workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
-    }
-  }, [tab, lastLivePredictionMatchId]);
+    if (tab !== "predictions" || isLoading || !currentUser || !workspaceRef.current) return undefined;
+    const requestKey = `${predictionScrollRequest}:${activePredictionRound}`;
+    if (handledPredictionScrollRef.current === requestKey) return undefined;
+    handledPredictionScrollRef.current = requestKey;
+    const frameId = window.requestAnimationFrame(() => {
+      if (predictionScrollTargetId && predictionTargetRef.current) {
+        predictionTargetRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
+      }
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activePredictionRound, currentUser?.id, isLoading, predictionScrollRequest, predictionScrollTargetId, tab]);
+
+  useEffect(() => {
+    if (tab !== "results" || isLoading || !currentUser || !workspaceRef.current) return undefined;
+    const requestKey = `${resultScrollRequest}:${activeResultRound}`;
+    if (handledResultScrollRef.current === requestKey) return undefined;
+    handledResultScrollRef.current = requestKey;
+    const frameId = window.requestAnimationFrame(() => {
+      if (resultScrollTargetId && resultTargetRef.current) {
+        resultTargetRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
+      }
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeResultRound, currentUser?.id, isLoading, resultScrollRequest, resultScrollTargetId, tab]);
 
 
   function handleTabClick(tabId) {
     setTab(tabId);
     setMobileMenuOpen(false);
-    // predictions and results handle scroll via their own useEffect (live → match, no live → top)
+    if (tabId === "predictions") setPredictionScrollRequest((current) => current + 1);
+    if (tabId === "results") setResultScrollRequest((current) => current + 1);
     if (tabId !== "predictions" && tabId !== "results") {
       window.requestAnimationFrame(() => {
         workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
@@ -878,12 +915,6 @@ function App() {
     return <AuthScreen error={authError} onLogin={loginUser} onRegister={registerUser} />;
   }
 
-  const userParticipant = state.participants.find((participant) => participant.id === currentUser.participantId);
-  const activeParticipant = isAdmin
-    ? state.participants.find((participant) => participant.id === state.activeParticipantId) ??
-      userParticipant ??
-      state.participants[0]
-    : userParticipant;
   return (
     <main className="app-shell">
       {mobileMenuOpen && <div className="menu-overlay" onClick={() => setMobileMenuOpen(false)} />}
@@ -1056,9 +1087,9 @@ function App() {
           </section>
         )}
 
-        {tab === "audit" && (
+        {tab === "audit" && isAdmin && (
           <section className="panel">
-            <SectionHeader title="Auditoria" caption={`${state.auditLogs?.length ?? 0} / ${AUDIT_LOG_LIMIT} registros`} />
+            <SectionHeader title="Logs do sistema" caption={`${state.auditLogs?.length ?? 0} / ${AUDIT_LOG_LIMIT} registros`} />
             <AuditLogPanel logs={state.auditLogs} />
           </section>
         )}
@@ -1071,6 +1102,7 @@ function App() {
                 Rodada
                 <select value={activePredictionRound} onChange={(event) => {
                   setSelectedPredictionRound(Number(event.target.value));
+                  setPredictionScrollRequest((current) => current + 1);
                 }}>
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
@@ -1110,7 +1142,7 @@ function App() {
                     <article
                       className={`match-card prediction-card ${isLocked ? "locked" : ""}`}
                       key={match.id}
-                      ref={match.id === lastLivePredictionMatchId ? livePredictionRef : null}
+                      ref={match.id === predictionScrollTargetId ? predictionTargetRef : null}
                     >
                       <div className="prediction-card-vote">
                         <div className="prediction-match-info">
@@ -1185,6 +1217,7 @@ function App() {
                 Rodada
                 <select value={activeResultRound} onChange={(event) => {
                   setSelectedResultRound(Number(event.target.value));
+                  setResultScrollRequest((current) => current + 1);
                 }}>
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
@@ -1201,8 +1234,9 @@ function App() {
             <ResultsList
               activeParticipant={activeParticipant}
               matches={resultMatches}
-              workspaceRef={workspaceRef}
               predictions={state.predictions}
+              scrollTargetId={resultScrollTargetId}
+              scrollTargetRef={resultTargetRef}
             />
           </section>
         )}
@@ -1576,6 +1610,12 @@ function AuditModal({ participant, matches, predictions, onClose }) {
       return { match, prediction, points };
     });
   const total = scoredMatches.reduce((sum, r) => sum + r.points, 0);
+  const auditRounds = [...new Set(
+    scoredMatches.map(({ match }) => getMatchRound(match)).filter((round) => round !== null && !Number.isNaN(round))
+  )].sort((a, b) => a - b);
+  const [selectedAuditRound, setSelectedAuditRound] = useState(() => auditRounds[auditRounds.length - 1] ?? 1);
+  const roundMatches = scoredMatches.filter(({ match }) => getMatchRound(match) === selectedAuditRound);
+  const roundTotal = roundMatches.reduce((sum, result) => sum + result.points, 0);
 
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape") onClose(); }
@@ -1591,61 +1631,70 @@ function AuditModal({ participant, matches, predictions, onClose }) {
           <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Fechar">×</button>
         </div>
         {scoredMatches.length ? (
-          <div className="audit-table-wrap">
-            <table className="audit-table">
-              <thead>
-                <tr>
-                  <th>Jogo</th>
-                  <th>Resultado</th>
-                  <th>Palpite</th>
-                  <th>Pts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scoredMatches.map(({ match, prediction, points }) => (
-                  <tr key={match.id} className={`audit-row audit-row-${points === 3 ? "exact" : points === 1 ? "winner" : "miss"}`}>
-                    <td className="audit-teams">
-                      <div className="audit-team-row">
+          <div className="audit-cards-wrap">
+            <div className="audit-cards-toolbar">
+              <label className="select-label audit-round-select">
+                Rodada
+                <select value={selectedAuditRound} onChange={(event) => setSelectedAuditRound(Number(event.target.value))}>
+                  {auditRounds.map((round) => (
+                    <option value={round} key={round}>Rodada {round}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="audit-cards-summary">
+                <span>{roundMatches.length} jogos analisados</span>
+                <strong>{roundTotal} pontos na rodada</strong>
+                <small>{total} pontos no total</small>
+              </div>
+            </div>
+            <div className="audit-cards-grid">
+              {roundMatches.map(({ match, prediction, points }, index) => {
+                const hasParticipantPrediction = hasPrediction(prediction);
+                const resultLabel = points === 3
+                  ? "Placar exato"
+                  : points === 1
+                    ? "Resultado correto"
+                    : hasParticipantPrediction ? "Não pontuou" : "Sem palpite";
+
+                return (
+                  <article key={match.id} className={`audit-game-card audit-game-card-${points === 3 ? "exact" : points === 1 ? "winner" : "miss"}`}>
+                    <div className="audit-game-card-header">
+                      <span>Jogo {String(index + 1).padStart(2, "0")}</span>
+                      <span className={`audit-card-result audit-card-result-${points === 3 ? "exact" : points === 1 ? "winner" : "miss"}`}>
+                        {resultLabel}
+                      </span>
+                    </div>
+
+                    <div className="audit-card-matchup">
+                      <div className="audit-card-team">
                         <TeamName teamId={match.homeTeamId} fallback={match.home} />
                       </div>
-                      <span className="audit-versus">×</span>
-                      <div className="audit-team-row">
+                      <span className="audit-card-versus">×</span>
+                      <div className="audit-card-team">
                         <TeamName teamId={match.awayTeamId} fallback={match.away} />
                       </div>
-                    </td>
-                    <td className="audit-score">
-                      <div className="audit-score-line">{match.homeScore}</div>
-                      <div className="audit-score-sep">×</div>
-                      <div className="audit-score-line">{match.awayScore}</div>
-                    </td>
-                    <td className="audit-prediction">
-                      {hasPrediction(prediction) ? (
-                        <>
-                          <div className="audit-score-line">{prediction.home}</div>
-                          <div className="audit-score-sep">×</div>
-                          <div className="audit-score-line">{prediction.away}</div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="audit-score-line audit-no-prediction">—</div>
-                          <div className="audit-score-sep audit-no-prediction">×</div>
-                          <div className="audit-score-line audit-no-prediction">—</div>
-                        </>
-                      )}
-                    </td>
-                    <td className="audit-points">
-                      <strong className={`points-pill ${points === 3 ? "exact" : points === 1 ? "winner" : ""}`}>{points}</strong>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="audit-total-row">
-                  <td colSpan="3">Total</td>
-                  <td><strong className="points-pill">{total}</strong></td>
-                </tr>
-              </tfoot>
-            </table>
+                    </div>
+
+                    <div className="audit-card-details">
+                      <div className="audit-card-stat">
+                        <span>Resultado</span>
+                        <strong>{match.homeScore} <small>×</small> {match.awayScore}</strong>
+                      </div>
+                      <div className="audit-card-stat">
+                        <span>Palpite</span>
+                        <strong className={!hasParticipantPrediction ? "audit-no-prediction" : ""}>
+                          {hasParticipantPrediction ? `${prediction.home} × ${prediction.away}` : "— × —"}
+                        </strong>
+                      </div>
+                      <div className="audit-card-stat audit-card-points">
+                        <span>Pontos</span>
+                        <strong className={`points-pill ${points === 3 ? "exact" : points === 1 ? "winner" : ""}`}>{points}</strong>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         ) : (
           <p className="audit-empty">Nenhuma partida pontuada ainda.</p>
@@ -1655,14 +1704,8 @@ function AuditModal({ participant, matches, predictions, onClose }) {
   );
 }
 
-function ResultsList({ activeParticipant, matches, predictions, workspaceRef }) {
+function ResultsList({ activeParticipant, matches, predictions, scrollTargetId, scrollTargetRef }) {
   const [openMatchId, setOpenMatchId] = useState("");
-  const liveCardRef = useRef(null);
-
-  const lastLiveMatchId = useMemo(() => {
-    const live = matches.filter(isMatchLive);
-    return live.length ? live[live.length - 1].id : null;
-  }, [matches]);
 
   useEffect(() => {
     if (!matches.length) {
@@ -1674,14 +1717,6 @@ function ResultsList({ activeParticipant, matches, predictions, workspaceRef }) 
     setOpenMatchId("");
   }, [matches, openMatchId]);
 
-  useEffect(() => {
-    if (lastLiveMatchId && liveCardRef.current) {
-      liveCardRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    } else {
-      workspaceRef?.current?.scrollTo({ top: 0, behavior: "auto" });
-    }
-  }, [lastLiveMatchId]);
-
   if (!matches.length) return <EmptyState text="Nenhum jogo cadastrado para este dia." />;
 
   return (
@@ -1690,7 +1725,7 @@ function ResultsList({ activeParticipant, matches, predictions, workspaceRef }) 
         <ResultCard
           activeParticipant={activeParticipant}
           key={match.id}
-          ref={match.id === lastLiveMatchId ? liveCardRef : null}
+          ref={match.id === scrollTargetId ? scrollTargetRef : null}
           match={match}
           isOpen={openMatchId === match.id}
           onToggle={() => setOpenMatchId((current) => current === match.id ? "" : match.id)}

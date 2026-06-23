@@ -4,6 +4,8 @@ import {
   calculateRanking,
   createGroupStageMatches,
   getActiveRound,
+  getLatestPredictionMatchId,
+  getLatestResultMatchId,
   getReleasedPredictionRound,
   hasMatchStarted,
   normalizeUsers,
@@ -139,6 +141,27 @@ test("counts participants with saved predictions for pool value", () => {
   assert.equal(ranking.find((participant) => participant.id === "a").predictedMatches, 1);
   assert.equal(ranking.find((participant) => participant.id === "b").predictedMatches, 0);
   assert.equal(ranking.find((participant) => participant.id === "c").predictedMatches, 0);
+});
+
+test("finds the most recently configured prediction", () => {
+  const matches = [{ id: "m1" }, { id: "m2" }, { id: "m3" }];
+  const predictions = {
+    m1: { home: "1", away: "0", savedAt: "2026-06-22T12:00:00.000Z" },
+    m2: { home: "", away: "" },
+    m3: { home: "2", away: "1", savedAt: "2026-06-22T13:00:00.000Z" }
+  };
+
+  assert.equal(getLatestPredictionMatchId(matches, predictions), "m3");
+});
+
+test("prioritizes the latest live result", () => {
+  const matches = [
+    { id: "finished", homeScore: "2", awayScore: "0", status: "finished", resultUpdatedAt: "2026-06-22T15:00:00.000Z" },
+    { id: "live-old", homeScore: "1", awayScore: "0", status: "live", resultUpdatedAt: "2026-06-22T14:00:00.000Z" },
+    { id: "live-new", homeScore: "0", awayScore: "0", status: "live", resultUpdatedAt: "2026-06-22T14:30:00.000Z" }
+  ];
+
+  assert.equal(getLatestResultMatchId(matches), "live-new");
 });
 
 test("purges predictions saved after match kickoff", () => {
