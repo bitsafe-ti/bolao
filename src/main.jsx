@@ -1636,7 +1636,7 @@ function AuditModal({ participant, matches, predictions, onClose }) {
                   <article key={match.id} className={`audit-game-card audit-game-card-${points === 3 ? "exact" : points === 1 ? "winner" : "miss"}`}>
                     <div className="audit-game-card-header">
                       <span>Jogo {String(index + 1).padStart(2, "0")}</span>
-                      <span className={`audit-card-result audit-card-result-${points === 3 ? "exact" : points === 1 ? "winner" : "miss"}`}>
+                      <span className={`audit-card-result audit-card-result-${points === 3 ? "exact" : points === 1 ? "winner" : isBlocked ? "blocked" : "miss"}`}>
                         {resultLabel}
                       </span>
                     </div>
