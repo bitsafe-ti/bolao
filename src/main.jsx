@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faTrophy, faTrash } from "@fortawesome/free-solid-svg-icons";
 import {
   calculateRanking,
+  clearedOpeningPredictionMatchIds,
   createInitialState,
   emptyPrediction,
   getActiveRound,
@@ -35,7 +36,7 @@ import {
 import "./styles.css";
 
 const ACTIVE_POOL_ID = import.meta.env.VITE_POOL_ID || "copa-2026";
-const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva.rocha@hotmail.com";
+const DEFAULT_SUPER_ADMIN_EMAIL = "guilhermesaraiva25@gmail.com";
 const SUPER_ADMIN_EMAILS = new Set(
   [
     ...(import.meta.env.VITE_SUPER_ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean),
@@ -1624,11 +1625,12 @@ function AuditModal({ participant, matches, predictions, onClose }) {
             <div className="audit-cards-grid">
               {scoredMatches.map(({ match, prediction, points }, index) => {
                 const hasParticipantPrediction = hasPrediction(prediction);
+                const isBlocked = !hasParticipantPrediction && clearedOpeningPredictionMatchIds.includes(match.id);
                 const resultLabel = points === 3
                   ? "Placar exato"
                   : points === 1
                     ? "Resultado correto"
-                    : hasParticipantPrediction ? "Não pontuou" : "Sem palpite";
+                    : hasParticipantPrediction ? "Não pontuou" : isBlocked ? "Bloqueado" : "Sem palpite";
 
                 return (
                   <article key={match.id} className={`audit-game-card audit-game-card-${points === 3 ? "exact" : points === 1 ? "winner" : "miss"}`}>
