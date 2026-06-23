@@ -1589,6 +1589,45 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
   );
 }
 
+const CONFETTI_PIECES = [
+  { left:  8, delay: 0.0, dur: 2.2, color: "#bd2124", w: 6,  h: 10 },
+  { left: 18, delay: 0.4, dur: 2.8, color: "#0ecb81", w: 8,  h:  6 },
+  { left: 28, delay: 0.8, dur: 2.4, color: "#3B82F6", w: 5,  h:  9 },
+  { left: 38, delay: 0.2, dur: 2.6, color: "#d0980b", w: 7,  h:  7 },
+  { left: 50, delay: 0.6, dur: 2.1, color: "#bd2124", w: 6,  h:  8 },
+  { left: 62, delay: 1.0, dur: 2.9, color: "#0ecb81", w: 9,  h:  5 },
+  { left: 72, delay: 0.3, dur: 2.3, color: "#8B5CF6", w: 5,  h: 10 },
+  { left: 82, delay: 0.7, dur: 2.7, color: "#d0980b", w: 7,  h:  6 },
+  { left: 92, delay: 0.1, dur: 2.5, color: "#bd2124", w: 6,  h:  8 },
+  { left: 14, delay: 1.2, dur: 2.2, color: "#3B82F6", w: 8,  h:  5 },
+  { left: 44, delay: 0.9, dur: 2.6, color: "#8B5CF6", w: 5,  h:  9 },
+  { left: 58, delay: 0.5, dur: 2.4, color: "#0ecb81", w: 7,  h:  7 },
+  { left: 76, delay: 1.3, dur: 2.8, color: "#d0980b", w: 6,  h:  6 },
+  { left: 32, delay: 1.1, dur: 2.1, color: "#bd2124", w: 9,  h:  5 },
+  { left: 88, delay: 0.8, dur: 2.3, color: "#3B82F6", w: 5,  h:  8 },
+];
+
+function Confetti() {
+  return (
+    <div className="confetti-wrap" aria-hidden="true">
+      {CONFETTI_PIECES.map((p, i) => (
+        <span
+          key={i}
+          className="confetti-piece"
+          style={{
+            left: `${p.left}%`,
+            width: p.w,
+            height: p.h,
+            background: p.color,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.dur}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function AuditModal({ participant, matches, predictions, onClose }) {
   const participantPredictions = predictions[participant.id] ?? {};
   const scoredMatches = matches
@@ -1634,6 +1673,7 @@ function AuditModal({ participant, matches, predictions, onClose }) {
 
                 return (
                   <article key={match.id} className={`audit-game-card audit-game-card-${points === 3 ? "exact" : points === 1 ? "winner" : isBlocked ? "blocked" : hasParticipantPrediction ? "miss" : "noprediction"}`}>
+                    {points === 3 && <Confetti />}
                     <div className="audit-game-card-header">
                       <span>Jogo {String(index + 1).padStart(2, "0")}</span>
                       <span className={`audit-card-result audit-card-result-${points === 3 ? "exact" : points === 1 ? "winner" : isBlocked ? "blocked" : "miss"}`}>

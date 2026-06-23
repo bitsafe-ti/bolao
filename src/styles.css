@@ -2308,11 +2308,33 @@ h3 {
   gap: 14px;
 }
 
+.confetti-wrap {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -12px;
+  border-radius: 2px;
+  animation: confetti-fall linear infinite;
+}
+
+@keyframes confetti-fall {
+  0%   { transform: translateY(0) rotate(0deg);   opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(260px) rotate(600deg); opacity: 0; }
+}
+
 .audit-game-card {
   display: grid;
   align-content: start;
   gap: 14px;
   min-width: 0;
+  position: relative;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-top: 3px solid var(--line);
   border-radius: 10px;
