@@ -2325,7 +2325,7 @@ h3 {
 .audit-game-card-winner { border-top-color: var(--primary); }
 .audit-game-card-miss { border-top-color: var(--success); }
 .audit-game-card-noprediction { border-top-color: var(--warning); }
-.audit-game-card-blocked { border-top-color: var(--danger); background: var(--primary-soft); }
+.audit-game-card-blocked { border-top-color: var(--danger); }
 
 .audit-game-card-header {
   display: flex;
