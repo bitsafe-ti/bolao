@@ -2769,7 +2769,7 @@ h3 {
 .bracket-stage.left .bracket-pair::after {
   content: "";
   position: absolute;
-  right: -23px;
+  right: -11px;
   top: 25%;
   bottom: 25%;
   width: 0;
@@ -2779,7 +2779,7 @@ h3 {
 .bracket-stage.right .bracket-pair::after {
   content: "";
   position: absolute;
-  left: -23px;
+  left: -11px;
   top: 25%;
   bottom: 25%;
   width: 0;
@@ -2802,16 +2802,16 @@ h3 {
   content: "";
   position: absolute;
   top: 50%;
-  width: 23px;
+  width: 11px;
   border-top: 2px solid #aeb8c6;
 }
 
 .bracket-stage.left .bracket-match-card::after {
-  right: -23px;
+  right: -11px;
 }
 
 .bracket-stage.right .bracket-match-card::before {
-  left: -23px;
+  left: -11px;
 }
 
 .bracket-stage.left:not(.round32) .bracket-match-card::before,
@@ -2819,16 +2819,16 @@ h3 {
   content: "";
   position: absolute;
   top: 50%;
-  width: 23px;
+  width: 11px;
   border-top: 2px solid #aeb8c6;
 }
 
 .bracket-stage.left:not(.round32) .bracket-match-card::before {
-  left: -23px;
+  left: -11px;
 }
 
 .bracket-stage.right:not(.round32) .bracket-match-card::after {
-  right: -23px;
+  right: -11px;
 }
 
 .bracket-match-card > header {
