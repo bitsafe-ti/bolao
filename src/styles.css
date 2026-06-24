@@ -2980,11 +2980,13 @@ h3 {
 }
 
 .bracket-final-stage .bracket-match-card::before {
-  left: -11px;
+  left: -14px;
+  width: 14px;
 }
 
 .bracket-final-stage .bracket-match-card::after {
-  right: -11px;
+  right: -14px;
+  width: 14px;
 }
 
 .bracket-final-stage > strong {
