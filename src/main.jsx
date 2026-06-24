@@ -182,6 +182,54 @@ function maskEmail(email = "") {
   return `${visible}${"*".repeat(Math.max(2, name.length - 2))}@${domain}`;
 }
 
+function getUserInitials(name = "") {
+  return String(name)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "U";
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Não foi possível ler a imagem."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadProfileImage(source) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("A imagem selecionada é inválida."));
+    image.src = source;
+  });
+}
+
+async function resizeProfileImage(file) {
+  if (!file?.type?.startsWith("image/")) throw new Error("Selecione um arquivo de imagem.");
+  if (file.size > 5 * 1024 * 1024) throw new Error("A imagem deve ter no máximo 5 MB.");
+
+  const source = await readFileAsDataUrl(file);
+  const image = await loadProfileImage(source);
+  const maxSize = 512;
+  const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+  return canvas.toDataURL("image/webp", 0.82);
+}
+
 function appendAuditLog(state, entry) {
   return {
     ...state,
@@ -205,6 +253,7 @@ function App() {
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState("participants");
   const [historyTeamId, setHistoryTeamId] = useState("");
   const [clockNow, setClockNow] = useState(() => new Date());
@@ -872,6 +921,59 @@ function App() {
     ));
   }
 
+  async function saveProfile({ name, email, avatarUrl, currentPassword, newPassword }) {
+    const cleanName = String(name || "").trim();
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    const cleanAvatarUrl = String(avatarUrl || "");
+    const passwordRequested = Boolean(newPassword);
+    const emailChanged = cleanEmail !== String(currentUser.email || "").toLowerCase();
+
+    if (!cleanName) throw new Error("Informe seu nome.");
+    if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) throw new Error("Informe um e-mail válido.");
+    if (passwordRequested && newPassword.length < 6) throw new Error("A nova senha deve ter pelo menos 6 caracteres.");
+
+    const emailTaken =
+      state.users.some((user) => user.id !== currentUser.id && String(user.email || "").toLowerCase() === cleanEmail) ||
+      state.participants.some((participant) => participant.id !== currentUser.participantId && String(participant.email || "").toLowerCase() === cleanEmail);
+    if (emailTaken) throw new Error("Este e-mail já está cadastrado.");
+
+    if (emailChanged || passwordRequested) {
+      if (!currentPassword) throw new Error("Informe sua senha atual para alterar e-mail ou senha.");
+      if (!(await verifyPassword(currentUser, currentPassword))) throw new Error("A senha atual está incorreta.");
+    }
+
+    const updatedAt = new Date().toISOString();
+    let updatedUser = {
+      ...currentUser,
+      name: cleanName,
+      email: cleanEmail,
+      avatarUrl: cleanAvatarUrl,
+      updatedAt
+    };
+    if (passwordRequested) updatedUser = await attachPasswordCredential(updatedUser, newPassword);
+
+    const changedFields = [
+      cleanName !== currentUser.name ? "nome" : "",
+      emailChanged ? "e-mail" : "",
+      cleanAvatarUrl !== String(currentUser.avatarUrl || "") ? "foto" : "",
+      passwordRequested ? "senha" : ""
+    ].filter(Boolean);
+
+    updateState((current) => appendAuditLog(
+      {
+        ...current,
+        users: current.users.map((user) => user.id === currentUser.id ? updatedUser : user),
+        participants: current.participants.map((participant) =>
+          participant.id === currentUser.participantId
+            ? { ...participant, name: cleanName, email: cleanEmail, avatarUrl: cleanAvatarUrl, updatedAt }
+            : participant
+        )
+      },
+      makeAuditEntry(cleanName, "profile_updated", changedFields.length ? changedFields.join(", ") : "sem alterações")
+    ));
+    setSharedStatus({ state: "success", message: "Perfil atualizado com sucesso." });
+  }
+
   function resetData() {
     if (!confirm("Apagar todos os dados do bolão? Esta ação não pode ser desfeita.")) return;
     updateState(appendAuditLog(
@@ -950,6 +1052,15 @@ function App() {
         />
       )}
 
+      {profileModalOpen && (
+        <ProfileModal
+          user={currentUser}
+          participant={userParticipant}
+          onClose={() => setProfileModalOpen(false)}
+          onSave={saveProfile}
+        />
+      )}
+
       <section className="workspace" ref={workspaceRef}>
         <header className="topbar">
           <div className="topbar-left">
@@ -959,20 +1070,18 @@ function App() {
               <h1>{visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
             </div>
           </div>
-          {isAdmin ? (
-            <div className="topbar-user">
-              <div className="topbar-user-info">
-                <strong>{currentUser.name}</strong>
-                <small>Admin</small>
-              </div>
+          <button
+            type="button"
+            className="topbar-user topbar-user-button"
+            aria-label="Abrir perfil"
+            onClick={() => setProfileModalOpen(true)}
+          >
+            <UserAvatar user={currentUser} />
+            <div className="topbar-user-info">
+              <strong>{currentUser.name}</strong>
+              <small>{isAdmin ? "Admin · Perfil" : "Perfil"}</small>
             </div>
-          ) : (
-            <div className="topbar-user">
-              <div className="topbar-user-info">
-                <strong>{currentUser.name}</strong>
-              </div>
-            </div>
-          )}
+          </button>
         </header>
 
         {tab === "settings" && isAdmin && (
@@ -1414,6 +1523,166 @@ function AuthScreen({ error, onLogin, onRegister }) {
         </form>
       </section>
     </main>
+  );
+}
+
+function UserAvatar({ user, large = false }) {
+  const className = `profile-avatar${large ? " large" : ""}`;
+  return user?.avatarUrl ? (
+    <span className={className} aria-hidden="true">
+      <img src={user.avatarUrl} alt="" />
+    </span>
+  ) : (
+    <span className={className} aria-hidden="true">{getUserInitials(user?.name)}</span>
+  );
+}
+
+function ProfileModal({ user, participant, onClose, onSave }) {
+  const [form, setForm] = useState(() => ({
+    name: user.name || participant?.name || "",
+    email: user.email || participant?.email || "",
+    avatarUrl: user.avatarUrl || participant?.avatarUrl || "",
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  }));
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  function changeField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+    setSuccess("");
+  }
+
+  async function changePhoto(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError("");
+    setSuccess("");
+    try {
+      const avatarUrl = await resizeProfileImage(file);
+      setForm((current) => ({ ...current, avatarUrl }));
+    } catch (imageError) {
+      setError(imageError.message);
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  async function submitProfile(event) {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+    if (form.newPassword !== form.confirmPassword) {
+      setError("A confirmação da nova senha não confere.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(form);
+      setForm((current) => ({
+        ...current,
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      }));
+      setSuccess("Perfil atualizado com sucesso.");
+    } catch (saveError) {
+      setError(saveError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const previewUser = { ...user, name: form.name, avatarUrl: form.avatarUrl };
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="modal-card profile-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-modal-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">Minha conta</p>
+            <h2 id="profile-modal-title">Editar perfil</h2>
+          </div>
+          <button type="button" className="modal-close" aria-label="Fechar modal" onClick={onClose}>×</button>
+        </div>
+
+        <form className="modal-form profile-form" onSubmit={submitProfile}>
+          <div className="profile-photo-section">
+            <UserAvatar user={previewUser} large />
+            <div className="profile-photo-copy">
+              <strong>Foto do perfil</strong>
+              <span>JPG, PNG ou WebP de até 5 MB.</span>
+              <div className="profile-photo-actions">
+                <label className="profile-file-button">
+                  {form.avatarUrl ? "Trocar foto" : "Adicionar foto"}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" onChange={changePhoto} />
+                </label>
+                {form.avatarUrl && (
+                  <button type="button" className="ghost" onClick={() => changeField("avatarUrl", "")}>Remover foto</button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="profile-form-grid">
+            <label className="profile-field full">
+              <span>Nome completo</span>
+              <input value={form.name} autoComplete="name" onChange={(event) => changeField("name", event.target.value)} required />
+            </label>
+            <label className="profile-field full">
+              <span>E-mail</span>
+              <input type="email" value={form.email} autoComplete="email" onChange={(event) => changeField("email", event.target.value)} required />
+            </label>
+          </div>
+
+          <div className="profile-password-section">
+            <div>
+              <strong>Segurança</strong>
+              <p>Preencha a senha atual somente para alterar o e-mail ou criar uma nova senha.</p>
+            </div>
+            <div className="profile-form-grid">
+              <label className="profile-field full">
+                <span>Senha atual</span>
+                <input type="password" value={form.currentPassword} autoComplete="current-password" onChange={(event) => changeField("currentPassword", event.target.value)} />
+              </label>
+              <label className="profile-field">
+                <span>Nova senha</span>
+                <input type="password" value={form.newPassword} autoComplete="new-password" onChange={(event) => changeField("newPassword", event.target.value)} minLength={6} />
+              </label>
+              <label className="profile-field">
+                <span>Confirmar nova senha</span>
+                <input type="password" value={form.confirmPassword} autoComplete="new-password" onChange={(event) => changeField("confirmPassword", event.target.value)} minLength={6} />
+              </label>
+            </div>
+          </div>
+
+          {error && <p className="form-error profile-feedback">{error}</p>}
+          {success && <p className="profile-success profile-feedback">{success}</p>}
+
+          <div className="modal-actions">
+            <button type="button" className="ghost" onClick={onClose}>Cancelar</button>
+            <button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar perfil"}</button>
+          </div>
+        </form>
+      </section>
+    </div>
   );
 }
 
@@ -2351,6 +2620,7 @@ const AUDIT_ACTION_LABELS = {
   participant_added: "Participante adicionado",
   participant_removed: "Participante removido",
   password_reset: "Senha redefinida",
+  profile_updated: "Perfil atualizado",
   match_added: "Jogo adicionado",
   match_removed: "Jogo removido",
   results_synced: "Resultados sincronizados",
@@ -2365,6 +2635,7 @@ const AUDIT_ACTION_CLASS = {
   participant_added: "info",
   participant_removed: "danger",
   password_reset: "warning",
+  profile_updated: "info",
   match_added: "info",
   match_removed: "danger",
   results_synced: "success",
