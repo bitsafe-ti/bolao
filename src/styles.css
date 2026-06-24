@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;600;700&family=Inter:wght@400;500;600;700;800&display=swap");
 
 :root {
   color-scheme: light;
@@ -167,7 +167,7 @@ select:focus {
   flex-direction: column;
   align-items: center;
   gap: 24px;
-  color: var(--text-secondary);
+  color: var(--muted);
   font-size: 1rem;
 }
 
@@ -558,6 +558,13 @@ select:focus {
   height: var(--app-header-height);
   min-height: var(--app-header-height);
   padding: 16px 22px;
+  position: sticky;
+  top: -22px;
+  z-index: 100;
+}
+
+.topbar-logo-mobile {
+  display: none;
 }
 
 .topbar-user {
@@ -1442,11 +1449,16 @@ h3 {
 .form-field {
   display: grid;
   gap: 6px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.form-field > span {
+  line-height: 1.4;
 }
 
 .form-field input,
@@ -2523,11 +2535,11 @@ h3 {
 }
 
 .group-standings-table tbody tr.qualified {
-  background: rgba(22, 163, 74, 0.06);
+  background: color-mix(in srgb, var(--success) 8%, var(--surface));
 }
 
 .group-standings-table tbody tr.eliminated {
-  background: rgba(220, 38, 38, 0.06);
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
 }
 
 .group-team-cell .team-name {
@@ -2566,25 +2578,25 @@ h3 {
 }
 
 .knockout-status.projected {
-  border-color: rgba(217, 145, 0, 0.28);
-  background: rgba(255, 247, 224, 0.78);
-  color: #8b5c00;
+  border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+  color: var(--text);
 }
 
 .knockout-status.projected span {
-  background: #fff0c5;
-  color: #9a6500;
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface));
+  color: var(--text);
 }
 
 .knockout-status.confirmed {
-  border-color: rgba(5, 150, 105, 0.28);
-  background: rgba(236, 253, 245, 0.82);
-  color: #047857;
+  border-color: color-mix(in srgb, var(--success) 32%, transparent);
+  background: var(--success-soft);
+  color: var(--text);
 }
 
 .knockout-status.confirmed span {
-  background: #d1fae5;
-  color: #047857;
+  background: color-mix(in srgb, var(--success) 18%, var(--surface));
+  color: var(--text);
 }
 
 .third-place-section,
@@ -2659,15 +2671,15 @@ h3 {
   gap: 5px 9px;
   min-width: 0;
   border: 1px solid var(--line);
-  border-left: 4px solid #cbd5e1;
+  border-left: 4px solid var(--line-warm);
   border-radius: 9px;
   background: var(--surface);
   padding: 11px;
 }
 
 .third-place-ranking article.qualified {
-  border-left-color: #16a34a;
-  background: rgba(240, 253, 244, 0.72);
+  border-left-color: var(--success);
+  background: var(--success-soft);
 }
 
 .third-place-ranking article.outside {
@@ -2700,8 +2712,8 @@ h3 {
 }
 
 .third-place-ranking article.qualified .third-place-position {
-  background: #dcfce7;
-  color: #15803d;
+  background: color-mix(in srgb, var(--success) 18%, var(--surface));
+  color: var(--text);
 }
 
 .third-place-ranking article > strong {
@@ -2725,9 +2737,7 @@ h3 {
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background:
-    radial-gradient(circle at center, rgba(250, 204, 21, 0.12), transparent 18%),
-    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.72));
+  background: var(--surface);
   padding: 14px;
   scrollbar-color: var(--primary) var(--soft);
   display: flex;
@@ -2972,6 +2982,14 @@ h3 {
   margin-bottom: 16px;
 }
 
+.ranking-details {
+  margin-top: 32px;
+}
+
+.ranking-details-title {
+  margin: 0 0 16px;
+}
+
 .ranking-summary div {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -3040,7 +3058,7 @@ h3 {
 
 .audit-eye-btn:hover {
   color: var(--primary);
-  background: var(--surface-hover, rgba(59,130,246,0.08));
+  background: var(--primary-soft);
 }
 
 /* Modal overlay */
@@ -3901,8 +3919,10 @@ tr:last-child td {
     display: grid;
   }
 
-  .app-shell {
-    grid-template-columns: 1fr;
+  .app-shell,
+  .app-shell.sidebar-collapsed {
+    --app-header-height: 64px;
+    grid-template-columns: minmax(0, 1fr);
     height: 100vh;
     overflow: hidden;
   }
@@ -3915,7 +3935,8 @@ tr:last-child td {
     font-size: 1.4rem;
   }
 
-  .sidebar {
+  .sidebar,
+  .sidebar.collapsed {
     position: fixed;
     top: 0;
     left: -290px;
@@ -3928,8 +3949,9 @@ tr:last-child td {
     box-shadow: none;
     display: flex;
     flex-direction: column;
+    align-items: stretch;
     gap: 18px;
-    padding: 22px 14px;
+    padding: 0 14px 22px;
   }
 
   .sidebar.open {
@@ -3937,18 +3959,27 @@ tr:last-child td {
     box-shadow: 6px 0 32px rgba(30, 32, 38, 0.18);
   }
 
-  .brand-block {
+  .brand-block,
+  .sidebar.collapsed .brand-block {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    align-self: stretch;
     border-bottom: 1px solid var(--line);
-    flex-basis: auto;
-    padding: 4px 4px 20px;
+    flex: 0 0 var(--app-header-height);
+    min-height: var(--app-header-height);
+    margin: 0 -14px;
+    padding: 0 14px;
   }
 
   .brand-logo {
-    width: min(220px, 100%);
-    height: 90px;
+    width: min(160px, calc(100% - 48px));
+    height: 48px;
+  }
+
+  .brand-favicon {
+    width: 38px;
+    height: 38px;
   }
 
   .topbar {
@@ -3957,19 +3988,40 @@ tr:last-child td {
     justify-content: space-between;
     gap: 10px;
     margin: -14px -14px 12px;
-    padding: 12px 14px;
-    flex-wrap: wrap;
+    padding: 10px 14px;
+    flex-wrap: nowrap;
+    top: -14px;
+    position: relative;
+  }
+
+  .topbar-logo-mobile {
+    display: block;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 30px;
+    width: auto;
+    filter: brightness(0.5) sepia(1) saturate(4) hue-rotate(318deg) brightness(0.75);
+    pointer-events: none;
   }
 
   .topbar-left {
     display: flex;
     align-items: center;
     gap: 10px;
-    flex: 1;
+    flex: 0 0 auto;
   }
 
-.topbar-user {
-    max-width: 100%;
+  .topbar-user {
+    min-width: 0;
+    max-width: calc(100% - 54px);
+  }
+
+  .topbar-user-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .workspace {
@@ -3989,8 +4041,8 @@ tr:last-child td {
     background: var(--secondary);
     border: none;
     color: #ffffff;
-    min-height: 38px;
-    width: 38px;
+    min-height: 42px;
+    width: 42px;
     padding: 0;
     font-size: 1.3rem;
     border-radius: 8px;
@@ -4012,8 +4064,8 @@ tr:last-child td {
     background: transparent;
     border: none;
     color: var(--muted);
-    min-height: 32px;
-    width: 32px;
+    min-height: 42px;
+    width: 42px;
     padding: 0;
     font-size: 1.1rem;
     cursor: pointer;
@@ -4031,6 +4083,38 @@ tr:last-child td {
     inset: 0;
     background: rgba(30, 32, 38, 0.42);
     z-index: 150;
+  }
+
+  .sidebar.collapsed .tabs,
+  .sidebar.collapsed .sidebar-footer {
+    width: 100%;
+  }
+
+  .sidebar.collapsed .tabs button,
+  .sidebar.collapsed .sidebar-actions button {
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .sidebar.collapsed .tabs button .tab-label,
+  .sidebar.collapsed .sidebar-actions button .tab-label {
+    display: block;
+  }
+
+  .sidebar.collapsed .tabs button .tab-icon {
+    width: 16px;
+    font-size: inherit;
+  }
+
+  .sidebar.collapsed .tabs button::after,
+  .sidebar.collapsed .sidebar-actions button::after {
+    display: none;
+  }
+
+  .sidebar.collapsed .sidebar-footer {
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
   }
 
   .auth-page,
@@ -4372,6 +4456,30 @@ tr:last-child td {
     margin: 0;
   }
 
+  .topbar {
+    margin: -12px -12px 12px;
+    padding: 10px 12px;
+    top: -12px;
+  }
+
+  .topbar-user-name {
+    display: none;
+  }
+
+  .topbar-user,
+  .topbar-user-button:hover,
+  .topbar-user-button.active {
+    width: 42px;
+    min-width: 42px;
+    max-width: 42px;
+    height: 42px;
+    padding: 2px;
+    border-color: transparent;
+    border-radius: 50%;
+    background: transparent;
+    box-shadow: none;
+  }
+
   .auth-hero,
   .panel {
     padding: 16px;
@@ -4388,12 +4496,11 @@ tr:last-child td {
   }
 
   .group-standings-card .table-wrap {
-    overflow-x: visible;
+    overflow-x: auto;
   }
 
   .group-standings-table {
-    min-width: 0;
-    width: 100%;
+    min-width: 460px;
   }
 
   .group-standings-table th,

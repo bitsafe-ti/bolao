@@ -527,6 +527,17 @@ function App() {
   }, [tab, visibleTabs]);
 
   useEffect(() => {
+    const mobileViewport = window.matchMedia("(max-width: 860px)");
+    function syncNavigationState(event) {
+      if (event.matches) setSidebarCollapsed(false);
+      else setMobileMenuOpen(false);
+    }
+    syncNavigationState(mobileViewport);
+    mobileViewport.addEventListener("change", syncNavigationState);
+    return () => mobileViewport.removeEventListener("change", syncNavigationState);
+  }, []);
+
+  useEffect(() => {
     if (!userMenuOpen) return;
     function handleOutside(e) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setUserMenuOpen(false);
@@ -1061,7 +1072,7 @@ function App() {
         </div>
         <nav className="tabs" aria-label="Seções do bolão">
           {visibleTabs.map((item) => (
-            <button type="button" className={tab === item.id ? "active" : ""} key={item.id} onClick={() => handleTabClick(item.id)} data-label={item.label}>
+            <button type="button" className={tab === item.id ? "active" : ""} key={item.id} onClick={() => handleTabClick(item.id)} data-label={item.label} aria-current={tab === item.id ? "page" : undefined}>
               {item.icon && <FontAwesomeIcon icon={item.icon} className="tab-icon" />}
               <span className="tab-label">{item.label}</span>
             </button>
@@ -1102,6 +1113,7 @@ function App() {
               <h1>{tab === "profile" ? "Perfil" : visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
             </div>
           </div>
+          <img src={AUTH_LOGO_URL} alt="Bolão Copa 2026" className="topbar-logo-mobile" />
           <div className="topbar-user-menu" ref={userMenuRef}>
             <button
               type="button"
@@ -1146,6 +1158,7 @@ function App() {
                     type="button"
                     className={settingsTab === item.id ? "active" : ""}
                     key={item.id}
+                    aria-current={settingsTab === item.id ? "page" : undefined}
                     onClick={() => {
                       setSettingsTab(item.id);
                       try { sessionStorage.setItem("bol-settings-tab", item.id); } catch {}
@@ -1196,9 +1209,18 @@ function App() {
                           <button type="button" className="modal-close" aria-label="Fechar modal" onClick={() => setParticipantModalOpen(false)}>×</button>
                         </div>
                         <form className="modal-form participant-form" onSubmit={addParticipant}>
-                          <input name="name" placeholder="Nome do participante" autoFocus />
-                          <input name="email" type="email" placeholder="E-mail do participante" required />
-                          <input name="password" type="password" placeholder="Senha inicial" required />
+                          <label className="form-field">
+                            <span>Nome</span>
+                            <input name="name" placeholder="Nome do participante" autoComplete="name" autoFocus required />
+                          </label>
+                          <label className="form-field">
+                            <span>E-mail</span>
+                            <input name="email" type="email" placeholder="E-mail do participante" autoComplete="email" required />
+                          </label>
+                          <label className="form-field">
+                            <span>Senha inicial</span>
+                            <input name="password" type="password" placeholder="Mínimo de 6 caracteres" autoComplete="new-password" minLength="6" required />
+                          </label>
                           <div className="modal-actions">
                             <button type="button" className="ghost" onClick={() => setParticipantModalOpen(false)}>Cancelar</button>
                             <button type="submit">Adicionar</button>
@@ -1312,6 +1334,8 @@ function App() {
                   const isKickoffLocked = isMatchClosed(match, clockNow);
                   const isLocked = isRoundLocked || isKickoffLocked;
                   const predictionFeedback = getPredictionFeedback(storedPrediction, match);
+                  const homeTeamName = teamsById[match.homeTeamId]?.name ?? match.home ?? "time da casa";
+                  const awayTeamName = teamsById[match.awayTeamId]?.name ?? match.away ?? "time visitante";
                   return (
                     <article
                       className={`match-card prediction-card ${isLocked ? "locked" : ""}`}
@@ -1329,12 +1353,12 @@ function App() {
                           </div>
                           <p>{formatDate(match.date)}</p>
                           <p className="match-location">{formatVenue(match)}</p>
-                        </div>
-                        <div className="prediction-actions">
+                          </div>
+                          <div className="prediction-actions">
                           <div className="prediction-inputs">
-                            <ScoreInput disabled={isLocked} value={prediction.home} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "home", value)} />
+                            <ScoreInput label={`Placar de ${homeTeamName}`} disabled={isLocked} value={prediction.home} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "home", value)} />
                             <span>x</span>
-                            <ScoreInput disabled={isLocked} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
+                            <ScoreInput label={`Placar de ${awayTeamName}`} disabled={isLocked} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
                           </div>
                           <div className="prediction-action-row">
                             {isRoundLocked ? (
@@ -1540,14 +1564,14 @@ function AuthScreen({ error, onLogin, onRegister }) {
           <p>{mode === "register" ? "Seu cadastro já entra como participante." : "Use seu e-mail e senha cadastrados."}</p>
         </div>
         <div className="mode-switch" role="tablist" aria-label="Acesso">
-          <button type="button" className={mode === "register" ? "active" : ""} onClick={() => changeMode("register")}>Criar conta</button>
-          <button type="button" className={mode === "login" ? "active" : ""} onClick={() => changeMode("login")}>Entrar</button>
+          <button type="button" role="tab" aria-selected={mode === "register"} className={mode === "register" ? "active" : ""} onClick={() => changeMode("register")}>Criar conta</button>
+          <button type="button" role="tab" aria-selected={mode === "login"} className={mode === "login" ? "active" : ""} onClick={() => changeMode("login")}>Entrar</button>
         </div>
         <form className="auth-form" onSubmit={handleSubmit}>
-          {mode === "register" && <input name="firstName" placeholder="Nome" autoComplete="given-name" />}
-          {mode === "register" && <input name="lastName" placeholder="Sobrenome" autoComplete="family-name" />}
-          <input name="email" type="email" placeholder="E-mail" autoComplete="email" />
-          <input name="password" type="password" placeholder="Senha" autoComplete="current-password" />
+          {mode === "register" && <label className="form-field"><span>Nome</span><input name="firstName" placeholder="Seu nome" autoComplete="given-name" required /></label>}
+          {mode === "register" && <label className="form-field"><span>Sobrenome</span><input name="lastName" placeholder="Seu sobrenome" autoComplete="family-name" required /></label>}
+          <label className="form-field"><span>E-mail</span><input name="email" type="email" placeholder="voce@exemplo.com" autoComplete="email" required /></label>
+          <label className="form-field"><span>Senha</span><input name="password" type="password" placeholder="Sua senha" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength="6" required /></label>
           <TurnstileWidget
             resetKey={turnstileResetKey}
             onToken={(token) => {
@@ -1800,11 +1824,11 @@ function Flag({ team }) {
 }
 
 function SectionHeader({ title, caption, titleId }) {
-  return <header className="section-header"><h2 id={titleId}>{title}</h2><p>{caption}</p></header>;
+  return <header className="section-header"><h2 id={titleId}>{title}</h2>{caption && <p>{caption}</p>}</header>;
 }
 
-function ScoreInput({ value, onChange, disabled = false }) {
-  return <input className="score-input" disabled={disabled} min="0" inputMode="numeric" type="number" value={value} onChange={(event) => onChange(event.target.value)} placeholder="0" />;
+function ScoreInput({ label, value, onChange, disabled = false }) {
+  return <input aria-label={label} className="score-input" disabled={disabled} min="0" inputMode="numeric" type="number" value={value} onChange={(event) => onChange(event.target.value)} placeholder="0" />;
 }
 
 function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, onRemove, canRemove = true, removeLabel = "Remover", protectedUserId = "" }) {
@@ -1950,29 +1974,6 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
           <span className="live-dot" /> Pontuação parcial ao vivo — atualiza a cada 30s
         </div>
       )}
-      {!compact && (
-        <div className="ranking-summary">
-          <div>
-            <span>Valor por participante</span>
-            <strong>{formatCurrency(ENTRY_FEE)}</strong>
-          </div>
-          <div>
-            <span>Total arrecadado</span>
-            <strong>{formatCurrency(totalPoolValue)}</strong>
-          </div>
-          <div>
-            <span>Apostadores</span>
-            <strong>{paidParticipants}</strong>
-          </div>
-        </div>
-      )}
-      {!compact && <ScoringExamples />}
-      {!compact && (
-        <div className="ranking-info-grid">
-          <RankingTiebreakerCard />
-          <RankingPrizeNote />
-        </div>
-      )}
       {!compact && <PrizePodium ranking={ranking} totalPoolValue={totalPoolValue} />}
       {displayedRanking.length ? (
         <div className="table-wrap">
@@ -1998,7 +1999,7 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
                   <td>{participant.scoredMatches}</td>
                   {!compact && (
                     <td className="audit-cell">
-                      <button type="button" className="audit-eye-btn" onClick={() => setAuditParticipant(participant)} title={`Ver auditoria de ${participant.name}`}>
+                      <button type="button" className="audit-eye-btn" onClick={() => setAuditParticipant(participant)} aria-label={`Ver auditoria de ${participant.name}`} title={`Ver auditoria de ${participant.name}`}>
                         <FontAwesomeIcon icon={faEye} />
                       </button>
                     </td>
@@ -2009,6 +2010,30 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
           </table>
         </div>
       ) : <EmptyState text={ranking.length ? "Os três primeiros colocados aparecem no pódio." : "O ranking aparece quando houver participantes cadastrados."} />}
+      {!compact && (
+        <div className="ranking-details">
+          <h2 className="ranking-details-title">Informativo</h2>
+          <div className="ranking-summary">
+            <div>
+              <span>Valor por participante</span>
+              <strong>{formatCurrency(ENTRY_FEE)}</strong>
+            </div>
+            <div>
+              <span>Total arrecadado</span>
+              <strong>{formatCurrency(totalPoolValue)}</strong>
+            </div>
+            <div>
+              <span>Apostadores</span>
+              <strong>{paidParticipants}</strong>
+            </div>
+          </div>
+          <ScoringExamples />
+          <div className="ranking-info-grid">
+            <RankingTiebreakerCard />
+            <RankingPrizeNote />
+          </div>
+        </div>
+      )}
       {auditParticipant && (
         <AuditModal
           participant={auditParticipant}
@@ -2025,19 +2050,19 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
 const CONFETTI_PIECES = [
   { left:  8, delay: 0.0, dur: 2.2, color: "#bd2124", w: 6,  h: 10 },
   { left: 18, delay: 0.4, dur: 2.8, color: "#0ecb81", w: 8,  h:  6 },
-  { left: 28, delay: 0.8, dur: 2.4, color: "#3B82F6", w: 5,  h:  9 },
+  { left: 28, delay: 0.8, dur: 2.4, color: "#1e2026", w: 5,  h:  9 },
   { left: 38, delay: 0.2, dur: 2.6, color: "#d0980b", w: 7,  h:  7 },
   { left: 50, delay: 0.6, dur: 2.1, color: "#bd2124", w: 6,  h:  8 },
   { left: 62, delay: 1.0, dur: 2.9, color: "#0ecb81", w: 9,  h:  5 },
-  { left: 72, delay: 0.3, dur: 2.3, color: "#8B5CF6", w: 5,  h: 10 },
+  { left: 72, delay: 0.3, dur: 2.3, color: "#848e9c", w: 5,  h: 10 },
   { left: 82, delay: 0.7, dur: 2.7, color: "#d0980b", w: 7,  h:  6 },
   { left: 92, delay: 0.1, dur: 2.5, color: "#bd2124", w: 6,  h:  8 },
-  { left: 14, delay: 1.2, dur: 2.2, color: "#3B82F6", w: 8,  h:  5 },
-  { left: 44, delay: 0.9, dur: 2.6, color: "#8B5CF6", w: 5,  h:  9 },
+  { left: 14, delay: 1.2, dur: 2.2, color: "#1e2026", w: 8,  h:  5 },
+  { left: 44, delay: 0.9, dur: 2.6, color: "#848e9c", w: 5,  h:  9 },
   { left: 58, delay: 0.5, dur: 2.4, color: "#0ecb81", w: 7,  h:  7 },
   { left: 76, delay: 1.3, dur: 2.8, color: "#d0980b", w: 6,  h:  6 },
   { left: 32, delay: 1.1, dur: 2.1, color: "#bd2124", w: 9,  h:  5 },
-  { left: 88, delay: 0.8, dur: 2.3, color: "#3B82F6", w: 5,  h:  8 },
+  { left: 88, delay: 0.8, dur: 2.3, color: "#1e2026", w: 5,  h:  8 },
 ];
 
 function Confetti() {
