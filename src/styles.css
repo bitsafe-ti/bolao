@@ -2865,7 +2865,12 @@ h3 {
 }
 
 .bracket-team .team-name {
+  display: flex;
+  align-items: center;
+  flex: 1;
   min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
   gap: 5px;
   font-size: 0.7rem;
   font-weight: 800;
@@ -2873,6 +2878,7 @@ h3 {
 }
 
 .bracket-team .flag {
+  flex-shrink: 0;
   width: 23px;
   height: 16px;
 }
