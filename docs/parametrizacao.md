@@ -37,18 +37,19 @@
 .app-shell
 ├── .sidebar          (240px expandido | 56px colapsado)
 └── .workspace        (flex: 1, overflow-y auto, padding 22px)
-    ├── .topbar       (height 73px, sticky)
+    ├── .topbar       (88px desktop | 64px mobile, sticky)
     └── conteúdo da aba ativa
 ```
 
 ### Sidebar
-- **Expandida:** 240px, `padding: 22px 14px` → brand-block + nav tabs + footer
-- **Colapsada:** 56px, `padding: 22px 4px 14px` → só ícones + tooltip hover
+- **Expandida:** 240px, `padding: 0 14px 22px` → brand-block + nav tabs + footer
+- **Colapsada:** 56px, `padding: 0 4px 14px` → só ícones + tooltip hover
 - **Mobile (≤860px):** drawer fixo, abre via hambúrguer no topbar
 - Estado controlado por `sidebarCollapsed` (useState) — **não** persiste entre sessões
 
 ### Topbar
-- `min-height: 73px`, `padding: 16px 22px`, `border-bottom: 1px solid var(--line)`
+- Desktop: `height: 88px`, `padding: 16px 22px`, `border-bottom: 1px solid var(--line)`
+- Mobile (≤860px): `height: 64px`, `padding: 10px 14px`; em telas ≤520px, padding horizontal de 12px
 - Esquerda: botão colapsar sidebar (desktop) + título da aba ativa
 - Direita: avatar do usuário com dropdown (Perfil / Sair)
 
@@ -96,7 +97,9 @@ Este padrão se aplica a **todos os itens de navegação** do projeto: sidebar p
 | `rounds` | Rodadas |
 | `audit` | Logs do sistema |
 
-Layout: `.settings-layout` (flex-row) → `.settings-sidenav` (220px) + `.settings-content` (flex 1)
+Layout: `.settings-layout` (flex-column) → `.settings-header` (título + `.settings-tabs-nav`) + `.settings-content`
+
+Tabs horizontais: `border-bottom: 3px solid var(--primary)` no item ativo, `background: var(--primary-soft)`, `color: var(--primary)`, `font-weight: 600`. Radius `6px 6px 0 0`.
 
 ---
 
@@ -157,7 +160,7 @@ Layout: `.settings-layout` (flex-row) → `.settings-sidenav` (220px) + `.settin
 <UserAvatar user={user} large={false} />
 ```
 - Exibe foto (`avatarUrl`) ou iniciais em círculo colorido
-- Tamanhos: padrão `32px`, `large` `64px`
+- Tamanhos: padrão `38px`, `large` `88px`
 
 ---
 
@@ -188,7 +191,8 @@ Importação central em `src/main.jsx`:
 ```js
 import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup,
          faSitemap, faMedal, faGear, faChevronLeft, faChevronRight,
-         faRightFromBracket, faUser } from "@fortawesome/free-solid-svg-icons";
+         faRightFromBracket, faUser, faUsers, faCalendarDays,
+         faClipboardList } from "@fortawesome/free-solid-svg-icons";
 ```
 
 | Ícone | Uso |
@@ -202,6 +206,9 @@ import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup,
 | `faChevronLeft/Right` | Botão colapsar/expandir sidebar |
 | `faRightFromBracket` | Sair (sidebar footer + dropdown) |
 | `faUser` | Perfil (dropdown) |
+| `faUsers` | Participantes nas configurações |
+| `faCalendarDays` | Rodadas nas configurações |
+| `faClipboardList` | Logs do sistema nas configurações |
 | `faTrophy` | Uso interno (legado) |
 | `faEye` | Visualizar senha |
 | `faTrash` | Remover item |
@@ -222,11 +229,11 @@ Definidas em `:root` em `src/styles.css`:
 
 ```css
 --primary:        #BD2124   /* vermelho BitSafe */
---primary-hover:  #a31b1e
+--primary-strong: #a31b1e
 --primary-soft:   #FFF1F1   /* fundo item ativo */
 --text:           #1E2026
 --muted:          #848E9C
---muted-light:    #b0b8c4
+--muted-light:    #6A696A
 --line:           #E6E8EA   /* borda padrão */
 --line-warm:      #D0D3D7   /* borda forte */
 --soft:           #F5F5F5   /* hover bg */

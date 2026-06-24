@@ -1150,9 +1150,9 @@ function App() {
 
         {tab === "settings" && isAdmin && (
           <div className="settings-layout">
-            <aside className="settings-sidenav panel">
-              <p className="settings-sidenav-title">Configurações</p>
-              <nav aria-label="Seções de configurações">
+            <div className="settings-header">
+              <p className="settings-header-title">Configurações</p>
+              <nav className="settings-tabs-nav" aria-label="Seções de configurações">
                 {settingsTabs.map((item) => (
                   <button
                     type="button"
@@ -1169,7 +1169,7 @@ function App() {
                   </button>
                 ))}
               </nav>
-            </aside>
+            </div>
 
             <div className="settings-content">
               {settingsTab === "participants" && (

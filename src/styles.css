@@ -837,54 +837,58 @@ h3 {
 
 .settings-layout {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: 0;
 }
 
-.settings-sidenav {
-  width: 220px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  position: sticky;
-  top: 0;
-  padding: 4px 12px 20px;
-  border-right: 1px solid var(--line);
-  margin-right: 32px;
+.settings-header {
+  margin-bottom: 24px;
 }
 
-.settings-sidenav-title {
+.settings-header-title {
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--muted);
-  padding: 0 8px 10px;
-  margin-bottom: 4px;
+  margin: 0 0 10px 0;
+  padding: 0;
 }
 
-.settings-sidenav nav {
+.settings-tabs-nav {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: flex-end;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
 }
 
-.settings-sidenav nav button {
-  display: flex;
+.settings-tabs-nav button {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  text-align: left;
-  padding: 10px 12px;
-  border-radius: 8px;
+  gap: 8px;
+  padding: 8px 14px;
   border: none;
-  border-left: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-radius: 6px 6px 0 0;
   background: transparent;
   color: var(--muted);
   font-size: 0.88rem;
   font-weight: 500;
   cursor: pointer;
+  margin-bottom: -1px;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.settings-tabs-nav button:hover:not(.active) {
+  background: var(--soft);
+  color: var(--text);
+}
+
+.settings-tabs-nav button.active {
+  background: var(--primary-soft);
+  border-bottom-color: var(--primary);
+  color: var(--primary);
+  font-weight: 600;
 }
 
 .settings-nav-icon {
@@ -892,20 +896,7 @@ h3 {
   flex-shrink: 0;
 }
 
-.settings-sidenav nav button:hover {
-  background: #f5f5f5;
-  color: var(--text);
-}
-
-.settings-sidenav nav button.active {
-  background: #FFF1F1;
-  color: #BD2124;
-  font-weight: 600;
-  border-left-color: #BD2124;
-}
-
 .settings-content {
-  flex: 1;
   min-width: 0;
 }
 
@@ -941,38 +932,11 @@ h3 {
   flex: 0 0 auto;
 }
 
-@media (max-width: 860px) {
-  .settings-layout {
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .settings-sidenav {
-    width: 100%;
-    position: static;
-    border-right: none;
-    border-bottom: 1px solid var(--line);
-    margin-right: 0;
-    padding-bottom: 12px;
-  }
-
-  .settings-sidenav nav {
-    flex-direction: row;
-    flex-wrap: wrap;
+@media (max-width: 560px) {
+  .settings-tabs-nav button {
+    padding: 8px 10px;
+    font-size: 0.8rem;
     gap: 6px;
-  }
-
-  .settings-sidenav nav button {
-    width: auto;
-    flex: 1 1 auto;
-    justify-content: center;
-    border-left: none;
-    border-bottom: 2px solid transparent;
-    border-radius: 6px;
-  }
-
-  .settings-sidenav nav button.active {
-    border-bottom-color: #BD2124;
   }
 }
 
