@@ -154,8 +154,7 @@ const adminTabs = [
 const settingsTabs = [
   { id: "participants", label: "Participantes" },
   { id: "rounds", label: "Rodadas" },
-  { id: "audit", label: "Logs do sistema" },
-  { id: "results", label: "Atualizar resultados" }
+  { id: "audit", label: "Logs do sistema" }
 ];
 
 const defaultRounds = [1, 2, 3];
@@ -1231,28 +1230,6 @@ function App() {
           </section>
         )}
 
-        {tab === "settings" && settingsTab === "results" && isAdmin && (
-          <section className="panel">
-            <SectionHeader title="Atualizar resultados" caption="Sincroniza os placares mais recentes do servidor." />
-            <div className="settings-results-card">
-              <div>
-                <strong>Atualização manual dos placares</strong>
-                <span>Busque imediatamente os resultados mais recentes. A sincronização automática continua ativa.</span>
-              </div>
-              <button type="button" onClick={refreshResults} disabled={syncStatus.state === "loading"}>
-                {syncStatus.state === "loading" ? "Atualizando..." : "Atualizar resultados agora"}
-              </button>
-            </div>
-            <div className={`sync-strip ${syncStatus.state}`}>
-              <strong>{syncStatus.message}</strong>
-              <span>
-                {state.lastResultSyncAt
-                  ? `Última checagem do servidor: ${formatDate(state.lastResultSyncAt)}. ${resultSyncIntervalText}`
-                  : resultSyncIntervalText}
-              </span>
-            </div>
-          </section>
-        )}
 
 
         {tab === "predictions" && (
