@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup, faSitemap, faMedal, faGear, faChevronLeft, faChevronRight, faRightFromBracket, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup, faSitemap, faMedal, faGear, faChevronLeft, faChevronRight, faRightFromBracket, faUser, faUsers, faCalendarDays, faClipboardList } from "@fortawesome/free-solid-svg-icons";
 import {
   calculateRanking,
   clearedOpeningPredictionMatchIds,
@@ -152,9 +152,9 @@ const adminTabs = [
 ];
 
 const settingsTabs = [
-  { id: "participants", label: "Participantes" },
-  { id: "rounds", label: "Rodadas" },
-  { id: "audit", label: "Logs do sistema" }
+  { id: "participants", label: "Participantes", icon: faUsers },
+  { id: "rounds", label: "Rodadas", icon: faCalendarDays },
+  { id: "audit", label: "Logs do sistema", icon: faClipboardList }
 ];
 
 const defaultRounds = [1, 2, 3];
@@ -1151,6 +1151,7 @@ function App() {
                       try { sessionStorage.setItem("bol-settings-tab", item.id); } catch {}
                     }}
                   >
+                    <FontAwesomeIcon icon={item.icon} className="settings-nav-icon" />
                     {item.label}
                   </button>
                 ))}

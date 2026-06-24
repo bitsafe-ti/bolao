@@ -824,59 +824,70 @@ h3 {
 .settings-layout {
   display: flex;
   align-items: flex-start;
-  gap: 20px;
+  gap: 0;
 }
 
 .settings-sidenav {
-  width: 200px;
+  width: 220px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
   position: sticky;
   top: 0;
-  padding: 16px 12px;
+  padding: 4px 12px 20px;
+  border-right: 1px solid var(--line);
+  margin-right: 32px;
 }
 
 .settings-sidenav-title {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   color: var(--muted);
-  padding: 0 4px 10px;
+  padding: 0 8px 10px;
   margin-bottom: 4px;
-  border-bottom: 1px solid var(--line);
 }
 
 .settings-sidenav nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .settings-sidenav nav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   text-align: left;
   padding: 10px 12px;
   border-radius: 8px;
   border: none;
+  border-left: 3px solid transparent;
   background: transparent;
-  color: var(--text);
+  color: var(--muted);
   font-size: 0.88rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.settings-nav-icon {
+  width: 14px;
+  flex-shrink: 0;
 }
 
 .settings-sidenav nav button:hover {
-  background: var(--soft);
+  background: #f5f5f5;
+  color: var(--text);
 }
 
 .settings-sidenav nav button.active {
   background: #FFF1F1;
   color: #BD2124;
   font-weight: 600;
+  border-left-color: #BD2124;
 }
 
 .settings-content {
@@ -919,11 +930,16 @@ h3 {
 @media (max-width: 860px) {
   .settings-layout {
     flex-direction: column;
+    gap: 16px;
   }
 
   .settings-sidenav {
     width: 100%;
     position: static;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    margin-right: 0;
+    padding-bottom: 12px;
   }
 
   .settings-sidenav nav {
@@ -935,12 +951,14 @@ h3 {
   .settings-sidenav nav button {
     width: auto;
     flex: 1 1 auto;
-    text-align: center;
-    border: 1px solid var(--line);
+    justify-content: center;
+    border-left: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 6px;
   }
 
   .settings-sidenav nav button.active {
-    border-color: #BD2124;
+    border-bottom-color: #BD2124;
   }
 }
 
