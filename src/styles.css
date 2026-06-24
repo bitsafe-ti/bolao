@@ -2808,6 +2808,7 @@ h3 {
   content: "";
   position: absolute;
   top: 50%;
+  transform: translateY(-50%);
   width: 11px;
   border-top: 2px solid #aeb8c6;
 }
@@ -2825,6 +2826,7 @@ h3 {
   content: "";
   position: absolute;
   top: 50%;
+  transform: translateY(-50%);
   width: 11px;
   border-top: 2px solid #aeb8c6;
 }
@@ -2861,6 +2863,7 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
   gap: 5px;
   min-height: 34px;
   padding: 5px 7px;
@@ -2873,11 +2876,15 @@ h3 {
 .bracket-team .team-name {
   display: flex;
   align-items: center;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+  width: fit-content;
+  max-width: calc(100% - 28px);
   overflow: hidden;
   white-space: nowrap;
   gap: 5px;
+  margin-inline: auto;
+  padding-inline: 6px;
   font-size: 0.7rem;
   font-weight: 800;
   line-height: 1.12;
@@ -2901,6 +2908,11 @@ h3 {
   color: var(--muted);
   font-size: 0.55rem;
   font-weight: 900;
+}
+
+.bracket-team > span:last-child {
+  position: absolute;
+  right: 7px;
 }
 
 .bracket-team.pending {
@@ -2937,13 +2949,27 @@ h3 {
 }
 
 .bracket-final-stage {
+  display: grid;
+  grid-template-rows: 30px 1fr;
+  min-width: 0;
+  text-align: center;
+}
+
+.bracket-final-content {
+  grid-row: 2;
+  display: grid;
+  grid-template-rows: 1fr auto 1fr;
+  min-height: 0;
+}
+
+.bracket-final-heading {
   display: flex;
   align-items: center;
-  justify-content: center;
   flex-direction: column;
   gap: 10px;
-  text-align: center;
-  padding-bottom: 44px;
+  align-self: end;
+  width: 100%;
+  margin-bottom: 10px;
 }
 
 .bracket-final-kicker {
@@ -2970,11 +2996,87 @@ h3 {
   border: 2px solid #e7bd28;
 }
 
+.bracket-champion-card {
+  position: relative;
+  width: 100%;
+  overflow: visible;
+  border: 2px solid #e7bd28;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 4px 11px rgba(30, 32, 38, 0.08);
+}
+
+.bracket-champion-card::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  height: 12px;
+  transform: translateX(-50%);
+  border-left: 2px solid #aeb8c6;
+}
+
+.bracket-champion-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 23px;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 7px;
+  color: #a16207;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.bracket-champion-team {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 5px 7px;
+}
+
+.bracket-champion-team > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 17px;
+  max-width: 100%;
+  border-radius: 5px;
+  padding-inline: 8px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.bracket-champion-team .team-name {
+  gap: 5px;
+  border-radius: 5px;
+  padding: 1px 8px;
+  background: var(--soft);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.bracket-champion-team .flag {
+  width: 23px;
+  height: 16px;
+}
+
+.bracket-champion-team.pending {
+  opacity: 0.6;
+}
+
 .bracket-final-stage .bracket-match-card::before,
 .bracket-final-stage .bracket-match-card::after {
   content: "";
   position: absolute;
   top: 50%;
+  transform: translateY(-50%);
   width: 11px;
   border-top: 2px solid #aeb8c6;
 }
@@ -2987,16 +3089,6 @@ h3 {
 .bracket-final-stage .bracket-match-card::after {
   right: -14px;
   width: 14px;
-}
-
-.bracket-final-stage > strong {
-  color: #a16207;
-  font-size: 0.92rem;
-}
-
-.bracket-final-stage > small {
-  color: var(--muted);
-  font-weight: 800;
 }
 
 .knockout-note {

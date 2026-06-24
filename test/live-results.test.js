@@ -4,6 +4,7 @@ import test from "node:test";
 import { fetchApiFootballResults, normalizeApiFootballFixture, normalizeEspnEvent, normalizeFixtureStatus } from "../workers/live-results/provider.js";
 import { shouldSyncLiveResults } from "../workers/live-results/sync.js";
 import { mergeMatchesPreservingResults } from "../functions/api/pool-state/[poolId].js";
+import { applyResultUpdates } from "../src/resultsSync.js";
 
 test("normalizes API-Football live fixtures and goal events", () => {
   const fixture = normalizeApiFootballFixture({
@@ -147,6 +148,73 @@ test("normalizes ESPN live score and goal events", () => {
   assert.equal(match.resultSource, "espn");
 });
 
+test("updates simultaneous live matches without mixing their scores", () => {
+  const matches = [
+    {
+      id: "match-argentina-austria",
+      homeTeamId: "argentina",
+      awayTeamId: "austria",
+      homeScore: "0",
+      awayScore: "0",
+      status: "live",
+      statusShort: "1H",
+      elapsed: 20,
+      resultSource: "api-football"
+    },
+    {
+      id: "match-brazil-morocco",
+      homeTeamId: "brazil",
+      awayTeamId: "morocco",
+      homeScore: "0",
+      awayScore: "0",
+      status: "live",
+      statusShort: "1H",
+      elapsed: 20,
+      resultSource: "api-football"
+    }
+  ];
+  const sourceMatches = [
+    {
+      homeTeamId: "argentina",
+      awayTeamId: "austria",
+      score: [2, 0],
+      status: "live",
+      statusShort: "2H",
+      elapsed: 61,
+      resultSource: "api-football",
+      homeGoals: [{ name: "Atacante argentino", minute: 14 }],
+      awayGoals: []
+    },
+    {
+      homeTeamId: "brazil",
+      awayTeamId: "morocco",
+      score: [1, 2],
+      status: "live",
+      statusShort: "2H",
+      elapsed: 63,
+      resultSource: "api-football",
+      homeGoals: [{ name: "Atacante brasileiro", minute: 28 }],
+      awayGoals: [
+        { name: "Atacante marroquino", minute: 37 },
+        { name: "Meia marroquino", minute: 55 }
+      ]
+    }
+  ];
+
+  const update = applyResultUpdates(matches, sourceMatches);
+  const argentinaMatch = update.matches.find((match) => match.id === "match-argentina-austria");
+  const brazilMatch = update.matches.find((match) => match.id === "match-brazil-morocco");
+
+  assert.equal(update.changed, 2);
+  assert.deepEqual([argentinaMatch.homeScore, argentinaMatch.awayScore], ["2", "0"]);
+  assert.deepEqual([brazilMatch.homeScore, brazilMatch.awayScore], ["1", "2"]);
+  assert.equal(argentinaMatch.elapsed, 61);
+  assert.equal(brazilMatch.elapsed, 63);
+  assert.equal(argentinaMatch.homeGoals[0].name, "Atacante argentino");
+  assert.equal(brazilMatch.awayGoals.length, 2);
+  assert.equal(argentinaMatch.resultUpdatedAt, brazilMatch.resultUpdatedAt);
+});
+
 test("sync window includes nearby and live matches but skips finished matches", () => {
   const now = new Date("2026-06-11T19:30:00.000Z");
   assert.equal(shouldSyncLiveResults([{ date: "2026-06-11T19:00:00.000Z", status: "live" }], now), true);
@@ -194,4 +262,46 @@ test("server merge preserves the newest live score", () => {
   }];
   const [merged] = mergeMatchesPreservingResults(current, incoming);
   assert.equal(merged.homeScore, "1");
+});
+
+test("server merge preserves independent scores from simultaneous matches", () => {
+  const current = [
+    {
+      id: "m1",
+      homeScore: "2",
+      awayScore: "0",
+      status: "live",
+      resultUpdatedAt: "2026-06-11T20:20:00.000Z"
+    },
+    {
+      id: "m2",
+      homeScore: "1",
+      awayScore: "2",
+      status: "live",
+      resultUpdatedAt: "2026-06-11T20:21:00.000Z"
+    }
+  ];
+  const incoming = [
+    {
+      id: "m1",
+      homeScore: "0",
+      awayScore: "0",
+      status: "live",
+      resultUpdatedAt: "2026-06-11T20:10:00.000Z"
+    },
+    {
+      id: "m2",
+      homeScore: "0",
+      awayScore: "0",
+      status: "live",
+      resultUpdatedAt: "2026-06-11T20:10:00.000Z"
+    }
+  ];
+
+  const merged = mergeMatchesPreservingResults(current, incoming);
+  const first = merged.find((match) => match.id === "m1");
+  const second = merged.find((match) => match.id === "m2");
+
+  assert.deepEqual([first.homeScore, first.awayScore], ["2", "0"]);
+  assert.deepEqual([second.homeScore, second.awayScore], ["1", "2"]);
 });

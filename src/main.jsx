@@ -2724,13 +2724,16 @@ function KnockoutBracketBoard({ bracket }) {
             <BracketStage title="Semifinal" side="left" level="semi" matches={selectMatches(semiById, [101])} />
 
             <div className="bracket-final-stage">
-              <span className="bracket-final-kicker">Grande final</span>
-              <div className="bracket-final-trophy" aria-hidden="true">
-                <img src={TACA_URL} alt="Taça da Copa do Mundo 2026" />
+              <div className="bracket-final-content">
+                <div className="bracket-final-heading">
+                  <span className="bracket-final-kicker">Grande final</span>
+                  <div className="bracket-final-trophy" aria-hidden="true">
+                    <img src={TACA_URL} alt="Taça da Copa do Mundo 2026" />
+                  </div>
+                  <BracketChampionCard finalMatch={bracket.rounds.final[0]} />
+                </div>
+                <BracketMatchCard match={bracket.rounds.final[0]} final />
               </div>
-              <BracketMatchCard match={bracket.rounds.final[0]} final />
-              <strong>Campeão do mundo</strong>
-              <small>Jogo 104</small>
             </div>
 
             <BracketStage title="Semifinal" side="right" level="semi" matches={selectMatches(semiById, [102])} />
@@ -2789,6 +2792,23 @@ function BracketMatchCard({ match, final = false }) {
           <span>{index === 0 ? "A" : "B"}</span>
         </div>
       ))}
+    </article>
+  );
+}
+
+function BracketChampionCard({ finalMatch }) {
+  const winner = finalMatch.winner ?? finalMatch.champion;
+
+  return (
+    <article className="bracket-champion-card">
+      <header>Campeão do mundo</header>
+      <div className={`bracket-champion-team${!winner?.confirmed ? " pending" : ""}`}>
+        {winner?.confirmed ? (
+          <TeamName teamId={winner.teamId} fallback={winner.name || winner.label} />
+        ) : (
+          <span>Vencedor do Jogo {finalMatch.id}</span>
+        )}
+      </div>
     </article>
   );
 }
