@@ -258,6 +258,8 @@ function App() {
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState(() => { try { return sessionStorage.getItem("bol-settings-tab") || "participants"; } catch { return "participants"; } });
   const [historyTeamId, setHistoryTeamId] = useState("");
@@ -523,6 +525,15 @@ function App() {
       try { sessionStorage.setItem("bol-tab", "predictions"); } catch {}
     }
   }, [tab, visibleTabs]);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    function handleOutside(e) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setUserMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [userMenuOpen]);
 
   useEffect(() => {
     if (tab !== "predictions" || isLoading || !currentUser || !workspaceRef.current) return undefined;
@@ -1091,18 +1102,31 @@ function App() {
               <h1>{tab === "profile" ? "Perfil" : visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
             </div>
           </div>
-          <button
-            type="button"
-            className={`topbar-user topbar-user-button${tab === "profile" ? " active" : ""}`}
-            aria-label="Abrir perfil"
-            onClick={() => handleTabClick("profile")}
-          >
-            <UserAvatar user={currentUser} />
-            <div className="topbar-user-info">
-              <strong>{currentUser.name}</strong>
-              <small>{isAdmin ? "Admin · Perfil" : "Perfil"}</small>
-            </div>
-          </button>
+          <div className="topbar-user-menu" ref={userMenuRef}>
+            <button
+              type="button"
+              className={`topbar-user topbar-user-button${userMenuOpen ? " active" : ""}`}
+              aria-label="Menu do usuário"
+              aria-expanded={userMenuOpen}
+              onClick={() => setUserMenuOpen((v) => !v)}
+            >
+              <UserAvatar user={currentUser} />
+              <div className="topbar-user-info">
+                <strong>{currentUser.name}</strong>
+                <small>{isAdmin ? "Admin" : "Usuário"}</small>
+              </div>
+            </button>
+            {userMenuOpen && (
+              <div className="user-dropdown" role="menu">
+                <button type="button" role="menuitem" onClick={() => { handleTabClick("profile"); setUserMenuOpen(false); }}>
+                  Perfil
+                </button>
+                <button type="button" role="menuitem" onClick={() => { logoutUser(); setUserMenuOpen(false); }}>
+                  Sair
+                </button>
+              </div>
+            )}
+          </div>
         </header>
 
         {tab === "profile" && (

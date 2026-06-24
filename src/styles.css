@@ -575,6 +575,52 @@ select:focus {
   box-shadow: 0 0 0 2px var(--primary-soft);
 }
 
+.topbar-user-menu {
+  position: relative;
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(30, 32, 38, 0.12);
+  min-width: 160px;
+  z-index: 300;
+  overflow: hidden;
+}
+
+.user-dropdown button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 11px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.user-dropdown button:hover {
+  background: var(--soft);
+}
+
+.user-dropdown button + button {
+  border-top: 1px solid var(--line);
+  color: var(--danger);
+}
+
+.user-dropdown button + button:hover {
+  background: #fee8e8;
+}
+
 .profile-avatar {
   display: inline-flex;
   align-items: center;
