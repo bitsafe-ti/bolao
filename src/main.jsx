@@ -249,7 +249,7 @@ function makeAuditEntry(actor, action, details = "") {
 function App() {
   const [state, setState] = useState(createInitialState);
   const [isLoading, setIsLoading] = useState(true);
-  const [tab, setTab] = useState("predictions");
+  const [tab, setTab] = useState(() => { try { return sessionStorage.getItem("bol-tab") || "predictions"; } catch { return "predictions"; } });
   const [authError, setAuthError] = useState("");
   const [syncStatus, setSyncStatus] = useState({ state: "idle", message: "Placares automáticos ativos." });
   const [sharedStatus, setSharedStatus] = useState({ state: "idle", message: "Carregando dados do bolão..." });
@@ -259,7 +259,7 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState("participants");
+  const [settingsTab, setSettingsTab] = useState(() => { try { return sessionStorage.getItem("bol-settings-tab") || "participants"; } catch { return "participants"; } });
   const [historyTeamId, setHistoryTeamId] = useState("");
   const [clockNow, setClockNow] = useState(() => new Date());
   const [predictionScrollRequest, setPredictionScrollRequest] = useState(0);
@@ -520,6 +520,7 @@ function App() {
   useEffect(() => {
     if (tab !== "profile" && !visibleTabs.some((item) => item.id === tab)) {
       setTab("predictions");
+      try { sessionStorage.setItem("bol-tab", "predictions"); } catch {}
     }
   }, [tab, visibleTabs]);
 
@@ -556,6 +557,7 @@ function App() {
 
   function handleTabClick(tabId) {
     setTab(tabId);
+    try { sessionStorage.setItem("bol-tab", tabId); } catch {}
     setMobileMenuOpen(false);
     if (tabId === "predictions") setPredictionScrollRequest((current) => current + 1);
     if (tabId === "results") setResultScrollRequest((current) => current + 1);
@@ -1109,125 +1111,132 @@ function App() {
         )}
 
         {tab === "settings" && isAdmin && (
-          <section className="panel settings-navigation-panel">
-            <SectionHeader title="Configurações" caption="Gerencie os recursos administrativos do bolão." />
-            <nav className="settings-tabs" aria-label="Seções de configurações">
-              {settingsTabs.map((item) => (
-                <button
-                  type="button"
-                  className={settingsTab === item.id ? "active" : ""}
-                  key={item.id}
-                  onClick={() => setSettingsTab(item.id)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-          </section>
-        )}
+          <div className="settings-layout">
+            <aside className="settings-sidenav panel">
+              <p className="settings-sidenav-title">Configurações</p>
+              <nav aria-label="Seções de configurações">
+                {settingsTabs.map((item) => (
+                  <button
+                    type="button"
+                    className={settingsTab === item.id ? "active" : ""}
+                    key={item.id}
+                    onClick={() => {
+                      setSettingsTab(item.id);
+                      try { sessionStorage.setItem("bol-settings-tab", item.id); } catch {}
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+            </aside>
 
-        {tab === "settings" && settingsTab === "participants" && isAdmin && (
-          <section className="panel">
-            <SectionHeader title="Participantes" />
-            <div className="panel-actions">
-              <button type="button" onClick={() => setParticipantModalOpen(true)}>Novo contato</button>
-            </div>
-            <ParticipantGrid
-              title="Administrador"
-              rows={adminParticipantRows}
-              emptyText="Nenhum administrador encontrado."
-              onChange={updateParticipantRow}
-              onResetPassword={resetPassword}
-              onRemove={removeParticipantRow}
-              canRemove
-              removeLabel="Remover admin"
-              protectedUserId={currentUser.id}
-            />
-            <ParticipantGrid
-              title="Usuários"
-              rows={regularParticipantRows}
-              emptyText="Nenhum usuário comum cadastrado."
-              onChange={updateParticipantRow}
-              onResetPassword={resetPassword}
-              onRemove={removeParticipantRow}
-              canRemove
-            />
-            {participantModalOpen && (
-              <div className="modal-backdrop" role="presentation" onMouseDown={() => setParticipantModalOpen(false)}>
-                <section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="participant-modal-title" onMouseDown={(event) => event.stopPropagation()}>
-                  <div className="modal-header">
-                    <div>
-                      <p className="eyebrow">Participantes</p>
-                      <h2 id="participant-modal-title">Novo contato</h2>
-                    </div>
-                    <button type="button" className="modal-close" aria-label="Fechar modal" onClick={() => setParticipantModalOpen(false)}>×</button>
+            <div className="settings-content">
+              {settingsTab === "participants" && (
+                <section className="panel">
+                  <SectionHeader title="Participantes" />
+                  <div className="panel-actions">
+                    <button type="button" onClick={() => setParticipantModalOpen(true)}>Novo contato</button>
                   </div>
-                  <form className="modal-form participant-form" onSubmit={addParticipant}>
-                    <input name="name" placeholder="Nome do participante" autoFocus />
-                    <input name="email" type="email" placeholder="E-mail do participante" required />
-                    <input name="password" type="password" placeholder="Senha inicial" required />
-                    <div className="modal-actions">
-                      <button type="button" className="ghost" onClick={() => setParticipantModalOpen(false)}>Cancelar</button>
-                      <button type="submit">Adicionar</button>
+                  <ParticipantGrid
+                    title="Administrador"
+                    rows={adminParticipantRows}
+                    emptyText="Nenhum administrador encontrado."
+                    onChange={updateParticipantRow}
+                    onResetPassword={resetPassword}
+                    onRemove={removeParticipantRow}
+                    canRemove
+                    removeLabel="Remover admin"
+                    protectedUserId={currentUser.id}
+                  />
+                  <ParticipantGrid
+                    title="Usuários"
+                    rows={regularParticipantRows}
+                    emptyText="Nenhum usuário comum cadastrado."
+                    onChange={updateParticipantRow}
+                    onResetPassword={resetPassword}
+                    onRemove={removeParticipantRow}
+                    canRemove
+                  />
+                  {participantModalOpen && (
+                    <div className="modal-backdrop" role="presentation" onMouseDown={() => setParticipantModalOpen(false)}>
+                      <section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="participant-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+                        <div className="modal-header">
+                          <div>
+                            <p className="eyebrow">Participantes</p>
+                            <h2 id="participant-modal-title">Novo contato</h2>
+                          </div>
+                          <button type="button" className="modal-close" aria-label="Fechar modal" onClick={() => setParticipantModalOpen(false)}>×</button>
+                        </div>
+                        <form className="modal-form participant-form" onSubmit={addParticipant}>
+                          <input name="name" placeholder="Nome do participante" autoFocus />
+                          <input name="email" type="email" placeholder="E-mail do participante" required />
+                          <input name="password" type="password" placeholder="Senha inicial" required />
+                          <div className="modal-actions">
+                            <button type="button" className="ghost" onClick={() => setParticipantModalOpen(false)}>Cancelar</button>
+                            <button type="submit">Adicionar</button>
+                          </div>
+                        </form>
+                      </section>
                     </div>
-                  </form>
+                  )}
                 </section>
-              </div>
-            )}
-          </section>
-        )}
+              )}
 
-        {tab === "settings" && settingsTab === "rounds" && isAdmin && (
-          <section className="panel">
-            <SectionHeader title="Rodadas" />
-            <div className="round-management-list">
-              {availableRounds.map((round) => {
-                const isReleased = round <= activeRound;
-                const isAutomatic = round <= automaticRound;
-                const roundMatches = state.matches.filter((m) => getMatchRound(m) === round);
-                const isManuallyLocked = roundMatches.length > 0 && roundMatches.every((m) => m.locked);
-                return (
-                  <div className="round-management-row" key={round}>
-                    <div className="round-management-info">
-                      <strong>Rodada {round}</strong>
-                      <span className={`round-status-label${isManuallyLocked ? " locked" : isReleased ? " released" : ""}`}>
-                        {isManuallyLocked
-                          ? "Travada manualmente"
-                          : isAutomatic
-                          ? "Liberada automaticamente"
-                          : isReleased
-                          ? "Liberada manualmente"
-                          : "Aguardando liberação"}
-                      </span>
-                    </div>
-                    <div className="round-management-actions">
-                      {!isReleased && (
-                        <button type="button" onClick={() => releasePredictionRound(round)}>
-                          Liberar rodada {round}
-                        </button>
-                      )}
-                      {isReleased && !isManuallyLocked && (
-                        <button type="button" className="ghost danger" onClick={() => lockRound(round)}>
-                          Travar rodada {round}
-                        </button>
-                      )}
-                    </div>
+              {settingsTab === "rounds" && (
+                <section className="panel">
+                  <SectionHeader title="Rodadas" />
+                  <div className="round-management-list">
+                    {availableRounds.map((round) => {
+                      const isReleased = round <= activeRound;
+                      const isAutomatic = round <= automaticRound;
+                      const roundMatches = state.matches.filter((m) => getMatchRound(m) === round);
+                      const isManuallyLocked = roundMatches.length > 0 && roundMatches.every((m) => m.locked);
+                      return (
+                        <div className="round-management-row" key={round}>
+                          <div className="round-management-info">
+                            <strong>Rodada {round}</strong>
+                            <span className={`round-status-label${isManuallyLocked ? " locked" : isReleased ? " released" : ""}`}>
+                              {isManuallyLocked
+                                ? "Travada manualmente"
+                                : isAutomatic
+                                ? "Liberada automaticamente"
+                                : isReleased
+                                ? "Liberada manualmente"
+                                : "Aguardando liberação"}
+                            </span>
+                          </div>
+                          <div className="round-management-actions">
+                            {!isReleased && (
+                              <button type="button" onClick={() => releasePredictionRound(round)}>
+                                Liberar rodada {round}
+                              </button>
+                            )}
+                            {isReleased && !isManuallyLocked && (
+                              <button type="button" className="ghost danger" onClick={() => lockRound(round)}>
+                                Travar rodada {round}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
-            <div className={`sync-strip ${sharedStatus.state}`}>
-              <strong>{sharedStatus.message}</strong>
-              <span>Rodada atual para palpites: {activeRound}</span>
-            </div>
-          </section>
-        )}
+                  <div className={`sync-strip ${sharedStatus.state}`}>
+                    <strong>{sharedStatus.message}</strong>
+                    <span>Rodada atual para palpites: {activeRound}</span>
+                  </div>
+                </section>
+              )}
 
-        {tab === "settings" && settingsTab === "audit" && isAdmin && (
-          <section className="panel">
-            <SectionHeader title="Logs do sistema" caption={`${state.auditLogs?.length ?? 0} / ${AUDIT_LOG_LIMIT} registros`} />
-            <AuditLogPanel logs={state.auditLogs} />
-          </section>
+              {settingsTab === "audit" && (
+                <section className="panel">
+                  <SectionHeader title="Logs do sistema" caption={`${state.auditLogs?.length ?? 0} / ${AUDIT_LOG_LIMIT} registros`} />
+                  <AuditLogPanel logs={state.auditLogs} />
+                </section>
+              )}
+            </div>
+          </div>
         )}
 
 

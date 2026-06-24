@@ -745,34 +745,67 @@ h3 {
   padding: 20px;
 }
 
-.settings-navigation-panel {
-  margin-bottom: 16px;
+.settings-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
 }
 
-.settings-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+.settings-sidenav {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: sticky;
+  top: 0;
+  padding: 16px 12px;
 }
 
-.settings-tabs button {
-  min-width: 0;
-  border: 1px solid var(--line);
-  background: var(--soft);
+.settings-sidenav-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  padding: 0 4px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-sidenav nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-sidenav nav button {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
   color: var(--text);
-  padding-inline: 12px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
-.settings-tabs button:hover {
-  border-color: var(--line-warm);
-  background: var(--primary-soft);
-  color: var(--primary);
+.settings-sidenav nav button:hover {
+  background: var(--soft);
 }
 
-.settings-tabs button.active {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: #ffffff;
+.settings-sidenav nav button.active {
+  background: #FFF1F1;
+  color: #BD2124;
+  font-weight: 600;
+}
+
+.settings-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .settings-results-card {
@@ -808,23 +841,30 @@ h3 {
 }
 
 @media (max-width: 860px) {
-  .settings-tabs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 560px) {
-  .settings-tabs {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-results-card {
-    align-items: stretch;
+  .settings-layout {
     flex-direction: column;
   }
 
-  .settings-results-card button {
+  .settings-sidenav {
     width: 100%;
+    position: static;
+  }
+
+  .settings-sidenav nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .settings-sidenav nav button {
+    width: auto;
+    flex: 1 1 auto;
+    text-align: center;
+    border: 1px solid var(--line);
+  }
+
+  .settings-sidenav nav button.active {
+    border-color: #BD2124;
   }
 }
 
