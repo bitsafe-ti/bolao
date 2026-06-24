@@ -2801,13 +2801,11 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 86px;
-  height: 86px;
-  border: 3px solid #fff6c7;
-  border-radius: 999px;
-  background: linear-gradient(145deg, #fffbe8, #fde68a 40%, #ca8a04);
-  padding: 8px;
-  box-shadow: 0 12px 28px rgba(185, 121, 0, 0.32), inset 0 3px 5px rgba(255, 255, 255, 0.74);
+  width: 96px;
+  height: 96px;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
 .bracket-final-stage .bracket-match-card {
