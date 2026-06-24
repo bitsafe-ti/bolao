@@ -2854,7 +2854,7 @@ h3 {
 .bracket-team {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 5px;
   min-height: 34px;
   padding: 5px 7px;
@@ -2867,6 +2867,7 @@ h3 {
 .bracket-team .team-name {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -2888,6 +2889,7 @@ h3 {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+  margin-left: auto;
   width: 17px;
   height: 17px;
   border-radius: 5px;
