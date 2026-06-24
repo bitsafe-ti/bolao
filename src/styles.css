@@ -382,7 +382,15 @@ select:focus {
   align-items: center;
   justify-content: center;
   border-bottom: 1px solid var(--line);
-  padding: 14px 10px 16px;
+  padding: 4px 8px 12px;
+}
+
+.brand-logo {
+  width: min(160px, 100%);
+  height: 140px;
+  object-fit: contain;
+  object-position: center;
+  filter: grayscale(1) contrast(1.2) brightness(0.72);
 }
 
 .brand-favicon {
@@ -3811,12 +3819,12 @@ tr:last-child td {
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid var(--line);
-    padding: 12px 14px 14px;
+    padding: 4px 4px 20px;
   }
 
-  .brand-favicon {
-    width: 36px;
-    height: 36px;
+  .brand-logo {
+    width: min(220px, 100%);
+    height: 90px;
   }
 
   .topbar {
