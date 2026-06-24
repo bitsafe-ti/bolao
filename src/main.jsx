@@ -1039,19 +1039,8 @@ function App() {
       {mobileMenuOpen && <div className="menu-overlay" onClick={() => setMobileMenuOpen(false)} />}
       <aside className={`sidebar${mobileMenuOpen ? " open" : ""}${sidebarCollapsed ? " collapsed" : ""}`}>
         <div className="brand-block">
-          {sidebarCollapsed
-            ? <img src={FAVICON_URL} className="brand-favicon" alt="Bolão" />
-            : <img src={AUTH_LOGO_URL} alt="Bolão Grupo Bit" fetchPriority="high" />
-          }
+          <img src={FAVICON_URL} className="brand-favicon" alt="Bolão" />
           <button type="button" className="menu-close" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>×</button>
-          <button
-            type="button"
-            className="sidebar-collapse-btn"
-            aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
-            onClick={() => setSidebarCollapsed((v) => !v)}
-          >
-            <FontAwesomeIcon icon={sidebarCollapsed ? faChevronRight : faChevronLeft} />
-          </button>
         </div>
         <nav className="tabs" aria-label="Seções do bolão">
           {visibleTabs.map((item) => (
@@ -1080,6 +1069,14 @@ function App() {
         <header className="topbar">
           <div className="topbar-left">
             <button type="button" className="hamburger" aria-label="Abrir menu" onClick={() => setMobileMenuOpen(true)}>☰</button>
+            <button
+              type="button"
+              className="sidebar-collapse-btn"
+              aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+              onClick={() => setSidebarCollapsed((v) => !v)}
+            >
+              <FontAwesomeIcon icon={sidebarCollapsed ? faChevronRight : faChevronLeft} />
+            </button>
             <div className="topbar-title">
               <p className="eyebrow">Copa do Mundo 2026</p>
               <h1>{tab === "profile" ? "Perfil" : visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
