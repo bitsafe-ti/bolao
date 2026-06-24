@@ -1058,7 +1058,7 @@ function App() {
         </nav>
         <div className="sidebar-footer">
           <div className="sidebar-actions">
-            <button type="button" onClick={logoutUser}>
+            <button type="button" data-label="Sair" onClick={logoutUser}>
               <FontAwesomeIcon icon={faRightFromBracket} className="tab-icon" />
               <span className="tab-label">Sair</span>
             </button>

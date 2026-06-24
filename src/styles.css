@@ -463,8 +463,38 @@ select:focus {
   align-items: center;
 }
 
-.sidebar.collapsed .sidebar-actions {
+.sidebar.collapsed .sidebar-actions button {
+  justify-content: center;
+  gap: 0;
+  padding: 11px 0;
+  position: relative;
+}
+
+.sidebar.collapsed .sidebar-actions button .tab-label {
   display: none;
+}
+
+.sidebar.collapsed .sidebar-actions button::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #1e2026;
+  color: #f8fafc;
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 400;
+}
+
+.sidebar.collapsed .sidebar-actions button:hover::after {
+  opacity: 1;
 }
 
 .sidebar.collapsed .sidebar-footer {
@@ -480,6 +510,9 @@ select:focus {
 }
 
 .sidebar-actions button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   justify-content: flex-start;
   background: transparent;
   border: 1px solid transparent;
