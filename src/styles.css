@@ -2735,6 +2735,7 @@ h3 {
 .knockout-tree-scroll {
   width: 100%;
   overflow-x: auto;
+  overflow-y: clip;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
