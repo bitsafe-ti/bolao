@@ -59,7 +59,7 @@ const PRIZE_DISTRIBUTION = [
   { label: "3º lugar", percent: 20 }
 ];
 const AUTH_LOGO_URL = `${import.meta.env.BASE_URL}logo_bolao_transparente.png`;
-const FAVICON_URL = `${import.meta.env.BASE_URL}favicon.png`;
+const FAVICON_URL = `${import.meta.env.BASE_URL}gb.png`;
 const TACA_URL = `${import.meta.env.BASE_URL}taca.png`;
 const TACA_PRATA_URL = `${import.meta.env.BASE_URL}taca-p.png`;
 const TACA_BRONZE_URL = `${import.meta.env.BASE_URL}taca-b.png`;
