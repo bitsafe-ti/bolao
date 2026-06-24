@@ -173,7 +173,9 @@ export function calculateRanking(participants, matches, predictions) {
     .map((participant) => {
       const participantPredictions = predictions?.[participant.id] ?? {};
       const perMatch = matches.map((match) => {
-        const points = scorePrediction(participantPredictions?.[match.id], match);
+        const points = isMatchResultFinal(match)
+          ? scorePrediction(participantPredictions?.[match.id], match)
+          : 0;
         return { matchId: match.id, points };
       });
 

@@ -91,6 +91,32 @@ test("scores a prediction while the match is live using current score", () => {
   );
 });
 
+test("ranking awards points only after the match is finished", () => {
+  const participants = [{ id: "a", name: "Ana" }];
+  const predictions = { a: { m1: { home: 1, away: 0 } } };
+  const liveMatch = {
+    id: "m1",
+    homeScore: 1,
+    awayScore: 0,
+    status: "live"
+  };
+
+  const liveRanking = calculateRanking(participants, [liveMatch], predictions);
+  assert.equal(liveRanking[0].total, 0);
+  assert.equal(liveRanking[0].exactScores, 0);
+  assert.equal(liveRanking[0].winnerHits, 0);
+  assert.equal(liveRanking[0].scoredMatches, 0);
+
+  const finalRanking = calculateRanking(
+    participants,
+    [{ ...liveMatch, status: "finished" }],
+    predictions
+  );
+  assert.equal(finalRanking[0].total, 3);
+  assert.equal(finalRanking[0].exactScores, 1);
+  assert.equal(finalRanking[0].scoredMatches, 1);
+});
+
 test("keeps participant predictions private until kickoff", () => {
   const match = { date: "2026-06-11T16:00:00.000Z", status: "scheduled" };
 
