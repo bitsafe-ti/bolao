@@ -24,6 +24,7 @@ import {
   scorePrediction
 } from "./domain.js";
 import { getFlagUrl, getTeamsByGroup, teamsById } from "./teams.js";
+import { buildRoundOf32Bracket } from "./bracket.js";
 import { attachPasswordCredential, hasLegacyPassword, verifyPassword } from "./passwords.js";
 import {
   fetchPoolState,
@@ -137,6 +138,7 @@ const userTabs = [
   { id: "predictions", label: "Palpites" },
   { id: "results", label: "Resultados" },
   { id: "groups", label: "Grupos" },
+  { id: "bracket", label: "Chaveamento" },
   { id: "ranking", label: "Ranking" }
 ];
 
@@ -252,6 +254,7 @@ function App() {
   const [selectedResultRound, setSelectedResultRound] = useState(null);
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState("participants");
   const [historyTeamId, setHistoryTeamId] = useState("");
@@ -283,6 +286,14 @@ function App() {
     [contestParticipants, state.matches, state.predictions]
   );
   const groupStandings = useMemo(() => calculateGroupStandings(state.matches), [state.matches]);
+  const groupStageComplete = useMemo(
+    () => state.matches.length > 0 && state.matches.every(isMatchResultFinal),
+    [state.matches]
+  );
+  const knockoutBracket = useMemo(
+    () => buildRoundOf32Bracket(groupStandings, { groupsComplete: groupStageComplete }),
+    [groupStandings, groupStageComplete]
+  );
   const automaticRound = useMemo(() => getActiveRound(state.matches), [state.matches]);
   const activeRound = useMemo(() => getReleasedPredictionRound(state), [state.matches, state.releasedPredictionRound]);
   const availableRounds = useMemo(() => {
@@ -550,7 +561,7 @@ function App() {
         workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
       });
     }
-    if (tabId === "groups" || tabId === "results") {
+    if (tabId === "groups" || tabId === "bracket" || tabId === "results") {
       fetchPoolState()
         .then((remote) => {
           const cleanedRemote = cleanPoolState(remote);
@@ -1022,9 +1033,9 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       {mobileMenuOpen && <div className="menu-overlay" onClick={() => setMobileMenuOpen(false)} />}
-      <aside className={`sidebar${mobileMenuOpen ? " open" : ""}`}>
+      <aside className={`sidebar${mobileMenuOpen ? " open" : ""}${sidebarCollapsed ? " collapsed" : ""}`}>
         <div className="brand-block">
           <img src={AUTH_LOGO_URL} alt="Bolão Grupo Bit" fetchPriority="high" />
           <button type="button" className="menu-close" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>×</button>
@@ -1040,6 +1051,14 @@ function App() {
           <div className="sidebar-actions">
             <button type="button" onClick={logoutUser}>Sair</button>
           </div>
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+            onClick={() => setSidebarCollapsed((v) => !v)}
+          >
+            {sidebarCollapsed ? "▶" : "◀"}
+          </button>
         </div>
       </aside>
 
@@ -1377,6 +1396,8 @@ function App() {
         )}
 
         {tab === "groups" && <GroupStandingsBoard groups={groupStandings} />}
+
+        {tab === "bracket" && <KnockoutBracketBoard bracket={knockoutBracket} />}
 
         {tab === "ranking" && <RankingTable ranking={ranking} matches={state.matches} predictions={state.predictions} />}
       </section>
@@ -2449,8 +2470,11 @@ function PrizePodium({ ranking, totalPoolValue }) {
       <div className="podium-stage">
         {podium.map(({ rank, participant, prize }) => (
           <article className={`podium-place podium-place-${rank}`} key={prize.label}>
-            <div className="podium-medal" aria-label={`${rank}º lugar`}>
-              <FontAwesomeIcon icon={faTrophy} title={`${rank}º lugar`} />
+            <div className="podium-profile" aria-label={`${rank}º lugar`}>
+              <UserAvatar user={participant ?? { name: "Aguardando participante" }} />
+              <span className="podium-trophy" aria-hidden="true">
+                <WorldCupTrophy />
+              </span>
             </div>
             <div className="podium-person">
               <strong>{participant?.name ?? "Aguardando participante"}</strong>
@@ -2590,6 +2614,147 @@ function GroupStandingsBoard({ groups }) {
         ))}
       </div>
     </section>
+  );
+}
+
+function KnockoutBracketBoard({ bracket }) {
+  const qualifiedThirds = bracket.thirdPlacedTeams.filter((team) => team.qualified);
+  const round32ById = new Map(bracket.rounds.roundOf32.map((match) => [match.id, match]));
+  const round16ById = new Map(bracket.rounds.roundOf16.map((match) => [match.id, match]));
+  const quarterById = new Map(bracket.rounds.quarterFinals.map((match) => [match.id, match]));
+  const semiById = new Map(bracket.rounds.semiFinals.map((match) => [match.id, match]));
+  const selectMatches = (map, ids) => ids.map((id) => map.get(id));
+
+  return (
+    <section className="panel knockout-panel">
+      <SectionHeader
+        title="Chaveamento"
+        caption="Confrontos da rodada de 32 definidos pela classificação dos grupos."
+      />
+
+      <div className={`knockout-status ${bracket.groupsComplete ? "confirmed" : "projected"}`}>
+        <span>{bracket.groupsComplete ? "Classificação encerrada" : "Projeção ao vivo"}</span>
+        <strong>
+          {bracket.groupsComplete
+            ? "Os classificados da fase de grupos estão definidos."
+            : "O chaveamento será confirmado quando todos os jogos da 3ª rodada terminarem."}
+        </strong>
+      </div>
+
+      <details className="third-place-section">
+        <summary>
+          <span>Melhores terceiros colocados</span>
+          <strong>{qualifiedThirds.length} de 8 vagas projetadas</strong>
+        </summary>
+        <div className="third-place-ranking">
+          {bracket.thirdPlacedTeams.map((team) => (
+            <article className={team.qualified ? "qualified" : "outside"} key={team.teamId}>
+              <span className="third-place-position">{team.thirdPlaceRank}º</span>
+              <TeamName teamId={team.teamId} fallback={team.name} />
+              <span className="third-place-group">Grupo {team.group}</span>
+              <strong>{team.points} pts</strong>
+              <small>SG {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}</small>
+            </article>
+          ))}
+        </div>
+      </details>
+
+      <section className="knockout-tree-section" aria-labelledby="knockout-tree-title">
+        <div className="knockout-subheading">
+          <div>
+            <span>Mata-mata</span>
+            <h3 id="knockout-tree-title">Caminho até a final</h3>
+          </div>
+          <strong>Arraste para os lados para explorar</strong>
+        </div>
+
+        <div className="knockout-tree-scroll">
+          <div className="knockout-tree">
+            <BracketStage title="Rodada de 32" side="left" level="round32" matches={selectMatches(round32ById, [74, 77, 73, 75, 83, 84, 81, 82])} />
+            <BracketStage title="Oitavas" side="left" level="round16" matches={selectMatches(round16ById, [89, 90, 93, 94])} />
+            <BracketStage title="Quartas" side="left" level="quarter" matches={selectMatches(quarterById, [97, 98])} />
+            <BracketStage title="Semifinal" side="left" level="semi" matches={selectMatches(semiById, [101])} />
+
+            <div className="bracket-final-stage">
+              <span className="bracket-final-kicker">Grande final</span>
+              <div className="bracket-final-trophy" aria-hidden="true"><WorldCupTrophy /></div>
+              <BracketMatchCard match={bracket.rounds.final[0]} final />
+              <strong>Campeão do mundo</strong>
+              <small>Jogo 104</small>
+            </div>
+
+            <BracketStage title="Semifinal" side="right" level="semi" matches={selectMatches(semiById, [102])} />
+            <BracketStage title="Quartas" side="right" level="quarter" matches={selectMatches(quarterById, [99, 100])} />
+            <BracketStage title="Oitavas" side="right" level="round16" matches={selectMatches(round16ById, [91, 92, 95, 96])} />
+            <BracketStage title="Rodada de 32" side="right" level="round32" matches={selectMatches(round32ById, [76, 78, 79, 80, 86, 88, 85, 87])} />
+          </div>
+        </div>
+      </section>
+
+      <p className="knockout-note">
+        A ordem considera pontos, saldo de gols, gols marcados e vitórias. Enquanto houver jogos pendentes,
+        qualquer resultado novo pode alterar os classificados e os confrontos projetados.
+      </p>
+    </section>
+  );
+}
+
+function BracketStage({ title, matches, side, level }) {
+  return (
+    <section className={`bracket-stage ${side} ${level}`}>
+      <h4>{title}</h4>
+      <div className="bracket-stage-list">
+        {matches.map((match) => (
+          <BracketMatchCard match={match} key={match.id} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function BracketMatchCard({ match, final = false }) {
+  const isProjected = match.home.confirmed === false || match.away.confirmed === false;
+  return (
+    <article className={`bracket-match-card${final ? " final" : ""}`}>
+      <header>
+        <span>Jogo {match.id}</span>
+        {isProjected && <small>Projeção</small>}
+      </header>
+      {[match.home, match.away].map((slot, index) => (
+        <div className={`bracket-team${slot.confirmed === false ? " pending" : ""}`} key={`${match.id}-${index}`}>
+          {slot.confirmed !== false ? (
+            <TeamName teamId={slot.teamId} fallback={slot.name || slot.label} />
+          ) : (
+            <span className="bracket-pending-label">{slot.label}</span>
+          )}
+          <span>{index === 0 ? "A" : "B"}</span>
+        </div>
+      ))}
+    </article>
+  );
+}
+
+function WorldCupTrophy({ className, style }) {
+  return (
+    <svg viewBox="0 0 60 90" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className={className} style={style} aria-hidden="true">
+      {/* Cup bowl */}
+      <path d="M12 5 Q10 5 9 12 Q7 24 10 34 Q14 44 30 48 Q46 44 50 34 Q53 24 51 12 Q50 5 48 5 Z"/>
+      {/* Left handle */}
+      <path d="M12 10 C3 16 1 28 5 36 C7 42 14 44 19 40" fill="none" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Right handle */}
+      <path d="M48 10 C57 16 59 28 55 36 C53 42 46 44 41 40" fill="none" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Neck */}
+      <rect x="25" y="48" width="10" height="12" rx="3"/>
+      {/* Left figure */}
+      <ellipse cx="21" cy="67" rx="6" ry="7"/>
+      <path d="M25 60 L28 56 Q28 54 26 53 Q24 52 23 54" strokeWidth="0"/>
+      {/* Right figure */}
+      <ellipse cx="39" cy="67" rx="6" ry="7"/>
+      <path d="M35 60 L32 56 Q32 54 34 53 Q36 52 37 54" strokeWidth="0"/>
+      {/* Base tiers */}
+      <rect x="12" y="75" width="36" height="7" rx="2"/>
+      <rect x="7" y="82" width="46" height="8" rx="3"/>
+    </svg>
   );
 }
 
