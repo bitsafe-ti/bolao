@@ -374,7 +374,7 @@ select:focus {
   color: var(--text);
   height: 100vh;
   overflow-y: auto;
-  padding: 22px 14px;
+  padding: 0 14px 22px;
 }
 
 .brand-block {
@@ -458,7 +458,7 @@ select:focus {
 }
 
 .sidebar.collapsed {
-  padding: 8px 4px 14px;
+  padding: 0 4px 14px;
   overflow: visible;
   align-items: center;
 }
