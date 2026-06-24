@@ -99,7 +99,7 @@ function isMathematicallyConfirmed(position, rows) {
   for (let i = position; i < 4; i++) {
     const c = rows[i];
     const maxPoints = (c?.points ?? 0) + (3 - (c?.played ?? 0)) * 3;
-    if (maxPoints >= target.points) return false;
+    if (maxPoints > target.points) return false;
   }
   return true;
 }
