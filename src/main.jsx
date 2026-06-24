@@ -61,6 +61,8 @@ const PRIZE_DISTRIBUTION = [
 const AUTH_LOGO_URL = `${import.meta.env.BASE_URL}logo_bolao_transparente.png`;
 const FAVICON_URL = `${import.meta.env.BASE_URL}favicon.png`;
 const TACA_URL = `${import.meta.env.BASE_URL}taca.png`;
+const TACA_PRATA_URL = `${import.meta.env.BASE_URL}taca-p.png`;
+const TACA_BRONZE_URL = `${import.meta.env.BASE_URL}taca-b.png`;
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
 
@@ -2479,7 +2481,11 @@ function PrizePodium({ ranking, totalPoolValue }) {
             <div className="podium-profile" aria-label={`${rank}º lugar`}>
               <UserAvatar user={participant ?? { name: "Aguardando participante" }} />
               <span className="podium-trophy" aria-hidden="true">
-                <WorldCupTrophy />
+                <img
+                  src={rank === 1 ? TACA_URL : rank === 2 ? TACA_PRATA_URL : TACA_BRONZE_URL}
+                  alt=""
+                  className="podium-trophy-img"
+                />
               </span>
             </div>
             <div className="podium-person">
