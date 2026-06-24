@@ -2747,16 +2747,14 @@ function BracketStage({ title, matches, side, level }) {
 }
 
 function BracketMatchCard({ match, final = false }) {
-  const isProjected = match.home.confirmed === false || match.away.confirmed === false;
   return (
     <article className={`bracket-match-card${final ? " final" : ""}`}>
       <header>
         <span>Jogo {match.id}</span>
-        {isProjected && <small>Projeção</small>}
       </header>
       {[match.home, match.away].map((slot, index) => (
-        <div className={`bracket-team${!slot.teamId ? " pending" : slot.confirmed === false ? " projected" : ""}`} key={`${match.id}-${index}`}>
-          {slot.teamId ? (
+        <div className={`bracket-team${!slot.confirmed ? " pending" : ""}`} key={`${match.id}-${index}`}>
+          {slot.confirmed ? (
             <TeamName teamId={slot.teamId} fallback={slot.name || slot.label} />
           ) : (
             <span className="bracket-pending-label">{slot.label}</span>

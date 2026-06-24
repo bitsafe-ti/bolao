@@ -93,17 +93,29 @@ function findThirdAssignment(selectedThirds, thirdMatches) {
   return assign(0) ? assignments : new Map();
 }
 
+function isMathematicallyConfirmed(position, rows) {
+  if (!rows || rows.length < 4 || !rows[position - 1]?.teamId) return false;
+  const target = rows[position - 1];
+  for (let i = position; i < 4; i++) {
+    const c = rows[i];
+    const maxPoints = (c?.points ?? 0) + (3 - (c?.played ?? 0)) * 3;
+    if (maxPoints >= target.points) return false;
+  }
+  return true;
+}
+
 function resolveGroupSlot(slot, groupsByLetter) {
   const groupData = groupsByLetter.get(slot.group);
   const row = groupData?.rows?.[slot.position - 1];
   const groupDone = groupData?.rows?.length === 4 && groupData.rows.every((r) => r.played >= 3);
+  const confirmed = (groupDone && !!row?.teamId) || isMathematicallyConfirmed(slot.position, groupData?.rows);
   return {
     teamId: row?.teamId ?? "",
     name: row?.name ?? "",
     label: `${slot.position}º Grupo ${slot.group}`,
     group: slot.group,
     position: slot.position,
-    confirmed: groupDone && !!row?.teamId
+    confirmed
   };
 }
 
