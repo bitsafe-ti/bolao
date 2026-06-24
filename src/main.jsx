@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup, faSitemap, faMedal, faGear, faChevronLeft, faChevronRight, faRightFromBracket } from "@fortawesome/free-solid-svg-icons";
+import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup, faSitemap, faMedal, faGear, faChevronLeft, faChevronRight, faRightFromBracket, faUser } from "@fortawesome/free-solid-svg-icons";
 import {
   calculateRanking,
   clearedOpeningPredictionMatchIds,
@@ -1119,9 +1119,11 @@ function App() {
             {userMenuOpen && (
               <div className="user-dropdown" role="menu">
                 <button type="button" role="menuitem" onClick={() => { handleTabClick("profile"); setUserMenuOpen(false); }}>
+                  <FontAwesomeIcon icon={faUser} />
                   Perfil
                 </button>
                 <button type="button" role="menuitem" onClick={() => { logoutUser(); setUserMenuOpen(false); }}>
+                  <FontAwesomeIcon icon={faRightFromBracket} />
                   Sair
                 </button>
               </div>

@@ -595,6 +595,7 @@ select:focus {
 .user-dropdown button {
   display: flex;
   align-items: center;
+  gap: 10px;
   width: 100%;
   text-align: left;
   padding: 11px 16px;

@@ -245,3 +245,80 @@ Profundidade e intencionalmente contida. O sistema favorece contraste tonal, sur
 ### Known Gaps
 - Cores de status semantico compartilham o vermelho de marca com ações primárias — usar com contexto claro.
 - Alguns micro-estados de interação variam por módulo e não são representados como tokens universais.
+
+---
+
+## 10. Bolão Copa — Padrões Específicos
+
+> Esta seção cobre padrões implementados no Bolão Copa 2026 que estendem o design system base.
+> Para arquitetura, assets, ícones e regras de construção consultar `docs/parametrizacao.md`.
+
+### Shell de Layout
+
+O app-shell usa flex-row com sidebar fixa e área de workspace:
+- **Sidebar expandida:** 240px, `padding: 22px 14px`, bg `#1E2026`, borda-direita `1px solid rgba(255,255,255,0.07)`
+- **Sidebar colapsada:** 56px, `padding: 22px 4px 14px` — o `padding-top: 22px` é idêntico ao expandido para alinhar o brand-block com o topbar (topbar termina em y=95: `padding 16px + altura 73px`)
+- **Workspace:** `padding: 22px`, background `var(--bg, #F5F5F5)`
+- **Topbar:** `min-height: 73px`, bg `#ffffff`, `border-bottom: 1px solid #E6E8EA`, sticky no topo
+
+### Sidebar — Brand Block
+```css
+.brand-logo    { filter: brightness(0.5) sepia(1) saturate(4) hue-rotate(318deg) brightness(0.75); }
+.brand-favicon { filter: brightness(0.5) sepia(1) saturate(4) hue-rotate(318deg) brightness(0.75);
+                 width: 42px; height: 42px; object-fit: contain; }
+```
+O filtro converte imagens PNG brancas para `#BD2124`. Logo expandida: `logo_bolao_transparente.png`. Logo colapsada: `gb.png`.
+
+### Sidebar — Navegação
+
+Botão de tab ativo:
+```css
+background: rgba(189, 33, 36, 0.12);
+color: #f87171;
+border-left: 3px solid #BD2124;
+```
+
+Hover (inativo):
+```css
+background: rgba(255, 255, 255, 0.06);
+color: #f0f0f0;
+```
+
+Colapsado — ícone único + tooltip via CSS:
+```css
+button::after { content: attr(data-label); position: absolute; left: calc(100% + 12px);
+  background: #1E2026; color: #fff; padding: 5px 10px; border-radius: 6px;
+  font-size: 0.78rem; white-space: nowrap; opacity: 0; pointer-events: none; }
+button:hover::after { opacity: 1; }
+```
+
+### Topbar — Dropdown de Usuário
+
+Posicionamento relativo ao botão:
+```css
+.user-dropdown { position: absolute; top: calc(100% + 8px); right: 0;
+  background: #ffffff; border: 1px solid #E6E8EA; border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(30,32,38,0.12); min-width: 160px; z-index: 300; }
+```
+
+Itens com ícone + label (`gap: 10px`). Item "Sair": `border-top: 1px solid #E6E8EA`, `color: #BD2124`, hover bg `#fee8e8`.
+
+Fecha ao clicar fora: `useRef` + `document.addEventListener("mousedown")` removido no cleanup.
+
+### Settings — Layout Dois-Colunas
+
+```css
+.settings-layout { display: flex; align-items: flex-start; gap: 20px; }
+.settings-sidenav { width: 200px; flex-shrink: 0; position: sticky; top: 0; }
+.settings-content { flex: 1; min-width: 0; }
+@media (max-width: 860px) { .settings-layout { flex-direction: column; }
+  .settings-sidenav { width: 100%; position: static; } }
+```
+
+Item ativo no sidenav: `background: #FFF1F1; color: #BD2124; font-weight: 600;`
+
+### Responsividade Mobile (≤860px)
+
+- Sidebar vira drawer fixo overlay, abre via hambúrguer no topbar
+- Settings-layout empilha verticalmente, sidenav vira nav horizontal com `flex-wrap: wrap`
+- Perfil e rankings usam `width: 100%` sem `max-width`
