@@ -1110,11 +1110,8 @@ function App() {
               aria-expanded={userMenuOpen}
               onClick={() => setUserMenuOpen((v) => !v)}
             >
+              <span className="topbar-user-name">{currentUser.name}</span>
               <UserAvatar user={currentUser} />
-              <div className="topbar-user-info">
-                <strong>{currentUser.name}</strong>
-                <small>{isAdmin ? "Admin" : "Usuário"}</small>
-              </div>
             </button>
             {userMenuOpen && (
               <div className="user-dropdown" role="menu">
