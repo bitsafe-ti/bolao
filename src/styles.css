@@ -2790,6 +2790,38 @@ h3 {
   min-height: 0;
 }
 
+.bracket-stage.has-pairs .bracket-stage-list {
+  justify-content: flex-start;
+}
+
+.bracket-pair {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  position: relative;
+}
+
+.bracket-stage.left .bracket-pair::after {
+  content: "";
+  position: absolute;
+  right: -23px;
+  top: 25%;
+  bottom: 25%;
+  width: 0;
+  border-right: 2px solid #aeb8c6;
+}
+
+.bracket-stage.right .bracket-pair::after {
+  content: "";
+  position: absolute;
+  left: -23px;
+  top: 25%;
+  bottom: 25%;
+  width: 0;
+  border-left: 2px solid #aeb8c6;
+}
+
 .bracket-match-card {
   position: relative;
   z-index: 1;

@@ -2734,13 +2734,28 @@ function KnockoutBracketBoard({ bracket }) {
 }
 
 function BracketStage({ title, matches, side, level }) {
+  const hasPairs = matches.length > 1;
+  const pairs = [];
+  if (hasPairs) {
+    for (let i = 0; i < matches.length; i += 2) {
+      pairs.push(matches.slice(i, i + 2));
+    }
+  }
   return (
-    <section className={`bracket-stage ${side} ${level}`}>
+    <section className={`bracket-stage ${side} ${level}${hasPairs ? " has-pairs" : ""}`}>
       <h4>{title}</h4>
       <div className="bracket-stage-list">
-        {matches.map((match) => (
-          <BracketMatchCard match={match} key={match.id} />
-        ))}
+        {hasPairs
+          ? pairs.map((pair) => (
+              <div className="bracket-pair" key={pair[0].id}>
+                {pair.map((match) => (
+                  <BracketMatchCard match={match} key={match.id} />
+                ))}
+              </div>
+            ))
+          : matches.map((match) => (
+              <BracketMatchCard match={match} key={match.id} />
+            ))}
       </div>
     </section>
   );
