@@ -2898,6 +2898,10 @@ h3 {
   opacity: 0.6;
 }
 
+.bracket-team.projected {
+  opacity: 0.85;
+}
+
 .bracket-pending-label {
   flex: 1;
   min-width: 0;

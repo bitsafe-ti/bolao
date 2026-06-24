@@ -2755,8 +2755,8 @@ function BracketMatchCard({ match, final = false }) {
         {isProjected && <small>Projeção</small>}
       </header>
       {[match.home, match.away].map((slot, index) => (
-        <div className={`bracket-team${slot.confirmed === false ? " pending" : ""}`} key={`${match.id}-${index}`}>
-          {slot.confirmed !== false ? (
+        <div className={`bracket-team${!slot.teamId ? " pending" : slot.confirmed === false ? " projected" : ""}`} key={`${match.id}-${index}`}>
+          {slot.teamId ? (
             <TeamName teamId={slot.teamId} fallback={slot.name || slot.label} />
           ) : (
             <span className="bracket-pending-label">{slot.label}</span>
