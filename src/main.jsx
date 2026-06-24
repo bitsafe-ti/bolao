@@ -1113,7 +1113,7 @@ function App() {
               <h1>{tab === "profile" ? "Perfil" : visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
             </div>
           </div>
-          <img src={AUTH_LOGO_URL} alt="Bolão Copa 2026" className="topbar-logo-mobile" />
+          <img src={FAVICON_URL} alt="Bolão Copa 2026" className="topbar-logo-mobile" />
           <div className="topbar-user-menu" ref={userMenuRef}>
             <button
               type="button"
