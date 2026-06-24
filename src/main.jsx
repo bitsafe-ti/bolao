@@ -60,6 +60,7 @@ const PRIZE_DISTRIBUTION = [
 ];
 const AUTH_LOGO_URL = `${import.meta.env.BASE_URL}logo_bolao_transparente.png`;
 const FAVICON_URL = `${import.meta.env.BASE_URL}favicon.svg`;
+const TACA_URL = `${import.meta.env.BASE_URL}taca.png`;
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
 
@@ -2682,7 +2683,9 @@ function KnockoutBracketBoard({ bracket }) {
 
             <div className="bracket-final-stage">
               <span className="bracket-final-kicker">Grande final</span>
-              <div className="bracket-final-trophy" aria-hidden="true"><WorldCupTrophy /></div>
+              <div className="bracket-final-trophy" aria-hidden="true">
+                <img src={TACA_URL} alt="Taça da Copa do Mundo 2026" />
+              </div>
               <BracketMatchCard match={bracket.rounds.final[0]} final />
               <strong>Campeão do mundo</strong>
               <small>Jogo 104</small>
