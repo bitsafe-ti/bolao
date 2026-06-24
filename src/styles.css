@@ -486,6 +486,11 @@ select:focus {
   border-color: var(--line-warm);
 }
 
+.topbar-user-button.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
 .profile-avatar {
   display: inline-flex;
   align-items: center;
@@ -898,8 +903,9 @@ h3 {
   gap: 12px;
 }
 
-.profile-modal {
-  width: min(100%, 640px);
+.profile-page {
+  width: min(100%, 760px);
+  margin: 0 auto;
 }
 
 .profile-form {
@@ -1001,6 +1007,15 @@ h3 {
   color: var(--success);
   font-size: 0.9rem;
   font-weight: 800;
+}
+
+.profile-page-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.profile-page-actions button {
+  min-width: 160px;
 }
 
 .admin-menu-modal {
@@ -3497,8 +3512,8 @@ tr:last-child td {
     grid-column: auto;
   }
 
-  .profile-modal {
-    padding: 16px;
+  .profile-page-actions button {
+    width: 100%;
   }
 
   .result-accordion-toggle {

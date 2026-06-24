@@ -253,7 +253,6 @@ function App() {
   const [draftPredictions, setDraftPredictions] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState("participants");
   const [historyTeamId, setHistoryTeamId] = useState("");
   const [clockNow, setClockNow] = useState(() => new Date());
@@ -505,7 +504,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!visibleTabs.some((item) => item.id === tab)) {
+    if (tab !== "profile" && !visibleTabs.some((item) => item.id === tab)) {
       setTab("predictions");
     }
   }, [tab, visibleTabs]);
@@ -1052,29 +1051,20 @@ function App() {
         />
       )}
 
-      {profileModalOpen && (
-        <ProfileModal
-          user={currentUser}
-          participant={userParticipant}
-          onClose={() => setProfileModalOpen(false)}
-          onSave={saveProfile}
-        />
-      )}
-
       <section className="workspace" ref={workspaceRef}>
         <header className="topbar">
           <div className="topbar-left">
             <button type="button" className="hamburger" aria-label="Abrir menu" onClick={() => setMobileMenuOpen(true)}>☰</button>
             <div className="topbar-title">
               <p className="eyebrow">Copa do Mundo 2026</p>
-              <h1>{visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
+              <h1>{tab === "profile" ? "Perfil" : visibleTabs.find((item) => item.id === tab)?.label ?? "Bolão"}</h1>
             </div>
           </div>
           <button
             type="button"
-            className="topbar-user topbar-user-button"
+            className={`topbar-user topbar-user-button${tab === "profile" ? " active" : ""}`}
             aria-label="Abrir perfil"
-            onClick={() => setProfileModalOpen(true)}
+            onClick={() => handleTabClick("profile")}
           >
             <UserAvatar user={currentUser} />
             <div className="topbar-user-info">
@@ -1083,6 +1073,14 @@ function App() {
             </div>
           </button>
         </header>
+
+        {tab === "profile" && (
+          <ProfilePage
+            user={currentUser}
+            participant={userParticipant}
+            onSave={saveProfile}
+          />
+        )}
 
         {tab === "settings" && isAdmin && (
           <section className="panel settings-navigation-panel">
@@ -1537,7 +1535,7 @@ function UserAvatar({ user, large = false }) {
   );
 }
 
-function ProfileModal({ user, participant, onClose, onSave }) {
+function ProfilePage({ user, participant, onSave }) {
   const [form, setForm] = useState(() => ({
     name: user.name || participant?.name || "",
     email: user.email || participant?.email || "",
@@ -1549,14 +1547,6 @@ function ProfileModal({ user, participant, onClose, onSave }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    function handleKeyDown(event) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
 
   function changeField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -1607,23 +1597,13 @@ function ProfileModal({ user, participant, onClose, onSave }) {
   const previewUser = { ...user, name: form.name, avatarUrl: form.avatarUrl };
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <section
-        className="modal-card profile-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="profile-modal-title"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="modal-header">
-          <div>
-            <p className="eyebrow">Minha conta</p>
-            <h2 id="profile-modal-title">Editar perfil</h2>
-          </div>
-          <button type="button" className="modal-close" aria-label="Fechar modal" onClick={onClose}>×</button>
-        </div>
-
-        <form className="modal-form profile-form" onSubmit={submitProfile}>
+    <section className="panel profile-page" aria-labelledby="profile-page-title">
+      <SectionHeader
+        title="Meu perfil"
+        caption="Atualize sua foto, seus dados de acesso e suas informações pessoais."
+        titleId="profile-page-title"
+      />
+      <form className="modal-form profile-form" onSubmit={submitProfile}>
           <div className="profile-photo-section">
             <UserAvatar user={previewUser} large />
             <div className="profile-photo-copy">
@@ -1676,13 +1656,11 @@ function ProfileModal({ user, participant, onClose, onSave }) {
           {error && <p className="form-error profile-feedback">{error}</p>}
           {success && <p className="profile-success profile-feedback">{success}</p>}
 
-          <div className="modal-actions">
-            <button type="button" className="ghost" onClick={onClose}>Cancelar</button>
+          <div className="profile-page-actions">
             <button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar perfil"}</button>
           </div>
-        </form>
-      </section>
-    </div>
+      </form>
+    </section>
   );
 }
 
@@ -1779,8 +1757,8 @@ function Flag({ team }) {
   return <img className="flag" src={getFlagUrl(team)} alt={`Bandeira: ${team.name}`} loading="lazy" />;
 }
 
-function SectionHeader({ title, caption }) {
-  return <header className="section-header"><h2>{title}</h2><p>{caption}</p></header>;
+function SectionHeader({ title, caption, titleId }) {
+  return <header className="section-header"><h2 id={titleId}>{title}</h2><p>{caption}</p></header>;
 }
 
 function ScoreInput({ value, onChange, disabled = false }) {
