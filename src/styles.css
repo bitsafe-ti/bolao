@@ -254,7 +254,7 @@ select:focus {
   width: auto;
   object-fit: contain;
   justify-self: center;
-  filter: grayscale(1) contrast(1.2) brightness(0.72);
+  filter: brightness(0.5) sepia(1) saturate(4) hue-rotate(318deg) brightness(0.75);
   opacity: 0.95;
 }
 
@@ -391,14 +391,14 @@ select:focus {
   height: 56px;
   object-fit: contain;
   object-position: center;
-  filter: grayscale(1) contrast(1.2) brightness(0.72);
+  filter: brightness(0.5) sepia(1) saturate(4) hue-rotate(318deg) brightness(0.75);
 }
 
 .brand-favicon {
   width: 42px;
   height: 42px;
   object-fit: contain;
-  filter: grayscale(1) contrast(1.2) brightness(0.72);
+  filter: brightness(0.5) sepia(1) saturate(4) hue-rotate(318deg) brightness(0.75);
 }
 
 .workspace {
