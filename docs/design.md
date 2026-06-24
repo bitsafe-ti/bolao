@@ -256,9 +256,9 @@ Profundidade e intencionalmente contida. O sistema favorece contraste tonal, sur
 ### Shell de Layout
 
 O app-shell usa flex-row com sidebar fixa e área de workspace:
-- **Sidebar expandida:** 240px, `padding: 22px 14px`, bg `#1E2026`, borda-direita `1px solid rgba(255,255,255,0.07)`
+- **Sidebar expandida:** 240px, `padding: 22px 14px`, bg `#ffffff`, `border-right: 1px solid var(--line)`
 - **Sidebar colapsada:** 56px, `padding: 22px 4px 14px` — o `padding-top: 22px` é idêntico ao expandido para alinhar o brand-block com o topbar (topbar termina em y=95: `padding 16px + altura 73px`)
-- **Workspace:** `padding: 22px`, background `var(--bg, #F5F5F5)`
+- **Workspace:** `padding: 22px`, background `#ffffff`
 - **Topbar:** `min-height: 73px`, bg `#ffffff`, `border-bottom: 1px solid #E6E8EA`, sticky no topo
 
 ### Sidebar — Brand Block
@@ -269,20 +269,30 @@ O app-shell usa flex-row com sidebar fixa e área de workspace:
 ```
 O filtro converte imagens PNG brancas para `#BD2124`. Logo expandida: `logo_bolao_transparente.png`. Logo colapsada: `gb.png`.
 
-### Sidebar — Navegação
+### Padrão Universal de Item de Navegação Ativo
 
-Botão de tab ativo:
+> **Regra:** todo item de navegação do projeto usa este padrão de estado ativo, sem exceção.
+
 ```css
-background: rgba(189, 33, 36, 0.12);
-color: #f87171;
-border-left: 3px solid #BD2124;
+/* Estado base (inativo) */
+border-left: 3px solid transparent;
+color: var(--muted);          /* #848e9c */
+background: transparent;
+
+/* Estado ativo */
+background: #FFF1F1;
+border-left-color: #BD2124;
+color: #BD2124;
+font-weight: 600;
+
+/* Hover (apenas quando inativo) */
+background: #F5F5F5;
+color: var(--text);
 ```
 
-Hover (inativo):
-```css
-background: rgba(255, 255, 255, 0.06);
-color: #f0f0f0;
-```
+Aplica-se a: `.tabs button` (sidebar principal), `.settings-sidenav nav button` (settings), e qualquer nova área de navegação adicionada ao projeto.
+
+Mobile: substitui `border-left` por `border-bottom` quando os itens ficam horizontais.
 
 Colapsado — ícone único + tooltip via CSS:
 ```css

@@ -66,9 +66,23 @@
 | `ranking` | Ranking | `faMedal` |
 | `settings` | Configurações | `faGear` *(admin only)* |
 
-- Aba ativa: `background: #FFF1F1`, `color: #BD2124`, borda esquerda `#BD2124`
-- Hover: `background: #F5F5F5`
-- Colapsado: só ícone + tooltip via `::after { content: attr(data-label) }`
+**Padrão de estado ativo (regra universal de navegação):**
+```css
+/* base */
+border-left: 3px solid transparent;
+color: var(--muted);
+
+/* ativo */
+background: #FFF1F1;
+border-left-color: #BD2124;
+color: #BD2124;
+font-weight: 600;
+
+/* hover (inativo) */
+background: #F5F5F5;
+color: var(--text);
+```
+Este padrão se aplica a **todos os itens de navegação** do projeto: sidebar principal, settings sidenav e qualquer nova área de navegação.
 
 ### Persistência de navegação
 - `tab` e `settingsTab` salvos em `sessionStorage` (`bol-tab`, `bol-settings-tab`)
@@ -112,6 +126,7 @@ Layout: `.settings-layout` (flex-row) → `.settings-sidenav` (200px) + `.settin
 | Ghost | `.ghost` | border `var(--line)`, bg transparente |
 | Destrutivo | `.ghost.danger` | border + texto `#BD2124` |
 | Utilitário | *(sidebar-actions)* | bg transparente, texto `var(--muted-light)` |
+| Nav ativo | `.tabs button.active` / `.settings-sidenav nav button.active` | bg `#FFF1F1`, `border-left: 3px solid #BD2124`, texto `#BD2124` |
 
 ### Modal
 ```html

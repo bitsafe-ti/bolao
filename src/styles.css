@@ -727,24 +727,22 @@ h3 {
   gap: 10px;
   justify-content: flex-start;
   background: transparent;
-  border: 1px solid transparent;
-  color: var(--text);
+  border: none;
+  border-left: 3px solid transparent;
+  color: var(--muted);
   font-weight: 500;
   min-height: 40px;
   padding: 10px 12px;
   text-align: left;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .tab-icon {
   flex: 0 0 16px;
   width: 16px;
   text-align: center;
-  color: var(--muted);
+  color: inherit;
   transition: color 0.15s;
-}
-
-.tabs button.active .tab-icon {
-  color: var(--primary);
 }
 
 .tab-label {
@@ -754,13 +752,13 @@ h3 {
 
 .tabs button.active {
   background: var(--primary-soft);
-  border-color: var(--primary-soft);
+  border-left-color: var(--primary);
   color: var(--primary);
-  font-weight: 700;
+  font-weight: 600;
 }
 
-.tabs button:hover {
-  background: var(--soft);
+.tabs button:hover:not(.active) {
+  background: #f5f5f5;
   color: var(--text);
 }
 
