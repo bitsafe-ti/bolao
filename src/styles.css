@@ -398,6 +398,7 @@ select:focus {
   width: 42px;
   height: 42px;
   object-fit: contain;
+  filter: grayscale(1) contrast(1.2) brightness(0.72);
 }
 
 .workspace {
