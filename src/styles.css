@@ -666,6 +666,12 @@ select:focus {
   object-fit: cover;
 }
 
+.profile-avatar.protected {
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
 .topbar-user-info {
   display: flex;
   flex-direction: column;

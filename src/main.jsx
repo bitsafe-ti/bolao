@@ -1590,13 +1590,24 @@ function AuthScreen({ error, onLogin, onRegister }) {
   );
 }
 
-function UserAvatar({ user, large = false }) {
-  const className = `profile-avatar${large ? " large" : ""}`;
-  return user?.avatarUrl ? (
-    <span className={className} aria-hidden="true">
-      <img src={user.avatarUrl} alt="" />
-    </span>
-  ) : (
+function UserAvatar({ user, large = false, protect = false }) {
+  const className = `profile-avatar${large ? " large" : ""}${protect ? " protected" : ""}`;
+  if (user?.avatarUrl) {
+    return protect ? (
+      <span
+        className={className}
+        aria-hidden="true"
+        style={{ backgroundImage: `url(${user.avatarUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
+        onContextMenu={e => e.preventDefault()}
+        draggable={false}
+      />
+    ) : (
+      <span className={className} aria-hidden="true">
+        <img src={user.avatarUrl} alt="" />
+      </span>
+    );
+  }
+  return (
     <span className={className} aria-hidden="true">{getUserInitials(user?.name)}</span>
   );
 }
@@ -1989,7 +2000,7 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
                   </td>
                   <td className="participant-cell">
                     <div className="ranking-participant">
-                      <UserAvatar user={participant} />
+                      <UserAvatar user={participant} protect />
                       <span>{participant.name}</span>
                     </div>
                   </td>
@@ -2517,7 +2528,7 @@ function PrizePodium({ ranking, totalPoolValue }) {
         {podium.map(({ rank, participant, prize }) => (
           <article className={`podium-place podium-place-${rank}`} key={prize.label}>
             <div className="podium-profile" aria-label={`${rank}º lugar`}>
-              <UserAvatar user={participant ?? { name: "Aguardando participante" }} />
+              <UserAvatar user={participant ?? { name: "Aguardando participante" }} protect />
               <span className="podium-trophy" aria-hidden="true">
                 <img
                   src={rank === 1 ? TACA_URL : rank === 2 ? TACA_PRATA_URL : TACA_BRONZE_URL}
