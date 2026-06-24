@@ -2943,6 +2943,7 @@ h3 {
   flex-direction: column;
   gap: 10px;
   text-align: center;
+  padding-bottom: 44px;
 }
 
 .bracket-final-kicker {
@@ -2967,6 +2968,23 @@ h3 {
 .bracket-final-stage .bracket-match-card {
   width: 100%;
   border: 2px solid #e7bd28;
+}
+
+.bracket-final-stage .bracket-match-card::before,
+.bracket-final-stage .bracket-match-card::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  border-top: 2px solid #aeb8c6;
+}
+
+.bracket-final-stage .bracket-match-card::before {
+  left: -11px;
+}
+
+.bracket-final-stage .bracket-match-card::after {
+  right: -11px;
 }
 
 .bracket-final-stage > strong {
