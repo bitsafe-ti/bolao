@@ -2691,24 +2691,6 @@ function KnockoutBracketBoard({ bracket }) {
         </strong>
       </div>
 
-      <details className="third-place-section">
-        <summary>
-          <span>Melhores terceiros colocados</span>
-          <strong>{qualifiedThirds.length} de 8 vagas projetadas</strong>
-        </summary>
-        <div className="third-place-ranking">
-          {bracket.thirdPlacedTeams.map((team) => (
-            <article className={team.qualified ? "qualified" : "outside"} key={team.teamId}>
-              <span className="third-place-position">{team.thirdPlaceRank}º</span>
-              <TeamName teamId={team.teamId} fallback={team.name} />
-              <span className="third-place-group">Grupo {team.group}</span>
-              <strong>{team.points} pts</strong>
-              <small>SG {team.goalDiff > 0 ? `+${team.goalDiff}` : team.goalDiff}</small>
-            </article>
-          ))}
-        </div>
-      </details>
-
       <section className="knockout-tree-section" aria-labelledby="knockout-tree-title">
         <div className="knockout-subheading">
           <div>
