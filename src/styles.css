@@ -3991,7 +3991,6 @@ tr:last-child td {
     padding: 10px 14px;
     flex-wrap: nowrap;
     top: -14px;
-    position: relative;
   }
 
   .topbar-logo-mobile {
