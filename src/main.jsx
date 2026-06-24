@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faTrophy, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup, faSitemap, faMedal, faGear, faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import {
   calculateRanking,
   clearedOpeningPredictionMatchIds,
@@ -59,6 +59,7 @@ const PRIZE_DISTRIBUTION = [
   { label: "3º lugar", percent: 20 }
 ];
 const AUTH_LOGO_URL = `${import.meta.env.BASE_URL}logo_bolao_transparente.png`;
+const FAVICON_URL = `${import.meta.env.BASE_URL}favicon.svg`;
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
 
@@ -135,16 +136,16 @@ function withTimeout(promise, timeoutMs, message) {
 }
 
 const userTabs = [
-  { id: "predictions", label: "Palpites" },
-  { id: "results", label: "Resultados" },
-  { id: "groups", label: "Grupos" },
-  { id: "bracket", label: "Chaveamento" },
-  { id: "ranking", label: "Ranking" }
+  { id: "predictions", label: "Palpites", icon: faFutbol },
+  { id: "results", label: "Resultados", icon: faListCheck },
+  { id: "groups", label: "Grupos", icon: faLayerGroup },
+  { id: "bracket", label: "Chaveamento", icon: faSitemap },
+  { id: "ranking", label: "Ranking", icon: faMedal }
 ];
 
 const adminTabs = [
   ...userTabs,
-  { id: "settings", label: "Configurações" }
+  { id: "settings", label: "Configurações", icon: faGear }
 ];
 
 const settingsTabs = [
@@ -1037,13 +1038,25 @@ function App() {
       {mobileMenuOpen && <div className="menu-overlay" onClick={() => setMobileMenuOpen(false)} />}
       <aside className={`sidebar${mobileMenuOpen ? " open" : ""}${sidebarCollapsed ? " collapsed" : ""}`}>
         <div className="brand-block">
-          <img src={AUTH_LOGO_URL} alt="Bolão Grupo Bit" fetchPriority="high" />
+          {sidebarCollapsed
+            ? <img src={FAVICON_URL} className="brand-favicon" alt="Bolão" />
+            : <img src={AUTH_LOGO_URL} alt="Bolão Grupo Bit" fetchPriority="high" />
+          }
           <button type="button" className="menu-close" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>×</button>
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+            onClick={() => setSidebarCollapsed((v) => !v)}
+          >
+            <FontAwesomeIcon icon={sidebarCollapsed ? faChevronRight : faChevronLeft} />
+          </button>
         </div>
         <nav className="tabs" aria-label="Seções do bolão">
           {visibleTabs.map((item) => (
-            <button type="button" className={tab === item.id ? "active" : ""} key={item.id} onClick={() => handleTabClick(item.id)}>
-              {item.label}
+            <button type="button" className={tab === item.id ? "active" : ""} key={item.id} onClick={() => handleTabClick(item.id)} data-label={item.label}>
+              {item.icon && <FontAwesomeIcon icon={item.icon} className="tab-icon" />}
+              <span className="tab-label">{item.label}</span>
             </button>
           ))}
         </nav>
@@ -1051,14 +1064,6 @@ function App() {
           <div className="sidebar-actions">
             <button type="button" onClick={logoutUser}>Sair</button>
           </div>
-          <button
-            type="button"
-            className="sidebar-collapse-btn"
-            aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
-            onClick={() => setSidebarCollapsed((v) => !v)}
-          >
-            {sidebarCollapsed ? "▶" : "◀"}
-          </button>
         </div>
       </aside>
 
