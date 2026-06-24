@@ -318,8 +318,8 @@ Fecha ao clicar fora: `useRef` + `document.addEventListener("mousedown")` removi
 ### Settings — Layout Dois-Colunas
 
 ```css
-.settings-layout { display: flex; align-items: flex-start; gap: 20px; }
-.settings-sidenav { width: 200px; flex-shrink: 0; position: sticky; top: 0; }
+.settings-layout { display: flex; align-items: flex-start; gap: 0; }
+.settings-sidenav { width: 220px; flex-shrink: 0; position: sticky; top: 0; border-right: 1px solid var(--line); margin-right: 32px; }
 .settings-content { flex: 1; min-width: 0; }
 @media (max-width: 860px) { .settings-layout { flex-direction: column; }
   .settings-sidenav { width: 100%; position: static; } }

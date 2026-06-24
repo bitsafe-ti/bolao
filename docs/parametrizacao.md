@@ -96,7 +96,7 @@ Este padrão se aplica a **todos os itens de navegação** do projeto: sidebar p
 | `rounds` | Rodadas |
 | `audit` | Logs do sistema |
 
-Layout: `.settings-layout` (flex-row) → `.settings-sidenav` (200px) + `.settings-content` (flex 1)
+Layout: `.settings-layout` (flex-row) → `.settings-sidenav` (220px) + `.settings-content` (flex 1)
 
 ---
 
@@ -108,8 +108,9 @@ Layout: `.settings-layout` (flex-row) → `.settings-sidenav` (200px) + `.settin
   <!-- SectionHeader + conteúdo -->
 </section>
 ```
-- `background: #ffffff`, `border-radius: 12px`, `border: 1px solid var(--line)`
-- `padding: 20px`, `box-shadow: 0 1px 2px rgba(30,32,38,0.04)`
+- `padding: 20px` — apenas espaçamento interno, sem borda, raio ou sombra
+- Visual flat sobre o fundo branco da página (`--bg: #ffffff`)
+- Não usar `.panel` para criar separação visual por card; usar separadores tipográficos ou `border-bottom` se necessário
 
 ### SectionHeader
 ```jsx
