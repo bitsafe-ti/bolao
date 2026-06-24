@@ -2682,6 +2682,11 @@ function KnockoutBracketBoard({ bracket }) {
         caption="Confrontos da rodada de 32 definidos pela classificação dos grupos."
       />
 
+      <p className="knockout-note">
+        A ordem considera pontos, saldo de gols, gols marcados e vitórias. Enquanto houver jogos pendentes,
+        qualquer resultado novo pode alterar os classificados e os confrontos projetados.
+      </p>
+
       <div className={`knockout-status ${bracket.groupsComplete ? "confirmed" : "projected"}`}>
         <span>{bracket.groupsComplete ? "Classificação encerrada" : "Projeção ao vivo"}</span>
         <strong>
@@ -2725,10 +2730,6 @@ function KnockoutBracketBoard({ bracket }) {
         </div>
       </section>
 
-      <p className="knockout-note">
-        A ordem considera pontos, saldo de gols, gols marcados e vitórias. Enquanto houver jogos pendentes,
-        qualquer resultado novo pode alterar os classificados e os confrontos projetados.
-      </p>
     </section>
   );
 }

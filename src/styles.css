@@ -2854,7 +2854,7 @@ h3 {
 .bracket-team {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 5px;
   min-height: 34px;
   padding: 5px 7px;
@@ -2867,7 +2867,6 @@ h3 {
 .bracket-team .team-name {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -2889,7 +2888,6 @@ h3 {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  margin-left: auto;
   width: 17px;
   height: 17px;
   border-radius: 5px;
@@ -2977,8 +2975,10 @@ h3 {
 
 .knockout-note {
   margin: 0;
-  border-top: 1px solid var(--line);
-  padding-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: var(--soft);
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.5;
