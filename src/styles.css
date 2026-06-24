@@ -3092,6 +3092,24 @@ tbody tr:hover {
   font-weight: 800;
 }
 
+.ranking-participant {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ranking-participant .profile-avatar {
+  width: 34px;
+  height: 34px;
+  font-size: 0.7rem;
+}
+
+.ranking-participant > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .points-pill {
   align-items: center;
   background: var(--secondary-soft);

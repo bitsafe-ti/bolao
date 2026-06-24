@@ -1944,7 +1944,12 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
                       {compact && index === 0 ? <FontAwesomeIcon icon={faTrophy} title="Primeiro colocado" /> : rankOffset + index + 1}
                     </span>
                   </td>
-                  <td className="participant-cell">{participant.name}</td>
+                  <td className="participant-cell">
+                    <div className="ranking-participant">
+                      <UserAvatar user={participant} />
+                      <span>{participant.name}</span>
+                    </div>
+                  </td>
                   <td><strong className="points-pill">{participant.total}</strong></td>
                   <td>{participant.exactScores}</td>
                   <td>{participant.winnerHits}</td>
