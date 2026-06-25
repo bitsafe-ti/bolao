@@ -1691,6 +1691,172 @@ h3 {
   text-align: center;
 }
 
+.score-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.score-stepper-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  border: none;
+  font-size: 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 150ms, color 150ms;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.score-stepper-btn:hover:not(:disabled) {
+  background: var(--primary);
+  color: #fff;
+}
+
+.score-stepper-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.score-stepper-value {
+  min-width: 36px;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--primary);
+}
+
+.score-stepper-disabled .score-stepper-value {
+  color: var(--text-muted);
+}
+
+.stats-modal {
+  max-width: 480px;
+  width: min(100%, 480px);
+}
+
+.stats-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stats-modal-header h2 {
+  font-size: 1.1rem;
+  margin: 0 0 2px;
+}
+
+.stats-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.stats-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.stats-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.stats-tile strong {
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.stats-tile span {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.stats-tile-exact strong { color: #0ecb81; }
+.stats-tile-winner strong { color: var(--primary); }
+.stats-tile-miss strong { color: var(--text-muted); }
+.stats-tile-rate strong { color: #d0980b; }
+
+.stats-rounds-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+}
+
+.stats-rounds-table th,
+.stats-rounds-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.stats-rounds-table th {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.stats-rounds-table td:not(:first-child) {
+  text-align: center;
+}
+
+.stats-rounds-table th:not(:first-child) {
+  text-align: center;
+}
+
+.stats-best-round {
+  background: #fffbeb;
+}
+
+.stats-best-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.65rem;
+  background: #d0980b;
+  color: #fff;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.stats-goals-line {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+  text-align: right;
+}
+
+.notif-active {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.notif-denied {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .select-label {
   display: grid;
   gap: 7px;

@@ -179,16 +179,23 @@ export function calculateRanking(participants, matches, predictions) {
         return { matchId: match.id, points };
       });
 
+      const totalGoalsPredicted = Object.values(participantPredictions).reduce((sum, p) => {
+        const h = parseInt(p?.home, 10);
+        const a = parseInt(p?.away, 10);
+        return sum + (Number.isNaN(h) ? 0 : h) + (Number.isNaN(a) ? 0 : a);
+      }, 0);
+
       return {
         ...participant,
         total: perMatch.reduce((sum, item) => sum + item.points, 0),
         exactScores: perMatch.filter((item) => item.points === 3).length,
         winnerHits: perMatch.filter((item) => item.points === 1).length,
         scoredMatches: perMatch.filter((item) => item.points > 0).length,
-        predictedMatches: matches.filter((match) => hasSavedPrediction(participantPredictions?.[match.id])).length
+        predictedMatches: matches.filter((match) => hasSavedPrediction(participantPredictions?.[match.id])).length,
+        totalGoalsPredicted
       };
     })
-    .sort((a, b) => b.total - a.total || b.exactScores - a.exactScores || b.winnerHits - a.winnerHits || a.name.localeCompare(b.name));
+    .sort((a, b) => b.total - a.total || b.exactScores - a.exactScores || b.winnerHits - a.winnerHits || b.totalGoalsPredicted - a.totalGoalsPredicted || a.name.localeCompare(b.name));
 }
 
 export function normalizeUsers(users, superAdminEmails = new Set()) {

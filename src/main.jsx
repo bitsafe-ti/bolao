@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup, faSitemap, faMedal, faGear, faChevronLeft, faChevronRight, faRightFromBracket, faUser, faUsers, faCalendarDays, faClipboardList } from "@fortawesome/free-solid-svg-icons";
+import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup, faSitemap, faMedal, faGear, faChevronLeft, faChevronRight, faRightFromBracket, faUser, faUsers, faCalendarDays, faClipboardList, faChartSimple, faBell } from "@fortawesome/free-solid-svg-icons";
 import {
   calculateRanking,
   clearedOpeningPredictionMatchIds,
@@ -337,6 +337,9 @@ function App() {
   const [clockNow, setClockNow] = useState(() => new Date());
   const [predictionScrollRequest, setPredictionScrollRequest] = useState(0);
   const [resultScrollRequest, setResultScrollRequest] = useState(0);
+  const [notifPermission, setNotifPermission] = useState(() => {
+    try { return "Notification" in window ? Notification.permission : "unsupported"; } catch { return "unsupported"; }
+  });
   const workspaceRef = useRef(null);
   const predictionTargetRef = useRef(null);
   const resultTargetRef = useRef(null);
@@ -1188,6 +1191,29 @@ function App() {
         </nav>
         <div className="sidebar-footer">
           <div className="sidebar-actions">
+            {notifPermission !== "unsupported" && notifPermission !== "granted" && (
+              <button
+                type="button"
+                data-label="Notificações"
+                className={notifPermission === "denied" ? "notif-denied" : ""}
+                title={notifPermission === "denied" ? "Notificações bloqueadas no navegador" : "Ativar lembretes de jogos"}
+                onClick={async () => {
+                  if (notifPermission === "denied") return;
+                  const result = await Notification.requestPermission();
+                  setNotifPermission(result);
+                  if (result === "granted") new Notification("Bolão Copa 2026", { body: "Notificações ativadas! Você será lembrado antes dos jogos.", icon: "/favicon.png" });
+                }}
+              >
+                <FontAwesomeIcon icon={faBell} className="tab-icon" />
+                <span className="tab-label">{notifPermission === "denied" ? "Notif. bloqueadas" : "Ativar notificações"}</span>
+              </button>
+            )}
+            {notifPermission === "granted" && (
+              <button type="button" data-label="Notificações" className="notif-active" title="Notificações ativas">
+                <FontAwesomeIcon icon={faBell} className="tab-icon" />
+                <span className="tab-label">Notificações ativas</span>
+              </button>
+            )}
             <button type="button" data-label="Sair" onClick={logoutUser}>
               <FontAwesomeIcon icon={faRightFromBracket} className="tab-icon" />
               <span className="tab-label">Sair</span>
@@ -1978,7 +2004,14 @@ function SectionHeader({ title, caption, titleId }) {
 }
 
 function ScoreInput({ label, value, onChange, disabled = false }) {
-  return <input aria-label={label} className="score-input" disabled={disabled} min="0" inputMode="numeric" type="number" value={value} onChange={(event) => onChange(event.target.value)} placeholder="0" />;
+  const current = Math.max(0, parseInt(value, 10) || 0);
+  return (
+    <div className={`score-stepper${disabled ? " score-stepper-disabled" : ""}`} aria-label={label}>
+      <button type="button" className="score-stepper-btn" disabled={disabled || current <= 0} onClick={() => onChange(String(current - 1))} aria-label="Diminuir">−</button>
+      <span className="score-stepper-value">{current}</span>
+      <button type="button" className="score-stepper-btn" disabled={disabled} onClick={() => onChange(String(current + 1))} aria-label="Aumentar">+</button>
+    </div>
+  );
 }
 
 function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, onRemove, canRemove = true, removeLabel = "Remover", protectedUserId = "" }) {
@@ -2115,6 +2148,7 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
   const rankOffset = 0;
   const hasLiveMatches = matches.some(isMatchLive);
   const [auditParticipant, setAuditParticipant] = useState(null);
+  const [statsParticipant, setStatsParticipant] = useState(null);
 
   return (
     <section className="panel table-panel">
@@ -2128,7 +2162,7 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
       {displayedRanking.length ? (
         <div className="table-wrap">
           <table className="ranking-table">
-            <thead><tr><th>Colocação</th><th>Participante</th><th>Pontos</th><th>Cravados</th><th>Acertos 1 pt</th><th>Jogos pontuados</th>{!compact && <th>Auditoria</th>}</tr></thead>
+            <thead><tr><th>Colocação</th><th>Participante</th><th>Pontos</th><th>Cravados</th><th>Acertos 1 pt</th><th>Jogos pontuados</th>{!compact && <th>Stats</th>}{!compact && <th>Auditoria</th>}</tr></thead>
             <tbody>
               {displayedRanking.map((participant, index) => (
                 <tr key={participant.id}>
@@ -2149,7 +2183,14 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
                   <td>{participant.scoredMatches}</td>
                   {!compact && (
                     <td className="audit-cell">
-                      <button type="button" className="audit-eye-btn" onClick={() => setAuditParticipant(participant)} aria-label={`Ver auditoria de ${participant.name}`} title={`Ver auditoria de ${participant.name}`}>
+                      <button type="button" className="audit-eye-btn" onClick={() => setStatsParticipant(participant)} aria-label={`Ver estatísticas de ${participant.name}`} title="Estatísticas">
+                        <FontAwesomeIcon icon={faChartSimple} />
+                      </button>
+                    </td>
+                  )}
+                  {!compact && (
+                    <td className="audit-cell">
+                      <button type="button" className="audit-eye-btn" onClick={() => setAuditParticipant(participant)} aria-label={`Ver auditoria de ${participant.name}`} title="Auditoria de palpites">
                         <FontAwesomeIcon icon={faEye} />
                       </button>
                     </td>
@@ -2183,6 +2224,14 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
             <RankingPrizeNote />
           </div>
         </div>
+      )}
+      {statsParticipant && (
+        <ParticipantStatsModal
+          participant={statsParticipant}
+          matches={matches}
+          predictions={predictions}
+          onClose={() => setStatsParticipant(null)}
+        />
       )}
       {auditParticipant && (
         <AuditModal
@@ -2774,8 +2823,72 @@ function RankingTiebreakerCard() {
       <ol>
         <li><strong>1</strong><span>Maior número de placares cravados.</span></li>
         <li><strong>2</strong><span>Maior número de acertos de 1 ponto.</span></li>
-        <li><strong>3</strong><span>Persistindo o empate, prevalece a ordem alfabética.</span></li>
+        <li><strong>3</strong><span>Maior total de gols palpitados no torneio.</span></li>
+        <li><strong>4</strong><span>Persistindo o empate, prevalece a ordem alfabética.</span></li>
       </ol>
+    </div>
+  );
+}
+
+function ParticipantStatsModal({ participant, matches, predictions, onClose }) {
+  const participantPredictions = predictions[participant.id] ?? {};
+  const rounds = {};
+  for (const match of matches) {
+    const round = getMatchRound(match);
+    if (!round) continue;
+    if (!rounds[round]) rounds[round] = { points: 0, exact: 0, winner: 0, miss: 0, scored: 0 };
+    const pred = participantPredictions[match.id];
+    if (!isMatchResultFinal(match)) continue;
+    const pts = scorePrediction(pred, match);
+    rounds[round].scored++;
+    rounds[round].points += pts;
+    if (pts === 3) rounds[round].exact++;
+    else if (pts === 1) rounds[round].winner++;
+    else rounds[round].miss++;
+  }
+  const allScored = Object.values(rounds).reduce((s, r) => s + r.scored, 0);
+  const allExact = Object.values(rounds).reduce((s, r) => s + r.exact, 0);
+  const allWinner = Object.values(rounds).reduce((s, r) => s + r.winner, 0);
+  const allMiss = Object.values(rounds).reduce((s, r) => s + r.miss, 0);
+  const approx = allScored > 0 ? Math.round((allExact + allWinner) / allScored * 100) : 0;
+  const sortedRounds = Object.entries(rounds).sort((a, b) => Number(a[0]) - Number(b[0]));
+  const bestRound = [...sortedRounds].sort((a, b) => b[1].points - a[1].points)[0]?.[0];
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box stats-modal" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="modal-close" onClick={onClose}>×</button>
+        <div className="stats-modal-header">
+          <UserAvatar user={participant} />
+          <div>
+            <h2>{participant.name}</h2>
+            <p className="stats-subtitle">{participant.total} pts · {approx}% de aproveitamento</p>
+          </div>
+        </div>
+        <div className="stats-overview-grid">
+          <div className="stats-tile stats-tile-exact"><strong>{allExact}</strong><span>Cravados</span></div>
+          <div className="stats-tile stats-tile-winner"><strong>{allWinner}</strong><span>Acertos 1pt</span></div>
+          <div className="stats-tile stats-tile-miss"><strong>{allMiss}</strong><span>Erros</span></div>
+          <div className="stats-tile stats-tile-rate"><strong>{approx}%</strong><span>Aproveitamento</span></div>
+        </div>
+        {sortedRounds.length > 0 && (
+          <table className="stats-rounds-table">
+            <thead><tr><th>Rodada</th><th>Pts</th><th>Cravados</th><th>1pt</th><th>Erros</th></tr></thead>
+            <tbody>
+              {sortedRounds.map(([round, r]) => (
+                <tr key={round} className={bestRound === round ? "stats-best-round" : ""}>
+                  <td>{getRoundDisplayName(Number(round))}{bestRound === round && <span className="stats-best-badge">melhor</span>}</td>
+                  <td><strong>{r.points}</strong></td>
+                  <td>{r.exact}</td>
+                  <td>{r.winner}</td>
+                  <td>{r.miss}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="stats-goals-line">Total de gols palpitados: <strong>{participant.totalGoalsPredicted ?? "—"}</strong></p>
+      </div>
     </div>
   );
 }

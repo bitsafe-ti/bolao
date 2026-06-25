@@ -1,0 +1,19 @@
+{
+  "name": "Bolão Copa do Mundo 2026",
+  "short_name": "Bolão Copa",
+  "description": "Faça seus palpites e dispute o Bolão Copa do Mundo 2026 com amigos.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#BD2124",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
