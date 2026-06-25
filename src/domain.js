@@ -206,7 +206,7 @@ function slotLabel(slot) {
 export function createKnockoutStageMatches() {
   const base = { date: null, ground: null, city: null, stadium: null, country: null, homeTeamId: null, awayTeamId: null, homeScore: "", awayScore: "", homeGoals: [], awayGoals: [] };
   return [
-    ...ROUND_OF_32_MATCHES.map((m) => ({ ...base, id: m.id, phase: "Rodada 32", round: 4, homeSlotLabel: slotLabel(m.home), awaySlotLabel: slotLabel(m.away) })),
+    ...ROUND_OF_32_MATCHES.map((m) => ({ ...base, id: m.id, phase: "Rodada 4", round: 4, homeSlotLabel: slotLabel(m.home), awaySlotLabel: slotLabel(m.away) })),
     ...KNOCKOUT_PATH.roundOf16.map((m) => ({ ...base, id: m.id, phase: "Oitavas de Final", round: 5, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` })),
     ...KNOCKOUT_PATH.quarterFinals.map((m) => ({ ...base, id: m.id, phase: "Quartas de Final", round: 6, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` })),
     ...KNOCKOUT_PATH.semiFinals.map((m) => ({ ...base, id: m.id, phase: "Semifinal", round: 7, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` })),
@@ -223,7 +223,7 @@ export function ensureKnockoutMatches(state) {
 }
 
 export function getKnockoutRoundLabel(round) {
-  const labels = { 4: "Rodada 32", 5: "Oitavas de Final", 6: "Quartas de Final", 7: "Semifinal", 8: "Final" };
+  const labels = { 5: "Oitavas de Final", 6: "Quartas de Final", 7: "Semifinal", 8: "Final" };
   return labels[round] ?? null;
 }
 
