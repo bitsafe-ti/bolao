@@ -102,8 +102,7 @@ function getLatestMatchId(matches, getTimestamp) {
 }
 
 export function getPredictionScrollTargetId(matches) {
-  const orderedMatches = [...(matches ?? [])].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  return orderedMatches.find(isMatchLive)?.id ?? null;
+  return getLatestResultMatchId(matches);
 }
 
 export function getLatestResultMatchId(matches) {

@@ -60,11 +60,13 @@ const PRIZE_DISTRIBUTION = [
 ];
 const AUTH_LOGO_URL = `${import.meta.env.BASE_URL}logo_bolao_transparente.png`;
 const FAVICON_URL = `${import.meta.env.BASE_URL}gb.png`;
+const LOGIN_BALL_URL = `${import.meta.env.BASE_URL}favicon.png`;
 const TACA_URL = `${import.meta.env.BASE_URL}taca.png`;
 const TACA_PRATA_URL = `${import.meta.env.BASE_URL}taca-p.png`;
 const TACA_BRONZE_URL = `${import.meta.env.BASE_URL}taca-b.png`;
 const WORLD_CUP_LOGO_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ab/2026_FIFA_World_Cup_emblem_%28horizontal_lockup%29.svg";
+const LOGIN_TRANSITION_MS = 1250;
 
 function loadSession() {
   try {
@@ -79,6 +81,10 @@ function saveSession(updates) {
   try {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...loadSession(), ...updates }));
   } catch {}
+}
+
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function loadCachedPoolState() {
@@ -251,6 +257,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState(() => { try { return sessionStorage.getItem("bol-tab") || "predictions"; } catch { return "predictions"; } });
   const [authError, setAuthError] = useState("");
+  const [loginTransitionActive, setLoginTransitionActive] = useState(false);
   const [syncStatus, setSyncStatus] = useState({ state: "idle", message: "Placares automáticos ativos." });
   const [sharedStatus, setSharedStatus] = useState({ state: "idle", message: "Carregando dados do bolão..." });
   const [selectedPredictionRound, setSelectedPredictionRound] = useState(null);
@@ -675,7 +682,11 @@ function App() {
       return;
     }
 
-    saveSession({ currentUserId: user.id, activeParticipantId: participant.id });
+    const session = { currentUserId: user.id, activeParticipantId: participant.id };
+    setAuthError("");
+    setLoginTransitionActive(true);
+    await wait(LOGIN_TRANSITION_MS);
+    saveSession(session);
     updateState((current) => appendAuditLog(
       {
         ...current,
@@ -686,7 +697,7 @@ function App() {
       },
       makeAuditEntry(cleanName, "user_registered", maskEmail(cleanEmail))
     ));
-    setAuthError("");
+    setLoginTransitionActive(false);
   }
 
   async function loginUser({ email, password }) {
@@ -698,15 +709,20 @@ function App() {
       return;
     }
     const session = { currentUserId: user.id, activeParticipantId: user.participantId || "" };
-    saveSession(session);
+    let migratedUser;
     if (hasLegacyPassword(user)) {
-      let migratedUser;
       try {
         migratedUser = await attachPasswordCredential(user, password);
       } catch (error) {
         setAuthError(error.message);
         return;
       }
+    }
+    setAuthError("");
+    setLoginTransitionActive(true);
+    await wait(LOGIN_TRANSITION_MS);
+    saveSession(session);
+    if (migratedUser) {
       updateState((current) => ({
         ...current,
         ...session,
@@ -715,10 +731,11 @@ function App() {
     } else {
       setState((current) => ({ ...current, ...session }));
     }
-    setAuthError("");
+    setLoginTransitionActive(false);
   }
 
   function logoutUser() {
+    setLoginTransitionActive(false);
     saveSession({ currentUserId: "", activeParticipantId: "" });
     setState((current) => ({ ...current, currentUserId: "", activeParticipantId: "" }));
   }
@@ -1055,6 +1072,10 @@ function App() {
     );
   }
 
+  if (loginTransitionActive && !currentUser) {
+    return <LoginTransitionScreen />;
+  }
+
   if (!currentUser) {
     return <AuthScreen error={authError} onLogin={loginUser} onRegister={registerUser} />;
   }
@@ -1149,7 +1170,7 @@ function App() {
         )}
 
         {tab === "settings" && isAdmin && (
-          <div className="settings-layout">
+          <div className={`settings-layout${settingsTab === "audit" ? " settings-layout-scroll" : ""}`}>
             <div className="settings-header">
               <p className="settings-header-title">Configurações</p>
               <nav className="settings-tabs-nav" aria-label="Seções de configurações">
@@ -1279,7 +1300,7 @@ function App() {
               )}
 
               {settingsTab === "audit" && (
-                <section className="panel">
+                <section className="panel audit-log-panel">
                   <SectionHeader title="Logs do sistema" caption={`${state.auditLogs?.length ?? 0} / ${AUDIT_LOG_LIMIT} registros`} />
                   <AuditLogPanel logs={state.auditLogs} />
                 </section>
@@ -1291,7 +1312,7 @@ function App() {
 
 
         {tab === "predictions" && (
-          <section className="panel">
+          <section className="panel predictions-panel">
             <SectionHeader title="Palpites" />
             <div className="prediction-toolbar single">
               <label className="select-label">
@@ -1507,6 +1528,17 @@ function TurnstileWidget({ onToken, resetKey }) {
         data-action="turnstile-spin-v1"
       />
     </div>
+  );
+}
+
+function LoginTransitionScreen() {
+  return (
+    <main className="login-transition-page" aria-live="polite" aria-busy="true">
+      <div className="login-transition-orbit">
+        <img src={LOGIN_BALL_URL} alt="Bolão Grupo Bit" className="login-transition-ball" />
+      </div>
+      <p>Entrando no bolão...</p>
+    </main>
   );
 }
 
@@ -2098,6 +2130,7 @@ function Confetti() {
 }
 
 function AuditModal({ participant, matches, predictions, onClose }) {
+  const latestAuditCardRef = useRef(null);
   const participantPredictions = predictions[participant.id] ?? {};
   const scoredMatches = matches
     .filter((match) => isMatchResultFinal(match) || isMatchLive(match))
@@ -2107,6 +2140,7 @@ function AuditModal({ participant, matches, predictions, onClose }) {
       const points = scorePrediction(prediction, match);
       return { match, prediction, points };
     });
+  const latestScoredMatchId = scoredMatches.at(-1)?.match.id ?? "";
   const total = scoredMatches.reduce((sum, r) => sum + r.points, 0);
 
   useEffect(() => {
@@ -2114,6 +2148,14 @@ function AuditModal({ participant, matches, predictions, onClose }) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    if (!latestScoredMatchId || !latestAuditCardRef.current) return undefined;
+    const frameId = window.requestAnimationFrame(() => {
+      latestAuditCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [latestScoredMatchId, participant.id]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -2141,7 +2183,11 @@ function AuditModal({ participant, matches, predictions, onClose }) {
                     : hasParticipantPrediction ? "Não pontuou" : isBlocked ? "Bloqueado" : "Sem palpite";
 
                 return (
-                  <article key={match.id} className={`audit-game-card audit-game-card-${points === 3 ? "exact" : points === 1 ? "winner" : isBlocked ? "blocked" : hasParticipantPrediction ? "miss" : "noprediction"}`}>
+                  <article
+                    key={match.id}
+                    ref={match.id === latestScoredMatchId ? latestAuditCardRef : null}
+                    className={`audit-game-card audit-game-card-${points === 3 ? "exact" : points === 1 ? "winner" : isBlocked ? "blocked" : hasParticipantPrediction ? "miss" : "noprediction"}`}
+                  >
                     {points === 3 && <Confetti />}
                     <div className="audit-game-card-header">
                       <span>Jogo {String(index + 1).padStart(2, "0")}</span>
