@@ -8,6 +8,7 @@ const EMPTY_STATE = {
   participants: [],
   predictions: {},
   auditLogs: [],
+  notifications: [],
   matches: [],
   lastResultSyncAt: "",
   lastResultSyncSource: "",
@@ -48,6 +49,7 @@ export function getPublicPoolState(state) {
     participants: state.participants ?? [],
     predictions: state.predictions ?? {},
     auditLogs: state.auditLogs ?? [],
+    notifications: state.notifications ?? [],
     matches: state.matches ?? [],
     lastResultSyncAt: state.lastResultSyncAt ?? "",
     lastResultSyncSource: state.lastResultSyncSource ?? "",
@@ -226,6 +228,7 @@ export function mergePublicPoolState(current, shared = {}, options = {}) {
     participants,
     predictions,
     auditLogs: mergeAuditLogs(current.auditLogs, shared.auditLogs),
+    notifications: mergeById(current.notifications ?? [], shared.notifications ?? [], prefer),
     matches: [...matchesById.values()],
     releasedPredictionRound: Math.max(
       Number(current.releasedPredictionRound) || 1,

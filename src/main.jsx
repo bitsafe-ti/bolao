@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup, faSitemap, faMedal, faGear, faChevronLeft, faChevronRight, faRightFromBracket, faUser, faUsers, faCalendarDays, faClipboardList, faChartSimple, faBell } from "@fortawesome/free-solid-svg-icons";
+import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup, faSitemap, faMedal, faGear, faChevronLeft, faChevronRight, faRightFromBracket, faUser, faUsers, faCalendarDays, faClipboardList, faChartSimple, faBell, faXmark } from "@fortawesome/free-solid-svg-icons";
 import {
   calculateRanking,
   clearedOpeningPredictionMatchIds,
@@ -162,6 +162,7 @@ const adminTabs = [
 const settingsTabs = [
   { id: "participants", label: "Participantes", icon: faUsers },
   { id: "rounds", label: "Rodadas", icon: faCalendarDays },
+  { id: "notifications", label: "Notificações", icon: faBell },
   { id: "audit", label: "Logs do sistema", icon: faClipboardList }
 ];
 
@@ -340,6 +341,54 @@ function App() {
   const [notifPermission, setNotifPermission] = useState(() => {
     try { return "Notification" in window ? Notification.permission : "unsupported"; } catch { return "unsupported"; }
   });
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
+  const [notifPopup, setNotifPopup] = useState(null);
+  const [readNotifIds, setReadNotifIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("bolao-read-notifs") || "[]")); } catch { return new Set(); }
+  });
+  const notifRef = useRef(null);
+  const shownNotifIdsRef = useRef(null);
+
+  const notifications = (state.notifications ?? []).slice().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  const unreadCount = notifications.filter((n) => !readNotifIds.has(n.id)).length;
+
+  function markAllRead() {
+    const ids = new Set(notifications.map((n) => n.id));
+    setReadNotifIds(ids);
+    try { localStorage.setItem("bolao-read-notifs", JSON.stringify([...ids])); } catch {}
+  }
+
+  function markRead(id) {
+    setReadNotifIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      try { localStorage.setItem("bolao-read-notifs", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    if (!notifPanelOpen) return;
+    function handleClick(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifPanelOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [notifPanelOpen]);
+
+  useEffect(() => {
+    if (!state.currentUserId) return;
+    if (shownNotifIdsRef.current === null) {
+      shownNotifIdsRef.current = new Set(notifications.map((n) => n.id));
+      return;
+    }
+    const incoming = notifications.find((n) => !shownNotifIdsRef.current.has(n.id));
+    if (incoming) {
+      shownNotifIdsRef.current.add(incoming.id);
+      setNotifPopup(incoming);
+    }
+  }, [notifications, state.currentUserId]);
+
   const workspaceRef = useRef(null);
   const predictionTargetRef = useRef(null);
   const resultTargetRef = useRef(null);
@@ -1191,29 +1240,6 @@ function App() {
         </nav>
         <div className="sidebar-footer">
           <div className="sidebar-actions">
-            {notifPermission !== "unsupported" && notifPermission !== "granted" && (
-              <button
-                type="button"
-                data-label="Notificações"
-                className={notifPermission === "denied" ? "notif-denied" : ""}
-                title={notifPermission === "denied" ? "Notificações bloqueadas no navegador" : "Ativar lembretes de jogos"}
-                onClick={async () => {
-                  if (notifPermission === "denied") return;
-                  const result = await Notification.requestPermission();
-                  setNotifPermission(result);
-                  if (result === "granted") new Notification("Bolão Copa 2026", { body: "Notificações ativadas! Você será lembrado antes dos jogos.", icon: "/favicon.png" });
-                }}
-              >
-                <FontAwesomeIcon icon={faBell} className="tab-icon" />
-                <span className="tab-label">{notifPermission === "denied" ? "Notif. bloqueadas" : "Ativar notificações"}</span>
-              </button>
-            )}
-            {notifPermission === "granted" && (
-              <button type="button" data-label="Notificações" className="notif-active" title="Notificações ativas">
-                <FontAwesomeIcon icon={faBell} className="tab-icon" />
-                <span className="tab-label">Notificações ativas</span>
-              </button>
-            )}
             <button type="button" data-label="Sair" onClick={logoutUser}>
               <FontAwesomeIcon icon={faRightFromBracket} className="tab-icon" />
               <span className="tab-label">Sair</span>
@@ -1227,6 +1253,14 @@ function App() {
           team={historyTeam}
           matches={state.matches}
           onClose={() => setHistoryTeamId("")}
+        />
+      )}
+
+      {notifPopup && (
+        <NotificationPopupModal
+          notification={notifPopup}
+          onClose={() => setNotifPopup(null)}
+          onMarkRead={() => { markRead(notifPopup.id); setNotifPopup(null); }}
         />
       )}
 
@@ -1248,6 +1282,35 @@ function App() {
             </div>
           </div>
           <img src={FAVICON_URL} alt="Bolão Copa 2026" className="topbar-logo-mobile" />
+          <div className="topbar-right">
+          <div style={{ position: "relative" }} ref={notifRef}>
+            <button type="button" className="notif-bell-btn" aria-label="Notificações" onClick={() => setNotifPanelOpen((v) => !v)}>
+              <FontAwesomeIcon icon={faBell} />
+              {unreadCount > 0 && <span className="notif-badge">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+            </button>
+            {notifPanelOpen && (
+              <div className="notif-panel">
+                <div className="notif-panel-header">
+                  <span>Notificações</span>
+                  {unreadCount > 0 && <button type="button" onClick={markAllRead}>Marcar todas como lidas</button>}
+                </div>
+                {notifications.length === 0 ? (
+                  <p className="notif-empty">Nenhuma notificação.</p>
+                ) : (
+                  <div className="notif-list">
+                    {notifications.map((n) => (
+                      <div key={n.id} className={`notif-item${readNotifIds.has(n.id) ? "" : " unread"}`} onClick={() => { setNotifPanelOpen(false); setNotifPopup(n); }}>
+                        {n.imageUrl && <img src={n.imageUrl} alt="" className="notif-item-image" />}
+                        <div className="notif-item-title">{n.title}</div>
+                        {n.body && <div className="notif-item-body">{n.body}</div>}
+                        <div className="notif-item-date">{n.createdAt ? new Date(n.createdAt).toLocaleString("pt-BR") : ""}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <div className="topbar-user-menu" ref={userMenuRef}>
             <button
               type="button"
@@ -1271,6 +1334,7 @@ function App() {
                 </button>
               </div>
             )}
+          </div>
           </div>
         </header>
 
@@ -1424,6 +1488,21 @@ function App() {
                 </section>
               )}
 
+              {settingsTab === "notifications" && (
+                <NotificationsAdminPanel
+                  notifications={state.notifications ?? []}
+                  currentUser={currentUser}
+                  onAdd={(notif) => {
+                    setState((prev) => ({ ...prev, notifications: [notif, ...(prev.notifications ?? [])] }));
+                    persistPoolState({ ...state, notifications: [notif, ...(state.notifications ?? [])] }).catch(() => {});
+                  }}
+                  onDelete={(id) => {
+                    const next = (state.notifications ?? []).filter((n) => n.id !== id);
+                    setState((prev) => ({ ...prev, notifications: next }));
+                    persistPoolState({ ...state, notifications: next }).catch(() => {});
+                  }}
+                />
+              )}
               {settingsTab === "audit" && (
                 <section className="panel audit-log-panel">
                   <SectionHeader title="Logs do sistema" caption={`${state.auditLogs?.length ?? 0} / ${AUDIT_LOG_LIMIT} registros`} />
@@ -1590,7 +1669,7 @@ function App() {
 
         {tab === "bracket" && <KnockoutBracketBoard bracket={knockoutBracket} />}
 
-        {tab === "ranking" && <RankingTable ranking={ranking} matches={state.matches} predictions={state.predictions} />}
+        {tab === "ranking" && <RankingTable ranking={ranking} matches={state.matches} predictions={state.predictions} currentParticipant={activeParticipant} />}
 
         <footer className="app-footer">
           <p>© 2026 Bolão Copa do Mundo · Desenvolvido por Guilherme Saraiva</p>
@@ -2141,7 +2220,7 @@ function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, on
   );
 }
 
-function RankingTable({ ranking, matches = [], predictions = {}, compact = false }) {
+function RankingTable({ ranking, matches = [], predictions = {}, compact = false, currentParticipant = null }) {
   const paidParticipants = ranking.length;
   const totalPoolValue = paidParticipants * ENTRY_FEE;
   const displayedRanking = ranking;
@@ -2149,7 +2228,6 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
   const hasLiveMatches = matches.some(isMatchLive);
   const [auditParticipant, setAuditParticipant] = useState(null);
   const [statsParticipant, setStatsParticipant] = useState(null);
-
   return (
     <section className="panel table-panel">
       <SectionHeader title={compact ? "Top 5" : "Ranking"} />
@@ -2183,7 +2261,7 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
                   <td>{participant.scoredMatches}</td>
                   {!compact && (
                     <td className="audit-cell">
-                      <button type="button" className="audit-eye-btn" onClick={() => setStatsParticipant(participant)} aria-label={`Ver estatísticas de ${participant.name}`} title="Estatísticas">
+                      <button type="button" className="audit-eye-btn" onClick={() => setStatsParticipant({ participant, position: rankOffset + index + 1 })} aria-label={`Ver estatísticas de ${participant.name}`} title="Estatísticas">
                         <FontAwesomeIcon icon={faChartSimple} />
                       </button>
                     </td>
@@ -2227,7 +2305,8 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
       )}
       {statsParticipant && (
         <ParticipantStatsModal
-          participant={statsParticipant}
+          participant={statsParticipant.participant}
+          position={statsParticipant.position}
           matches={matches}
           predictions={predictions}
           onClose={() => setStatsParticipant(null)}
@@ -2813,6 +2892,97 @@ function ScoringExamples() {
   );
 }
 
+function NotificationPopupModal({ notification, onClose, onMarkRead }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box notif-popup" onClick={(e) => e.stopPropagation()}>
+        <div className="notif-popup-header">
+          <FontAwesomeIcon icon={faBell} />
+          <span>Nova notificação</span>
+          <button type="button" className="modal-close" aria-label="Fechar" onClick={onClose}>
+            <FontAwesomeIcon icon={faXmark} />
+          </button>
+        </div>
+        {notification.imageUrl && (
+          <img src={notification.imageUrl} alt="" className="notif-popup-image" />
+        )}
+        <div className="notif-popup-title">{notification.title}</div>
+        {notification.body && <div className="notif-popup-body">{notification.body}</div>}
+        {notification.createdAt && (
+          <div className="notif-popup-date">{new Date(notification.createdAt).toLocaleString("pt-BR")}</div>
+        )}
+        <div className="notif-popup-actions">
+          <button type="button" onClick={onMarkRead}>Marcar como lido</button>
+          <button type="button" className="ghost" onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NotificationsAdminPanel({ notifications, currentUser, onAdd, onDelete }) {
+  const sorted = [...notifications].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const title = (fd.get("title") || "").trim();
+    const body = (fd.get("body") || "").trim();
+    const imageUrl = (fd.get("imageUrl") || "").trim();
+    if (!title) return;
+    onAdd({
+      id: makeId("notif"),
+      title,
+      body,
+      imageUrl: imageUrl || undefined,
+      createdAt: new Date().toISOString(),
+      authorId: currentUser.id,
+      authorName: currentUser.name
+    });
+    e.target.reset();
+  }
+
+  return (
+    <section className="panel">
+      <SectionHeader title="Notificações" caption="Visíveis a todos os participantes" />
+      <form className="notif-admin-form" onSubmit={handleSubmit}>
+        <input name="title" placeholder="Título da notificação" required maxLength={120} />
+        <textarea name="body" placeholder="Mensagem (opcional)" rows={3} maxLength={600} />
+        <input name="imageUrl" placeholder="URL da imagem (opcional)" type="url" maxLength={500} />
+        <button type="submit">Publicar notificação</button>
+      </form>
+      {sorted.length === 0 ? (
+        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>Nenhuma notificação publicada.</p>
+      ) : (
+        <div className="notif-admin-list">
+          {sorted.map((n) => (
+            <div key={n.id} className="notif-admin-item">
+              <div className="notif-admin-item-body">
+                <div className="notif-admin-item-title">{n.title}</div>
+                {n.body && <div className="notif-admin-item-text">{n.body}</div>}
+                {n.imageUrl && <div className="notif-admin-item-text" style={{ fontSize: "0.75rem", wordBreak: "break-all" }}>🖼 {n.imageUrl}</div>}
+                <div className="notif-admin-item-date">
+                  {n.createdAt ? new Date(n.createdAt).toLocaleString("pt-BR") : ""}
+                  {n.authorName ? ` · ${n.authorName}` : ""}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="ghost danger"
+                style={{ flexShrink: 0 }}
+                onClick={() => onDelete(n.id)}
+                aria-label="Remover notificação"
+              >
+                <FontAwesomeIcon icon={faTrash} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function RankingTiebreakerCard() {
   return (
     <div className="ranking-tiebreaker-card">
@@ -2830,7 +3000,7 @@ function RankingTiebreakerCard() {
   );
 }
 
-function ParticipantStatsModal({ participant, matches, predictions, onClose }) {
+function ParticipantStatsModal({ participant, position, matches, predictions, onClose }) {
   const participantPredictions = predictions[participant.id] ?? {};
   const rounds = {};
   for (const match of matches) {
@@ -2872,20 +3042,22 @@ function ParticipantStatsModal({ participant, matches, predictions, onClose }) {
           <div className="stats-tile stats-tile-rate"><strong>{approx}%</strong><span>Aproveitamento</span></div>
         </div>
         {sortedRounds.length > 0 && (
-          <table className="stats-rounds-table">
-            <thead><tr><th>Rodada</th><th>Pts</th><th>Cravados</th><th>1pt</th><th>Erros</th></tr></thead>
-            <tbody>
-              {sortedRounds.map(([round, r]) => (
-                <tr key={round} className={bestRound === round ? "stats-best-round" : ""}>
-                  <td>{getRoundDisplayName(Number(round))}{bestRound === round && <span className="stats-best-badge">melhor</span>}</td>
-                  <td><strong>{r.points}</strong></td>
-                  <td>{r.exact}</td>
-                  <td>{r.winner}</td>
-                  <td>{r.miss}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <table className="stats-rounds-table">
+              <thead><tr><th>Rodada</th><th>Pts</th><th>Cravados</th><th>1pt</th><th>Erros</th></tr></thead>
+              <tbody>
+                {sortedRounds.map(([round, r]) => (
+                  <tr key={round} className={bestRound === round ? "stats-best-round" : ""}>
+                    <td>{getRoundDisplayName(Number(round))}{bestRound === round && <span className="stats-best-badge">melhor</span>}</td>
+                    <td><strong>{r.points}</strong></td>
+                    <td>{r.exact}</td>
+                    <td>{r.winner}</td>
+                    <td>{r.miss}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         <p className="stats-goals-line">Total de gols palpitados: <strong>{participant.totalGoalsPredicted ?? "—"}</strong></p>
       </div>

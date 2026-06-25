@@ -321,6 +321,7 @@ export function createInitialState() {
     matches: [...createGroupStageMatches(), ...createKnockoutStageMatches()],
     predictions: {},
     auditLogs: [],
+    notifications: [],
     deletedUserIds: [],
     deletedParticipantIds: [],
     activeParticipantId: "",
