@@ -451,6 +451,26 @@ function App() {
     saveCachedPoolState(cleaned);
   }, [state]);
 
+  // Auto-fill Round 4 teams from confirmed group standings
+  useEffect(() => {
+    if (!knockoutBracket?.matches?.length) return;
+    setState((current) => {
+      let changed = false;
+      const updatedMatches = current.matches.map((match) => {
+        if (getMatchRound(match) !== 4) return match;
+        const bm = knockoutBracket.matches.find((m) => m.id === match.id);
+        if (!bm) return match;
+        const homeTeamId = bm.home.confirmed && bm.home.teamId ? bm.home.teamId : null;
+        const awayTeamId = bm.away.confirmed && bm.away.teamId ? bm.away.teamId : null;
+        if (match.homeTeamId === homeTeamId && match.awayTeamId === awayTeamId) return match;
+        changed = true;
+        return { ...match, homeTeamId, awayTeamId };
+      });
+      if (!changed) return current;
+      return { ...current, matches: updatedMatches };
+    });
+  }, [knockoutBracket]);
+
   useEffect(() => {
     if (!participantModalOpen) return undefined;
     function handleKeyDown(event) {
