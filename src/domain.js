@@ -200,7 +200,7 @@ export function normalizeUsers(users, superAdminEmails = new Set()) {
 
 function slotLabel(slot) {
   if (slot.type === "group") return `${slot.position}º Grupo ${slot.group}`;
-  return `Melhor 3º (${slot.eligibleGroups.join("/")})`;
+  return "Melhor 3º";
 }
 
 export function createKnockoutStageMatches() {
