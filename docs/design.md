@@ -121,7 +121,7 @@ Key Characteristics:
 
 ### Navigation
 - Sidebar Desktop: bg branco, borda-direita #E6E8EA, ativos bg #FFF1F1 texto #BD2124, hover bg #F5F5F5.
-- Header: bg branco, borda-inferior #E6E8EA, altura 73px.
+- Header: bg branco, borda-inferior #E6E8EA, altura 88px no desktop e 64px no mobile.
 - Itens: 18px, gap 3px ícone, padding 10px 12px, border-radius 8px.
 
 ### Badges & Status
@@ -256,10 +256,10 @@ Profundidade e intencionalmente contida. O sistema favorece contraste tonal, sur
 ### Shell de Layout
 
 O app-shell usa flex-row com sidebar fixa e área de workspace:
-- **Sidebar expandida:** 240px, `padding: 22px 14px`, bg `#ffffff`, `border-right: 1px solid var(--line)`
-- **Sidebar colapsada:** 56px, `padding: 22px 4px 14px` — o `padding-top: 22px` é idêntico ao expandido para alinhar o brand-block com o topbar (topbar termina em y=95: `padding 16px + altura 73px`)
+- **Sidebar expandida:** 240px, `padding: 0 14px 22px`, bg `#ffffff`, `border-right: 1px solid var(--line)`
+- **Sidebar colapsada:** 56px, `padding: 0 4px 14px`; o brand-block usa a mesma altura compartilhada do topbar
 - **Workspace:** `padding: 22px`, background `#ffffff`
-- **Topbar:** `min-height: 73px`, bg `#ffffff`, `border-bottom: 1px solid #E6E8EA`, sticky no topo
+- **Topbar:** 88px no desktop e 64px no mobile, bg `#ffffff`, `border-bottom: 1px solid #E6E8EA`, sticky no topo
 
 ### Sidebar — Brand Block
 ```css

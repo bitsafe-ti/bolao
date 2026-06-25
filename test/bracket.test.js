@@ -58,8 +58,8 @@ test("buildRoundOf32Bracket monta os 16 confrontos sem repetir terceiros", () =>
     bracket.matches.find((match) => match.id === 73),
     {
       id: 73,
-      home: { teamId: "A-2", name: "A Segundo", label: "2º do Grupo A", group: "A", position: 2 },
-      away: { teamId: "B-2", name: "B Segundo", label: "2º do Grupo B", group: "B", position: 2 }
+      home: { teamId: "A-2", name: "A Segundo", label: "2º Grupo A", group: "A", position: 2, confirmed: true },
+      away: { teamId: "B-2", name: "B Segundo", label: "2º Grupo B", group: "B", position: 2, confirmed: true }
     }
   );
 });
