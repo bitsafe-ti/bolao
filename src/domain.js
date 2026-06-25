@@ -1,5 +1,6 @@
 import { getTeamsByGroup, worldCupTeams } from "./teams.js";
 import { getVenueByGround } from "./venues.js";
+import { ROUND_OF_32_MATCHES, KNOCKOUT_PATH } from "./bracket.js";
 
 export const STORAGE_KEY = "bolao-copa-2026:v1";
 export const APP_VERSION = 3;
@@ -197,6 +198,35 @@ export function normalizeUsers(users, superAdminEmails = new Set()) {
   }));
 }
 
+function slotLabel(slot) {
+  if (slot.type === "group") return `${slot.position}º Grupo ${slot.group}`;
+  return `Melhor 3º (${slot.eligibleGroups.join("/")})`;
+}
+
+export function createKnockoutStageMatches() {
+  const base = { date: null, ground: null, city: null, stadium: null, country: null, homeTeamId: null, awayTeamId: null, homeScore: "", awayScore: "", homeGoals: [], awayGoals: [] };
+  return [
+    ...ROUND_OF_32_MATCHES.map((m) => ({ ...base, id: m.id, phase: "Rodada de 32", round: 4, homeSlotLabel: slotLabel(m.home), awaySlotLabel: slotLabel(m.away) })),
+    ...KNOCKOUT_PATH.roundOf16.map((m) => ({ ...base, id: m.id, phase: "Oitavas de Final", round: 5, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` })),
+    ...KNOCKOUT_PATH.quarterFinals.map((m) => ({ ...base, id: m.id, phase: "Quartas de Final", round: 6, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` })),
+    ...KNOCKOUT_PATH.semiFinals.map((m) => ({ ...base, id: m.id, phase: "Semifinal", round: 7, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` })),
+    ...KNOCKOUT_PATH.final.map((m) => ({ ...base, id: m.id, phase: "Final", round: 8, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` }))
+  ];
+}
+
+export function ensureKnockoutMatches(state) {
+  const knockout = createKnockoutStageMatches();
+  const existingIds = new Set((state.matches ?? []).map((m) => m.id));
+  const missing = knockout.filter((m) => !existingIds.has(m.id));
+  if (!missing.length) return state;
+  return { ...state, matches: [...(state.matches ?? []), ...missing] };
+}
+
+export function getKnockoutRoundLabel(round) {
+  const labels = { 4: "Rodada de 32", 5: "Oitavas de Final", 6: "Quartas de Final", 7: "Semifinal", 8: "Final" };
+  return labels[round] ?? null;
+}
+
 export function createGroupStageMatches() {
   const defaultPairings = [
     [0, 1],
@@ -281,7 +311,7 @@ export function createInitialState() {
     users: [],
     currentUserId: "",
     participants: [],
-    matches: createGroupStageMatches(),
+    matches: [...createGroupStageMatches(), ...createKnockoutStageMatches()],
     predictions: {},
     auditLogs: [],
     deletedUserIds: [],

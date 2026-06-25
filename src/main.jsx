@@ -7,7 +7,9 @@ import {
   clearedOpeningPredictionMatchIds,
   createInitialState,
   emptyPrediction,
+  ensureKnockoutMatches,
   getActiveRound,
+  getKnockoutRoundLabel,
   getPredictionScrollTargetId,
   getLatestResultMatchId,
   getMatchRound,
@@ -23,7 +25,7 @@ import {
   purgeFutureRoundPredictions,
   scorePrediction
 } from "./domain.js";
-import { getFlagUrl, getTeamsByGroup, teamsById } from "./teams.js";
+import { getFlagUrl, getTeamsByGroup, teamsById, worldCupTeams } from "./teams.js";
 import { buildRoundOf32Bracket } from "./bracket.js";
 import { attachPasswordCredential, hasLegacyPassword, verifyPassword } from "./passwords.js";
 import {
@@ -177,7 +179,11 @@ function applyRemoteData(current, remoteData, { prefer = "shared" } = {}) {
 }
 
 function cleanPoolState(state) {
-  return purgeClearedOpeningPredictions(purgeExpiredPredictions(purgeFutureRoundPredictions(state)));
+  return purgeClearedOpeningPredictions(purgeExpiredPredictions(purgeFutureRoundPredictions(ensureKnockoutMatches(state))));
+}
+
+function getRoundDisplayName(round) {
+  return getKnockoutRoundLabel(round) ?? `Rodada ${round}`;
 }
 
 function parseScoreValue(value) {
@@ -252,6 +258,64 @@ function makeAuditEntry(actor, action, details = "") {
   return { id: makeId("audit"), createdAt: new Date().toISOString(), actor, action, details };
 }
 
+const sortedWorldCupTeams = [...worldCupTeams].sort((a, b) => a.name.localeCompare(b.name));
+
+function KnockoutMatchTeamRow({ match, onUpdate }) {
+  const [editing, setEditing] = React.useState(false);
+  const homeTeam = teamsById[match.homeTeamId];
+  const awayTeam = teamsById[match.awayTeamId];
+  const hasTeams = homeTeam && awayTeam;
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const homeTeamId = form.get("homeTeamId");
+    const awayTeamId = form.get("awayTeamId");
+    const date = form.get("date");
+    if (homeTeamId) onUpdate("homeTeamId", homeTeamId);
+    if (awayTeamId) onUpdate("awayTeamId", awayTeamId);
+    if (date) onUpdate("date", date);
+    setEditing(false);
+  }
+
+  return (
+    <div className="knockout-match-item">
+      <div className="knockout-match-teams-row">
+        <span className="knockout-match-slot">{homeTeam ? homeTeam.name : match.homeSlotLabel}</span>
+        <span className="knockout-match-vs">×</span>
+        <span className="knockout-match-slot">{awayTeam ? awayTeam.name : match.awaySlotLabel}</span>
+        {match.date && <span className="knockout-match-date">{new Date(match.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>}
+        {!editing && (
+          <button type="button" className="ghost" style={{ marginLeft: "auto" }} onClick={() => setEditing(true)}>
+            {hasTeams ? "Editar" : "Definir times"}
+          </button>
+        )}
+      </div>
+      {editing && (
+        <form onSubmit={handleSubmit} className="knockout-match-form">
+          <select name="homeTeamId" defaultValue={match.homeTeamId ?? ""}>
+            <option value="">Mandante ({match.homeSlotLabel})</option>
+            {sortedWorldCupTeams.map((team) => (
+              <option key={team.id} value={team.id}>{team.name}</option>
+            ))}
+          </select>
+          <select name="awayTeamId" defaultValue={match.awayTeamId ?? ""}>
+            <option value="">Visitante ({match.awaySlotLabel})</option>
+            {sortedWorldCupTeams.map((team) => (
+              <option key={team.id} value={team.id}>{team.name}</option>
+            ))}
+          </select>
+          <input type="datetime-local" name="date" defaultValue={match.date ?? ""} />
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button type="submit">Salvar</button>
+            <button type="button" className="ghost" onClick={() => setEditing(false)}>Cancelar</button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const [state, setState] = useState(createInitialState);
   const [isLoading, setIsLoading] = useState(true);
@@ -299,7 +363,10 @@ function App() {
   );
   const groupStandings = useMemo(() => calculateGroupStandings(state.matches), [state.matches]);
   const groupStageComplete = useMemo(
-    () => state.matches.length > 0 && state.matches.every(isMatchResultFinal),
+    () => {
+      const groupMatches = state.matches.filter((m) => { const r = getMatchRound(m); return r !== null && !Number.isNaN(r) && r <= 3; });
+      return groupMatches.length > 0 && groupMatches.every(isMatchResultFinal);
+    },
     [state.matches]
   );
   const knockoutBracket = useMemo(
@@ -317,14 +384,14 @@ function App() {
   const activeResultRound = selectedResultRound ?? automaticRound;
   const predictionMatches = state.matches
     .filter((match) => getMatchRound(match) === activePredictionRound)
-    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    .sort((a, b) => (a.date || "").localeCompare(b.date || "") || String(a.id).localeCompare(String(b.id)));
   const predictionScrollTargetId = useMemo(
     () => getPredictionScrollTargetId(predictionMatches),
     [predictionMatches]
   );
   const resultMatches = state.matches
     .filter((match) => getMatchRound(match) === activeResultRound)
-    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    .sort((a, b) => (a.date || "").localeCompare(b.date || "") || String(a.id).localeCompare(String(b.id)));
   const resultScrollTargetId = useMemo(() => getLatestResultMatchId(resultMatches), [resultMatches]);
   const resultSyncIntervalText = "O servidor verifica os jogos a cada minuto e esta tela recebe os dados em até 30 segundos.";
   const userRows = useMemo(() => {
@@ -1262,10 +1329,11 @@ function App() {
                       const isAutomatic = round <= automaticRound;
                       const roundMatches = state.matches.filter((m) => getMatchRound(m) === round);
                       const isManuallyLocked = roundMatches.length > 0 && roundMatches.every((m) => m.locked);
+                      const knockoutMatches = round > 3 ? roundMatches : [];
                       return (
                         <div className="round-management-row" key={round}>
                           <div className="round-management-info">
-                            <strong>Rodada {round}</strong>
+                            <strong>{getRoundDisplayName(round)}</strong>
                             <span className={`round-status-label${isManuallyLocked ? " locked" : isReleased ? " released" : ""}`}>
                               {isManuallyLocked
                                 ? "Travada manualmente"
@@ -1279,22 +1347,33 @@ function App() {
                           <div className="round-management-actions">
                             {!isReleased && (
                               <button type="button" onClick={() => releasePredictionRound(round)}>
-                                Liberar rodada {round}
+                                Liberar {getRoundDisplayName(round).toLowerCase()}
                               </button>
                             )}
                             {isReleased && !isManuallyLocked && (
                               <button type="button" className="ghost danger" onClick={() => lockRound(round)}>
-                                Travar rodada {round}
+                                Travar {getRoundDisplayName(round).toLowerCase()}
                               </button>
                             )}
                           </div>
+                          {knockoutMatches.length > 0 && (
+                            <div className="knockout-match-editor-list">
+                              {knockoutMatches.map((m) => (
+                                <KnockoutMatchTeamRow
+                                  key={m.id}
+                                  match={m}
+                                  onUpdate={(field, value) => updateMatch(m.id, field, value)}
+                                />
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                   <div className={`sync-strip ${sharedStatus.state}`}>
                     <strong>{sharedStatus.message}</strong>
-                    <span>Rodada atual para palpites: {activeRound}</span>
+                    <span>Rodada atual para palpites: {getRoundDisplayName(activeRound)}</span>
                   </div>
                 </section>
               )}
@@ -1324,10 +1403,10 @@ function App() {
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
                       {round < automaticRound
-                        ? `Rodada ${round} - Encerrada`
+                        ? `${getRoundDisplayName(round)} - Encerrada`
                         : round <= activeRound
-                        ? `Rodada ${round} - Liberada`
-                        : `Rodada ${round} - Pendente`}
+                        ? `${getRoundDisplayName(round)} - Liberada`
+                        : `${getRoundDisplayName(round)} - Pendente`}
                     </option>
                   ))}
                 </select>
@@ -1340,7 +1419,7 @@ function App() {
             {activePredictionRound > activeRound && (
               <div className="sync-strip loading">
                 <strong>
-                  Rodada {activePredictionRound} ainda não está liberada. Aguarde a conclusão da Rodada {activeRound}.
+                  {getRoundDisplayName(activePredictionRound)} ainda não está liberada. Aguarde a conclusão da {getRoundDisplayName(activeRound)}.
                 </strong>
               </div>
             )}
@@ -1355,8 +1434,8 @@ function App() {
                   const isKickoffLocked = isMatchClosed(match, clockNow);
                   const isLocked = isRoundLocked || isKickoffLocked;
                   const predictionFeedback = getPredictionFeedback(storedPrediction, match);
-                  const homeTeamName = teamsById[match.homeTeamId]?.name ?? match.home ?? "time da casa";
-                  const awayTeamName = teamsById[match.awayTeamId]?.name ?? match.away ?? "time visitante";
+                  const homeTeamName = teamsById[match.homeTeamId]?.name ?? match.homeSlotLabel ?? match.home ?? "time da casa";
+                  const awayTeamName = teamsById[match.awayTeamId]?.name ?? match.awaySlotLabel ?? match.away ?? "time visitante";
                   return (
                     <article
                       className={`match-card prediction-card ${isLocked ? "locked" : ""}`}
@@ -1368,9 +1447,9 @@ function App() {
                         <div className="prediction-match-info">
                           <span className="badge">{match.phase}</span>
                           <div className="prediction-teams-grid">
-                            <PredictionTeamColumn side="home" teamId={match.homeTeamId} fallback={match.home} onHistory={setHistoryTeamId} />
+                            <PredictionTeamColumn side="home" teamId={match.homeTeamId} fallback={match.homeSlotLabel ?? match.home} onHistory={setHistoryTeamId} />
                             <span className="prediction-versus">x</span>
-                            <PredictionTeamColumn side="away" teamId={match.awayTeamId} fallback={match.away} onHistory={setHistoryTeamId} />
+                            <PredictionTeamColumn side="away" teamId={match.awayTeamId} fallback={match.awaySlotLabel ?? match.away} onHistory={setHistoryTeamId} />
                           </div>
                           <p>{formatDate(match.date)}</p>
                           <p className="match-location">{formatVenue(match)}</p>
@@ -1442,10 +1521,10 @@ function App() {
                   {availableRounds.map((round) => (
                     <option value={round} key={round}>
                       {round < automaticRound
-                        ? `Rodada ${round} - Encerrada`
+                        ? `${getRoundDisplayName(round)} - Encerrada`
                         : round === automaticRound
-                        ? `Rodada ${round} - Em andamento`
-                        : `Rodada ${round} - Pendente`}
+                        ? `${getRoundDisplayName(round)} - Em andamento`
+                        : `${getRoundDisplayName(round)} - Pendente`}
                     </option>
                   ))}
                 </select>
