@@ -2072,18 +2072,19 @@ h3 {
 }
 
 .team-history-modal {
-  width: min(100%, 760px);
+  width: min(100%, 860px);
 }
 
 .team-history-list {
   display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
 .team-history-item {
   display: grid;
   justify-items: center;
-  gap: 12px;
+  gap: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--bg);
@@ -2167,6 +2168,12 @@ h3 {
 .team-history-details strong {
   color: var(--text);
   font-size: 0.86rem;
+}
+
+@media (max-width: 540px) {
+  .team-history-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 .result-card {
