@@ -5,12 +5,6 @@ export default defineConfig(({ command }) => ({
   base: process.env.VITE_BASE_PATH || (command === "serve" ? "/" : "/bolao/"),
   plugins: [react()],
   server: {
-    host: "127.0.0.1",
-    proxy: {
-      "/api": {
-        target: "https://bolao-copa2026.pages.dev",
-        changeOrigin: true
-      }
-    }
+    host: "127.0.0.1"
   }
 }));
