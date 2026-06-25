@@ -1565,6 +1565,10 @@ function App() {
         {tab === "bracket" && <KnockoutBracketBoard bracket={knockoutBracket} />}
 
         {tab === "ranking" && <RankingTable ranking={ranking} matches={state.matches} predictions={state.predictions} />}
+
+        <footer className="app-footer">
+          <p>© 2026 Bolão Copa do Mundo · Desenvolvido por Guilherme Saraiva</p>
+        </footer>
       </section>
     </main>
   );
