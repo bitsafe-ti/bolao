@@ -1283,10 +1283,9 @@ h3 {
   background: var(--soft);
   border: 1px solid var(--line);
   border-radius: 8px;
-  grid-template-columns: minmax(240px, 1fr) minmax(240px, 0.9fr) minmax(
-      160px,
-      0.45fr
-    ) 120px;
+  grid-template-columns:
+    minmax(240px, 1fr) minmax(240px, 0.9fr) minmax(160px, 0.45fr)
+    120px;
   margin: 18px 0 22px;
   padding: 12px;
 }
@@ -1550,10 +1549,9 @@ h3 {
 .participant-grid-header,
 .participant-grid-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.2fr) minmax(
-      130px,
-      0.45fr
-    ) minmax(120px, auto);
+  grid-template-columns:
+    minmax(180px, 1fr) minmax(260px, 1.2fr) minmax(130px, 0.45fr)
+    minmax(120px, auto);
   gap: 12px;
   align-items: center;
   padding: 10px 12px;
@@ -3719,7 +3717,6 @@ h3 {
   width: 17px;
   height: 17px;
   border-radius: 5px;
-  background: var(--soft);
   color: var(--muted);
   font-size: 0.55rem;
   font-weight: 900;
