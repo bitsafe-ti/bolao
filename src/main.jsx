@@ -1909,7 +1909,11 @@ function PredictionTeamColumn({ side = "", teamId, fallback, onHistory }) {
 function TeamHistoryModal({ team, matches, onClose }) {
   const teamMatches = (matches ?? [])
     .filter((match) => match.homeTeamId === team.id || match.awayTeamId === team.id)
-    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    .sort((a, b) => {
+      const rA = getMatchRound(a) ?? 999;
+      const rB = getMatchRound(b) ?? 999;
+      return rA - rB || (a.date || "").localeCompare(b.date || "") || String(a.id).localeCompare(String(b.id));
+    });
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
