@@ -3714,10 +3714,9 @@ h3 {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 17px;
+  width: auto;
   height: 17px;
   border-radius: 5px;
-  color: var(--muted);
   font-size: 0.55rem;
   font-weight: 900;
 }
