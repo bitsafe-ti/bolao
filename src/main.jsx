@@ -382,7 +382,7 @@ function App() {
       shownNotifIdsRef.current = new Set(notifications.map((n) => n.id));
       return;
     }
-    const incoming = notifications.find((n) => !shownNotifIdsRef.current.has(n.id));
+    const incoming = notifications.find((n) => !shownNotifIdsRef.current.has(n.id) && !readNotifIds.has(n.id));
     if (incoming) {
       shownNotifIdsRef.current.add(incoming.id);
       setNotifPopup(incoming);
