@@ -1493,6 +1493,108 @@ h3 {
   margin-right: auto;
 }
 
+.prediction-confirm-backdrop {
+  background:
+    linear-gradient(rgba(30, 32, 38, 0.58), rgba(30, 32, 38, 0.58)),
+    rgba(20, 20, 19, 0.4);
+}
+
+.prediction-confirm-modal {
+  width: min(100%, 460px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.prediction-confirm-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  padding: 22px 22px 18px;
+}
+
+.prediction-confirm-heading h2 {
+  margin: 2px 0 0;
+  font-size: 1.24rem;
+  line-height: 1.2;
+}
+
+.prediction-confirm-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 1.15rem;
+}
+
+.prediction-confirm-match {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px 18px 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 20px 22px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  padding: 14px;
+  text-align: center;
+}
+
+.prediction-confirm-match span {
+  min-width: 0;
+  color: var(--text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.prediction-confirm-match strong {
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--primary);
+  font-family: "Inconsolata", monospace;
+  font-size: 1.45rem;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.prediction-confirm-match small {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.prediction-confirm-copy {
+  display: grid;
+  gap: 6px;
+  margin: 0 22px 20px;
+  border-left: 4px solid var(--warning);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warning) 9%, var(--surface));
+  padding: 12px 14px;
+}
+
+.prediction-confirm-copy span {
+  color: var(--muted-light);
+  font-size: 0.9rem;
+}
+
+.prediction-confirm-copy strong {
+  color: var(--text);
+  font-size: 0.94rem;
+}
+
+.prediction-confirm-actions {
+  margin: 0;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  padding: 16px 22px 20px;
+}
+
 .match-form {
   grid-template-columns: 1fr 140px 1fr 1fr 1fr auto;
 }

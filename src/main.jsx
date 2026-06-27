@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup, faSitemap, faMedal, faGear, faChevronLeft, faChevronRight, faRightFromBracket, faUser, faUsers, faCalendarDays, faClipboardList, faChartSimple, faBell, faXmark } from "@fortawesome/free-solid-svg-icons";
 import {
   calculateRanking,
+  APP_VERSION,
   clearedOpeningPredictionMatchIds,
   createInitialState,
   emptyPrediction,
@@ -51,6 +52,8 @@ const PRIMARY_POOL_ID = "copa-2026";
 const STORAGE_SCOPE = ACTIVE_POOL_ID === "copa-2026" ? "" : `:${ACTIVE_POOL_ID}`;
 const SESSION_KEY = `bolao-copa-2026${STORAGE_SCOPE}:session`;
 const CACHE_KEY = `bolao-copa-2026${STORAGE_SCOPE}:cache`;
+const CACHE_SCHEMA_VERSION = `${APP_VERSION}:${__APP_BUILD_ID__}`;
+const SHOULD_USE_POOL_CACHE = !import.meta.env.DEV;
 const DEV_POOL_SEEDED_KEY = `bolao-copa-2026${STORAGE_SCOPE}:seeded`;
 const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
 const DATA_LOAD_TIMEOUT_MS = 7000;
@@ -72,6 +75,10 @@ const LOGIN_TRANSITION_MS = 1250;
 
 function loadSession() {
   try {
+    if (import.meta.env.DEV) {
+      sessionStorage.removeItem(SESSION_KEY);
+      return {};
+    }
     const saved = sessionStorage.getItem(SESSION_KEY);
     return saved ? JSON.parse(saved) : {};
   } catch {
@@ -81,6 +88,7 @@ function loadSession() {
 
 function saveSession(updates) {
   try {
+    if (import.meta.env.DEV) return;
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...loadSession(), ...updates }));
   } catch {}
 }
@@ -91,8 +99,18 @@ function wait(ms) {
 
 function loadCachedPoolState() {
   try {
+    if (!SHOULD_USE_POOL_CACHE) {
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
     const saved = localStorage.getItem(CACHE_KEY);
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    if (parsed?.cacheVersion !== CACHE_SCHEMA_VERSION) {
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -100,7 +118,9 @@ function loadCachedPoolState() {
 
 function saveCachedPoolState(state) {
   try {
+    if (!SHOULD_USE_POOL_CACHE) return;
     localStorage.setItem(CACHE_KEY, JSON.stringify({
+      cacheVersion: CACHE_SCHEMA_VERSION,
       users: state.users ?? [],
       participants: state.participants ?? [],
       predictions: state.predictions ?? {},
@@ -119,7 +139,8 @@ function hasMeaningfulPoolData(state) {
   return Boolean(
     state?.users?.length ||
     state?.participants?.length ||
-    Object.keys(state?.predictions ?? {}).length
+    Object.keys(state?.predictions ?? {}).length ||
+    state?.matches?.length
   );
 }
 
@@ -328,6 +349,7 @@ function App() {
   const [selectedPredictionRound, setSelectedPredictionRound] = useState(null);
   const [selectedResultRound, setSelectedResultRound] = useState(null);
   const [draftPredictions, setDraftPredictions] = useState({});
+  const [pendingPredictionUpdate, setPendingPredictionUpdate] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -723,6 +745,18 @@ function App() {
   }, [activeResultRound, currentUser?.id, isLoading, resultScrollRequest, resultScrollTargetId, tab]);
 
 
+  async function refreshPoolStateFromRemote() {
+    const remote = await withTimeout(
+      fetchPoolState(),
+      DATA_LOAD_TIMEOUT_MS,
+      "Tempo excedido ao atualizar dados do banco."
+    );
+    const cleanedRemote = cleanPoolState(remote);
+    saveCachedPoolState(cleanedRemote);
+    setState((current) => applyRemoteData(current, cleanedRemote));
+    return cleanedRemote;
+  }
+
   function handleTabClick(tabId) {
     setTab(tabId);
     try { sessionStorage.setItem("bol-tab", tabId); } catch {}
@@ -734,14 +768,8 @@ function App() {
         workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
       });
     }
-    if (tabId === "groups" || tabId === "bracket" || tabId === "results") {
-      fetchPoolState()
-        .then((remote) => {
-          const cleanedRemote = cleanPoolState(remote);
-          saveCachedPoolState(cleanedRemote);
-          setState((current) => applyRemoteData(current, cleanedRemote));
-        })
-        .catch(() => {});
+    if (tabId === "groups" || tabId === "bracket" || tabId === "results" || tabId === "ranking") {
+      refreshPoolStateFromRemote().catch(() => {});
     }
   }
 
@@ -774,10 +802,7 @@ function App() {
   async function refreshResults() {
     setSyncStatus({ state: "loading", message: "Buscando placares mais recentes..." });
     try {
-      const remote = await withTimeout(fetchPoolState(), DATA_LOAD_TIMEOUT_MS, "Tempo excedido ao buscar os placares.");
-      const cleanedRemote = cleanPoolState(remote);
-      saveCachedPoolState(cleanedRemote);
-      setState((current) => applyRemoteData(current, cleanedRemote));
+      await refreshPoolStateFromRemote();
       setSyncStatus({ state: "success", message: "Placares mais recentes carregados." });
     } catch (error) {
       setSyncStatus({ state: "error", message: `Não consegui buscar os placares agora. ${error.message}` });
@@ -1055,7 +1080,36 @@ function App() {
     }));
   }
 
-  function savePrediction(participantId, matchId) {
+  function commitPredictionUpdate(update) {
+    if (!update) return;
+    const match = state.matches.find((item) => item.id === update.matchId);
+    if (!match || getMatchRound(match) > activeRound || isMatchClosed(match)) {
+      setPendingPredictionUpdate(null);
+      return;
+    }
+    const savedAt = new Date().toISOString();
+    updateState((current) => appendAuditLog(
+      {
+        ...current,
+        predictions: {
+          ...current.predictions,
+          [update.participantId]: {
+            ...current.predictions[update.participantId],
+            [update.matchId]: { ...emptyPrediction, ...current.predictions[update.participantId]?.[update.matchId], ...update.normalizedDraft, savedAt, updatedAt: savedAt }
+          }
+        }
+      },
+      makeAuditEntry(update.actorName, "prediction_saved", update.detail)
+    ));
+    setDraftPredictions((current) => {
+      const next = { ...current };
+      delete next[update.key];
+      return next;
+    });
+    setPendingPredictionUpdate(null);
+  }
+
+  function savePrediction(participantId, matchId, { confirmUpdate = false } = {}) {
     const key = getPredictionKey(participantId, matchId);
     const match = state.matches.find((item) => item.id === matchId);
     const currentPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
@@ -1070,29 +1124,27 @@ function App() {
 
     const participant = state.participants.find((p) => p.id === participantId);
     const actorName = participant?.name ?? currentUser?.name ?? "Participante";
-    const homeTeam = teamsById[match?.homeTeamId]?.name ?? "?";
-    const awayTeam = teamsById[match?.awayTeamId]?.name ?? "?";
+    const homeTeam = teamsById[match?.homeTeamId]?.name ?? match?.homeSlotLabel ?? "?";
+    const awayTeam = teamsById[match?.awayTeamId]?.name ?? match?.awaySlotLabel ?? "?";
     const detail = `${homeTeam} ${normalizedDraft.home} x ${normalizedDraft.away} ${awayTeam}`;
+    const update = {
+      participantId,
+      matchId,
+      key,
+      currentPrediction,
+      normalizedDraft,
+      actorName,
+      homeTeam,
+      awayTeam,
+      detail
+    };
 
-    const savedAt = new Date().toISOString();
-    updateState((current) => appendAuditLog(
-      {
-        ...current,
-        predictions: {
-          ...current.predictions,
-          [participantId]: {
-            ...current.predictions[participantId],
-            [matchId]: { ...emptyPrediction, ...current.predictions[participantId]?.[matchId], ...normalizedDraft, savedAt, updatedAt: savedAt }
-          }
-        }
-      },
-      makeAuditEntry(actorName, "prediction_saved", detail)
-    ));
-    setDraftPredictions((current) => {
-      const next = { ...current };
-      delete next[key];
-      return next;
-    });
+    if (confirmUpdate && hasPrediction(currentPrediction)) {
+      setPendingPredictionUpdate(update);
+      return;
+    }
+
+    commitPredictionUpdate(update);
   }
 
   async function resetPassword(userId, newPassword) {
@@ -1261,6 +1313,14 @@ function App() {
           notification={notifPopup}
           onClose={() => setNotifPopup(null)}
           onMarkRead={() => { markRead(notifPopup.id); setNotifPopup(null); }}
+        />
+      )}
+
+      {pendingPredictionUpdate && (
+        <PredictionUpdateConfirmModal
+          update={pendingPredictionUpdate}
+          onCancel={() => setPendingPredictionUpdate(null)}
+          onConfirm={() => commitPredictionUpdate(pendingPredictionUpdate)}
         />
       )}
 
@@ -1591,7 +1651,7 @@ function App() {
                             ) : isKickoffLocked ? (
                               <span className="round-locked-pill">Prazo encerrado</span>
                             ) : (
-                              <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id)}>
+                              <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id, { confirmUpdate: isSaved })}>
                                 {isSaved ? "Atualizar palpite" : "Salvar palpite"}
                               </button>
                             )}
@@ -1747,6 +1807,48 @@ function LoginTransitionScreen() {
       </div>
       <p>Entrando no bolão...</p>
     </main>
+  );
+}
+
+function PredictionUpdateConfirmModal({ update, onCancel, onConfirm }) {
+  return (
+    <div className="modal-backdrop prediction-confirm-backdrop" role="presentation" onMouseDown={onCancel}>
+      <section
+        className="modal-card prediction-confirm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="prediction-confirm-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="prediction-confirm-heading">
+          <span className="prediction-confirm-icon" aria-hidden="true">
+            <FontAwesomeIcon icon={faFutbol} />
+          </span>
+          <div>
+            <p className="eyebrow">Atualizar palpite</p>
+            <h2 id="prediction-confirm-title">Confirmar novo placar?</h2>
+          </div>
+        </div>
+
+        <div className="prediction-confirm-match">
+          <span>{update.homeTeam}</span>
+          <strong>{update.normalizedDraft.home}</strong>
+          <small>x</small>
+          <strong>{update.normalizedDraft.away}</strong>
+          <span>{update.awayTeam}</span>
+        </div>
+
+        <div className="prediction-confirm-copy">
+          <span>Palpite atual: {formatPrediction(update.currentPrediction)}</span>
+          <strong>O palpite salvo sera substituido por este novo placar.</strong>
+        </div>
+
+        <div className="modal-actions prediction-confirm-actions">
+          <button type="button" className="ghost" onClick={onCancel}>Cancelar</button>
+          <button type="button" onClick={onConfirm}>Confirmar atualizacao</button>
+        </div>
+      </section>
+    </div>
   );
 }
 
