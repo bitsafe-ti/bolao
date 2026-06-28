@@ -22,6 +22,25 @@ export const ROUND_OF_32_MATCHES = [
   { id: 88, home: groupSlot("D", 2), away: groupSlot("G", 2) }
 ];
 
+export const ROUND_OF_32_SCHEDULE = {
+  73: { date: "2026-06-28T16:00", ground: "Los Angeles (Inglewood)" },
+  76: { date: "2026-06-29T14:00", ground: "Houston" },
+  74: { date: "2026-06-29T17:30", ground: "Boston (Foxborough)" },
+  75: { date: "2026-06-29T22:00", ground: "Monterrey (Guadalupe)" },
+  78: { date: "2026-06-30T14:00", ground: "Dallas (Arlington)" },
+  77: { date: "2026-06-30T18:00", ground: "New York/New Jersey (East Rutherford)" },
+  79: { date: "2026-06-30T22:00", ground: "Mexico City" },
+  80: { date: "2026-07-01T13:00", ground: "Atlanta" },
+  82: { date: "2026-07-01T17:00", ground: "Seattle" },
+  81: { date: "2026-07-01T21:00", ground: "San Francisco Bay Area (Santa Clara)" },
+  84: { date: "2026-07-02T16:00", ground: "Los Angeles (Inglewood)" },
+  83: { date: "2026-07-02T20:00", ground: "Toronto" },
+  85: { date: "2026-07-03T00:00", ground: "Vancouver" },
+  88: { date: "2026-07-03T15:00", ground: "Dallas (Arlington)" },
+  86: { date: "2026-07-03T19:00", ground: "Miami (Miami Gardens)" },
+  87: { date: "2026-07-03T22:30", ground: "Kansas City" }
+};
+
 export const KNOCKOUT_PATH = {
   roundOf16: [
     { id: 89, sources: [74, 77] },
@@ -119,6 +138,30 @@ function resolveGroupSlot(slot, groupsByLetter) {
   };
 }
 
+function parseScore(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const score = Number(value);
+  return Number.isInteger(score) && score >= 0 ? score : null;
+}
+
+function hasFinalResult(match) {
+  const homeScore = parseScore(match?.homeScore);
+  const awayScore = parseScore(match?.awayScore);
+  if (homeScore === null || awayScore === null) return false;
+
+  const status = String(match?.status || match?.statusShort || "").toLowerCase();
+  if (!status) return true;
+  return ["finished", "ft", "aet", "pen", "awd", "wo"].includes(status);
+}
+
+function getMatchWinnerSide(match) {
+  if (!hasFinalResult(match)) return null;
+  const homeScore = parseScore(match?.homeScore);
+  const awayScore = parseScore(match?.awayScore);
+  if (homeScore === awayScore) return null;
+  return homeScore > awayScore ? "home" : "away";
+}
+
 export function buildRoundOf32Bracket(groups, options = {}) {
   const groupsByLetter = new Map(groups.map((group) => [group.group, group]));
   const thirdPlacedTeams = rankThirdPlacedTeams(groups);
@@ -136,6 +179,7 @@ export function buildRoundOf32Bracket(groups, options = {}) {
     ({ rows }) => rows.length === 4 && rows.every((row) => row.played >= 3)
   );
   const groupsComplete = options.groupsComplete ?? standingsComplete;
+  const storedMatchesById = new Map((options.matches ?? []).map((match) => [Number(match.id), match]));
 
   const matches = ROUND_OF_32_MATCHES.map((match) => {
     const home = resolveGroupSlot(match.home, groupsByLetter);
@@ -155,25 +199,50 @@ export function buildRoundOf32Bracket(groups, options = {}) {
           };
         })();
 
-    return { id: match.id, home, away };
+    const storedMatch = storedMatchesById.get(match.id);
+    return {
+      id: match.id,
+      home: storedMatch?.homeTeamId ? { ...home, teamId: storedMatch.homeTeamId, confirmed: true } : home,
+      away: storedMatch?.awayTeamId ? { ...away, teamId: storedMatch.awayTeamId, confirmed: true } : away
+    };
   });
 
-  const makeFutureMatches = (matches) => matches.map((match) => ({
-    id: match.id,
-    home: { teamId: "", name: "", label: `Vencedor do Jogo ${match.sources[0]}` },
-    away: { teamId: "", name: "", label: `Vencedor do Jogo ${match.sources[1]}` },
-    sources: match.sources
-  }));
+  const resolvedById = new Map(matches.map((match) => [match.id, match]));
+  const winnerSlot = (sourceId) => {
+    const source = resolvedById.get(sourceId);
+    const storedMatch = storedMatchesById.get(sourceId);
+    const winnerSide = getMatchWinnerSide(storedMatch);
+    const winner = winnerSide ? source?.[winnerSide] : null;
+    return winner?.teamId
+      ? { ...winner, confirmed: true, label: winner.name || winner.label || `Vencedor do Jogo ${sourceId}` }
+      : { teamId: "", name: "", label: `Vencedor do Jogo ${sourceId}`, confirmed: false };
+  };
+  const makeFutureMatches = (matches) => matches.map((match) => {
+    const projected = {
+      id: match.id,
+      home: winnerSlot(match.sources[0]),
+      away: winnerSlot(match.sources[1]),
+      sources: match.sources
+    };
+    resolvedById.set(match.id, projected);
+    return projected;
+  });
+
+  const roundOf16 = makeFutureMatches(KNOCKOUT_PATH.roundOf16);
+  const quarterFinals = makeFutureMatches(KNOCKOUT_PATH.quarterFinals);
+  const semiFinals = makeFutureMatches(KNOCKOUT_PATH.semiFinals);
+  const final = makeFutureMatches(KNOCKOUT_PATH.final);
+  final[0].winner = winnerSlot(final[0].id);
 
   return {
     groupsComplete,
     matches,
     rounds: {
       roundOf32: matches,
-      roundOf16: makeFutureMatches(KNOCKOUT_PATH.roundOf16),
-      quarterFinals: makeFutureMatches(KNOCKOUT_PATH.quarterFinals),
-      semiFinals: makeFutureMatches(KNOCKOUT_PATH.semiFinals),
-      final: makeFutureMatches(KNOCKOUT_PATH.final)
+      roundOf16,
+      quarterFinals,
+      semiFinals,
+      final
     },
     thirdPlacedTeams,
     hasCompleteThirdAssignment: thirdAssignments.size === thirdMatches.length

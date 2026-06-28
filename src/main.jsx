@@ -52,8 +52,10 @@ const PRIMARY_POOL_ID = "copa-2026";
 const STORAGE_SCOPE = ACTIVE_POOL_ID === "copa-2026" ? "" : `:${ACTIVE_POOL_ID}`;
 const SESSION_KEY = `bolao-copa-2026${STORAGE_SCOPE}:session`;
 const CACHE_KEY = `bolao-copa-2026${STORAGE_SCOPE}:cache`;
-const CACHE_SCHEMA_VERSION = `${APP_VERSION}:${__APP_BUILD_ID__}`;
-const SHOULD_USE_POOL_CACHE = !import.meta.env.DEV;
+const CACHE_SCHEMA_VERSION = String(APP_VERSION);
+const LEGACY_CACHE_SCHEMA_PREFIX = `${APP_VERSION}:`;
+const IS_LOCAL_ONLY_DEV = import.meta.env.DEV && !import.meta.env.VITE_API_BASE_URL;
+const SHOULD_USE_POOL_CACHE = !import.meta.env.DEV || IS_LOCAL_ONLY_DEV;
 const DEV_POOL_SEEDED_KEY = `bolao-copa-2026${STORAGE_SCOPE}:seeded`;
 const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
 const DATA_LOAD_TIMEOUT_MS = 7000;
@@ -75,7 +77,7 @@ const LOGIN_TRANSITION_MS = 1250;
 
 function loadSession() {
   try {
-    if (import.meta.env.DEV) {
+    if (import.meta.env.DEV && !IS_LOCAL_ONLY_DEV) {
       sessionStorage.removeItem(SESSION_KEY);
       return {};
     }
@@ -88,7 +90,7 @@ function loadSession() {
 
 function saveSession(updates) {
   try {
-    if (import.meta.env.DEV) return;
+    if (import.meta.env.DEV && !IS_LOCAL_ONLY_DEV) return;
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...loadSession(), ...updates }));
   } catch {}
 }
@@ -106,7 +108,8 @@ function loadCachedPoolState() {
     const saved = localStorage.getItem(CACHE_KEY);
     if (!saved) return null;
     const parsed = JSON.parse(saved);
-    if (parsed?.cacheVersion !== CACHE_SCHEMA_VERSION) {
+    const cacheVersion = String(parsed?.cacheVersion ?? "");
+    if (cacheVersion !== CACHE_SCHEMA_VERSION && !cacheVersion.startsWith(LEGACY_CACHE_SCHEMA_PREFIX)) {
       localStorage.removeItem(CACHE_KEY);
       return null;
     }
@@ -125,6 +128,7 @@ function saveCachedPoolState(state) {
       participants: state.participants ?? [],
       predictions: state.predictions ?? {},
       auditLogs: state.auditLogs ?? [],
+      notifications: state.notifications ?? [],
       matches: state.matches ?? [],
       lastResultSyncAt: state.lastResultSyncAt ?? "",
       lastResultSyncSource: state.lastResultSyncSource ?? "",
@@ -141,6 +145,27 @@ function hasMeaningfulPoolData(state) {
     state?.participants?.length ||
     Object.keys(state?.predictions ?? {}).length ||
     state?.matches?.length
+  );
+}
+
+function hasRecoverableLocalIdentity(localState, remoteState) {
+  const remoteUserIds = new Set((remoteState?.users ?? []).map((user) => user.id).filter(Boolean));
+  const remoteParticipantIds = new Set((remoteState?.participants ?? []).map((participant) => participant.id).filter(Boolean));
+  const deletedUserIds = new Set(remoteState?.deletedUserIds ?? []);
+  const deletedParticipantIds = new Set(remoteState?.deletedParticipantIds ?? []);
+
+  return Boolean(
+    (localState?.users ?? []).some((user) =>
+      user?.id &&
+      !remoteUserIds.has(user.id) &&
+      !deletedUserIds.has(user.id) &&
+      !deletedParticipantIds.has(user.participantId)
+    ) ||
+    (localState?.participants ?? []).some((participant) =>
+      participant?.id &&
+      !remoteParticipantIds.has(participant.id) &&
+      !deletedParticipantIds.has(participant.id)
+    )
   );
 }
 
@@ -205,7 +230,14 @@ function cleanPoolState(state) {
 }
 
 function getRoundDisplayName(round) {
-  return getKnockoutRoundLabel(round) ?? `Rodada ${round}`;
+  const roundNumber = Number(round);
+  if (roundNumber === 4) return "16 avos";
+  return getKnockoutRoundLabel(roundNumber) ?? `Rodada ${round}`;
+}
+
+function getMatchPhaseDisplayName(match) {
+  const round = getMatchRound(match);
+  return round > 3 ? getRoundDisplayName(round) : match.phase;
 }
 
 function parseScoreValue(value) {
@@ -444,8 +476,8 @@ function App() {
     [state.matches]
   );
   const knockoutBracket = useMemo(
-    () => buildRoundOf32Bracket(groupStandings, { groupsComplete: groupStageComplete }),
-    [groupStandings, groupStageComplete]
+    () => buildRoundOf32Bracket(groupStandings, { groupsComplete: groupStageComplete, matches: state.matches }),
+    [groupStandings, groupStageComplete, state.matches]
   );
   const automaticRound = useMemo(() => getActiveRound(state.matches), [state.matches]);
   const activeRound = useMemo(() => getReleasedPredictionRound(state), [state.matches, state.releasedPredictionRound]);
@@ -525,14 +557,22 @@ function App() {
     saveCachedPoolState(cleaned);
   }, [state]);
 
-  // Auto-fill Round 4 teams from confirmed group standings
+  // Auto-fill knockout teams from standings and completed knockout results
   useEffect(() => {
     if (!knockoutBracket?.matches?.length) return;
     setState((current) => {
+      const bracketMatches = [
+        ...knockoutBracket.rounds.roundOf32,
+        ...knockoutBracket.rounds.roundOf16,
+        ...knockoutBracket.rounds.quarterFinals,
+        ...knockoutBracket.rounds.semiFinals,
+        ...knockoutBracket.rounds.final
+      ];
+      const bracketById = new Map(bracketMatches.map((match) => [Number(match.id), match]));
       let changed = false;
       const updatedMatches = current.matches.map((match) => {
-        if (getMatchRound(match) !== 4) return match;
-        const bm = knockoutBracket.matches.find((m) => m.id === match.id);
+        if (getMatchRound(match) <= 3) return match;
+        const bm = bracketById.get(Number(match.id));
         if (!bm) return match;
         const homeTeamId = bm.home.confirmed && bm.home.teamId ? bm.home.teamId : null;
         const awayTeamId = bm.away.confirmed && bm.away.teamId ? bm.away.teamId : null;
@@ -574,6 +614,19 @@ function App() {
         setSharedStatus({ state: "loading", message: "Atualizando dados do banco..." });
       }
 
+      if (IS_LOCAL_ONLY_DEV) {
+        if (!cached) {
+          setState((current) => cleanPoolState({
+            ...current,
+            currentUserId: session.currentUserId ?? "",
+            activeParticipantId: session.activeParticipantId ?? ""
+          }));
+        }
+        setSharedStatus({ state: "success", message: "Modo dev local: dados salvos neste navegador." });
+        setIsLoading(false);
+        return;
+      }
+
       try {
         let remote = await withTimeout(
           fetchPoolState(),
@@ -608,9 +661,13 @@ function App() {
           }
         } catch {}
 
-        const base = legacyData
-          ? mergePublicPoolState(remote, legacyData, { prefer: "current" })
+        const recoveredFromCache = cached && hasRecoverableLocalIdentity(cached, remote);
+        const remoteWithCache = recoveredFromCache
+          ? mergePublicPoolState(remote, cached, { prefer: "current" })
           : remote;
+        const base = legacyData
+          ? mergePublicPoolState(remoteWithCache, legacyData, { prefer: "current" })
+          : remoteWithCache;
         const cleanedBase = cleanPoolState(base);
         saveCachedPoolState(cleanedBase);
         setState((current) => {
@@ -625,14 +682,21 @@ function App() {
           return cleanPoolState(next);
         });
 
-        // Only persist when migrating legacy localStorage data.
+        // Only persist when migrating legacy localStorage data or recovering a local-only identity.
         // Purge-only changes are intentionally skipped here to avoid a race condition where
         // this write (with auditLogs from the initial D1 fetch) races against a concurrent
         // server update and overwrites audit log entries that were just persisted.
         // Purge is idempotent - expired predictions are removed on every client load, and the
         // next user action will persist the cleaned state via persistAndSync anyway.
-        if (legacyData) {
-          try { await persistPoolState(cleanedBase); } catch {}
+        if (legacyData || recoveredFromCache) {
+          try {
+            const saved = await withTimeout(
+              persistPoolState(cleanedBase),
+              DATA_LOAD_TIMEOUT_MS,
+              "Tempo excedido ao recuperar cadastro local no banco."
+            );
+            saveCachedPoolState(cleanPoolState(saved));
+          } catch {}
         }
 
         setSharedStatus({ state: "success", message: "Dados sincronizados com o banco." });
@@ -788,8 +852,16 @@ function App() {
 
   async function persistAndSync(nextState) {
     saveCachedPoolState(nextState);
+    if (IS_LOCAL_ONLY_DEV) {
+      setSharedStatus({ state: "success", message: "Modo dev local: dados salvos neste navegador." });
+      return;
+    }
     try {
-      const saved = await persistPoolState(nextState);
+      const saved = await withTimeout(
+        persistPoolState(nextState),
+        DATA_LOAD_TIMEOUT_MS,
+        "Tempo excedido ao salvar dados no banco."
+      );
       const cleanedSaved = cleanPoolState(saved);
       saveCachedPoolState(cleanedSaved);
       // prefer: "current" - local deletions and edits always win over the just-saved remote snapshot
@@ -847,21 +919,45 @@ function App() {
     }
 
     const session = { currentUserId: user.id, activeParticipantId: participant.id };
-    setAuthError("");
-    setLoginTransitionActive(true);
-    await wait(LOGIN_TRANSITION_MS);
-    saveSession(session);
-    updateState((current) => appendAuditLog(
+    const nextState = appendAuditLog(
       {
-        ...current,
-        users: [...current.users, user],
-        participants: [...current.participants, participant],
+        ...state,
+        users: [...state.users, user],
+        participants: [...state.participants, participant],
         currentUserId: user.id,
         activeParticipantId: participant.id
       },
       makeAuditEntry(cleanName, "user_registered", maskEmail(cleanEmail))
-    ));
-    setLoginTransitionActive(false);
+    );
+
+    setAuthError("");
+    setLoginTransitionActive(true);
+    try {
+      const saved = IS_LOCAL_ONLY_DEV
+        ? nextState
+        : await withTimeout(
+            persistPoolState(nextState),
+            DATA_LOAD_TIMEOUT_MS,
+            "Tempo excedido ao salvar cadastro no banco."
+          );
+      const cleanedSaved = cleanPoolState(saved);
+      const savedSessionState = cleanPoolState({
+        ...cleanedSaved,
+        users: normalizeUsers(cleanedSaved.users ?? [], SUPER_ADMIN_EMAILS),
+        ...session
+      });
+      saveCachedPoolState(savedSessionState);
+      await wait(LOGIN_TRANSITION_MS);
+      saveSession(session);
+      setState(savedSessionState);
+      if (IS_LOCAL_ONLY_DEV) {
+        setSharedStatus({ state: "success", message: "Modo dev local: cadastro salvo neste navegador." });
+      }
+    } catch (error) {
+      setAuthError(`Não consegui salvar seu cadastro no banco. Tente novamente. ${error.message}`);
+    } finally {
+      setLoginTransitionActive(false);
+    }
   }
 
   async function loginUser({ email, password }) {
@@ -1074,9 +1170,10 @@ function App() {
 
   function updateDraftPrediction(participantId, matchId, field, value) {
     const key = getPredictionKey(participantId, matchId);
+    const storedPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
     setDraftPredictions((current) => ({
       ...current,
-      [key]: { ...emptyPrediction, ...current[key], [field]: value }
+      [key]: { ...emptyPrediction, ...storedPrediction, ...current[key], [field]: value }
     }));
   }
 
@@ -1087,7 +1184,6 @@ function App() {
       setPendingPredictionUpdate(null);
       return;
     }
-    const savedAt = new Date().toISOString();
     updateState((current) => appendAuditLog(
       {
         ...current,
@@ -1095,7 +1191,13 @@ function App() {
           ...current.predictions,
           [update.participantId]: {
             ...current.predictions[update.participantId],
-            [update.matchId]: { ...emptyPrediction, ...current.predictions[update.participantId]?.[update.matchId], ...update.normalizedDraft, savedAt, updatedAt: savedAt }
+            [update.matchId]: (() => {
+              const previous = current.predictions[update.participantId]?.[update.matchId];
+              const previousTime = Date.parse(previous?.updatedAt || previous?.savedAt || "");
+              const nextTime = Math.max(Date.now(), Number.isNaN(previousTime) ? 0 : previousTime + 1);
+              const savedAt = new Date(nextTime).toISOString();
+              return { ...emptyPrediction, ...previous, ...update.normalizedDraft, savedAt, updatedAt: savedAt };
+            })()
           }
         }
       },
@@ -1228,18 +1330,20 @@ function App() {
   }
 
   function releasePredictionRound(round) {
+    const roundName = getRoundDisplayName(round);
     updateState((current) => appendAuditLog(
       {
         ...current,
         releasedPredictionRound: Math.max(Number(current.releasedPredictionRound) || 1, Number(round) || 1)
       },
-      makeAuditEntry(currentUser?.name ?? "Admin", "round_released", `Rodada ${round}`)
+      makeAuditEntry(currentUser?.name ?? "Admin", "round_released", roundName)
     ));
-    setSharedStatus({ state: "success", message: `Rodada ${round} liberada para votação.` });
+    setSharedStatus({ state: "success", message: `${roundName} liberada para votação.` });
   }
 
   function lockRound(round) {
     const now = new Date().toISOString();
+    const roundName = getRoundDisplayName(round);
     updateState((current) => appendAuditLog(
       {
         ...current,
@@ -1247,9 +1351,9 @@ function App() {
           getMatchRound(m) === round ? { ...m, locked: true, updatedAt: now } : m
         )
       },
-      makeAuditEntry(currentUser?.name ?? "Admin", "round_locked", `Rodada ${round}`)
+      makeAuditEntry(currentUser?.name ?? "Admin", "round_locked", roundName)
     ));
-    setSharedStatus({ state: "success", message: `Rodada ${round} travada manualmente.` });
+    setSharedStatus({ state: "success", message: `${roundName} travada manualmente.` });
   }
 
   if (isLoading) {
@@ -1630,7 +1734,7 @@ function App() {
                         <div className="prediction-card-vote">
                         {predictionFeedback?.className === "exact" && <Confetti />}
                         <div className="prediction-match-info">
-                          <span className="badge">{match.phase}</span>
+                          <span className="badge">{getMatchPhaseDisplayName(match)}</span>
                           <div className="prediction-teams-grid">
                             <PredictionTeamColumn side="home" teamId={match.homeTeamId} fallback={match.homeSlotLabel ?? match.home} onHistory={setHistoryTeamId} />
                             <span className="prediction-versus">x</span>
@@ -1872,13 +1976,15 @@ function AuthScreen({ error, onLogin, onRegister }) {
     setTurnstileError("");
     setTurnstileChecking(true);
 
-    const verification = await verifyTurnstileToken(turnstileToken);
-    if (!verification.success) {
-      setTurnstileError(verification.message);
-      setTurnstileToken("");
-      setTurnstileResetKey((key) => key + 1);
-      setTurnstileChecking(false);
-      return;
+    if (!IS_LOCAL_ONLY_DEV) {
+      const verification = await verifyTurnstileToken(turnstileToken);
+      if (!verification.success) {
+        setTurnstileError(verification.message);
+        setTurnstileToken("");
+        setTurnstileResetKey((key) => key + 1);
+        setTurnstileChecking(false);
+        return;
+      }
     }
 
     try {
@@ -1914,13 +2020,15 @@ function AuthScreen({ error, onLogin, onRegister }) {
           {mode === "register" && <label className="form-field"><span>Sobrenome</span><input name="lastName" placeholder="Seu sobrenome" autoComplete="family-name" required /></label>}
           <label className="form-field"><span>E-mail</span><input name="email" type="email" placeholder="voce@exemplo.com" autoComplete="email" required /></label>
           <label className="form-field"><span>Senha</span><input name="password" type="password" placeholder="Sua senha" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength="6" required /></label>
-          <TurnstileWidget
-            resetKey={turnstileResetKey}
-            onToken={(token) => {
-              setTurnstileToken(token);
-              if (token) setTurnstileError("");
-            }}
-          />
+          {!IS_LOCAL_ONLY_DEV && (
+            <TurnstileWidget
+              resetKey={turnstileResetKey}
+              onToken={(token) => {
+                setTurnstileToken(token);
+                if (token) setTurnstileError("");
+              }}
+            />
+          )}
           {turnstileError && <p className="form-error">{turnstileError}</p>}
           {error && <p className="form-error">{error}</p>}
           <button type="submit" disabled={turnstileChecking}>
@@ -2143,7 +2251,7 @@ function TeamHistoryModal({ team, matches, onClose }) {
               return (
                 <article className="team-history-item" key={match.id}>
                   <div className="team-history-tags">
-                    <span className="badge">{match.phase}</span>
+                    <span className="badge">{getMatchPhaseDisplayName(match)}</span>
                     <span className={`result-status ${statusClass}`}>{statusLabel}</span>
                   </div>
                   <div className="team-history-teams">
@@ -2658,7 +2766,7 @@ const ResultCard = React.forwardRef(function ResultCard({ activeParticipant, mat
       {isExactScore && <Confetti />}
       <button type="button" className="result-accordion-toggle" onClick={onToggle} aria-expanded={isOpen}>
         <div className="result-card-tags">
-          <span className="badge">{match.phase}</span>
+          <span className="badge">{getMatchPhaseDisplayName(match)}</span>
           <span className={`result-status ${statusClass}`}>{statusLabel}</span>
         </div>
         <div className="result-card-teams">
@@ -3230,7 +3338,7 @@ function KnockoutBracketBoard({ bracket }) {
     <section className="panel knockout-panel">
       <SectionHeader
         title="Chaveamento"
-        caption="Confrontos da rodada de 32 definidos pela classificação dos grupos."
+        caption="Confrontos dos 16 avos definidos pela classificação dos grupos."
       />
 
       <p className="knockout-note">
@@ -3258,7 +3366,7 @@ function KnockoutBracketBoard({ bracket }) {
 
         <div className="knockout-tree-scroll">
           <div className="knockout-tree">
-            <BracketStage title="Rodada de 32" side="left" level="round32" matches={selectMatches(round32ById, [74, 77, 73, 75, 83, 84, 81, 82])} />
+            <BracketStage title="16 AVOS" side="left" level="round32" matches={selectMatches(round32ById, [74, 77, 73, 75, 83, 84, 81, 82])} />
             <BracketStage title="Oitavas" side="left" level="round16" matches={selectMatches(round16ById, [89, 90, 93, 94])} />
             <BracketStage title="Quartas" side="left" level="quarter" matches={selectMatches(quarterById, [97, 98])} />
             <BracketStage title="Semifinal" side="left" level="semi" matches={selectMatches(semiById, [101])} />
@@ -3279,7 +3387,7 @@ function KnockoutBracketBoard({ bracket }) {
             <BracketStage title="Semifinal" side="right" level="semi" matches={selectMatches(semiById, [102])} />
             <BracketStage title="Quartas" side="right" level="quarter" matches={selectMatches(quarterById, [99, 100])} />
             <BracketStage title="Oitavas" side="right" level="round16" matches={selectMatches(round16ById, [91, 92, 95, 96])} />
-            <BracketStage title="Rodada de 32" side="right" level="round32" matches={selectMatches(round32ById, [76, 78, 79, 80, 86, 88, 85, 87])} />
+            <BracketStage title="16 AVOS" side="right" level="round32" matches={selectMatches(round32ById, [76, 78, 79, 80, 86, 88, 85, 87])} />
           </div>
         </div>
       </section>

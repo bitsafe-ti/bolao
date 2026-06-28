@@ -3,7 +3,9 @@ import test from "node:test";
 import {
   calculateRanking,
   createGroupStageMatches,
+  createKnockoutStageMatches,
   getActiveRound,
+  getKnockoutRoundLabel,
   getPredictionScrollTargetId,
   getLatestResultMatchId,
   getReleasedPredictionRound,
@@ -275,6 +277,15 @@ test("creates group-stage schedule with dates, times and rounds", () => {
   assert.ok(matches.every((match) => match.city && match.stadium && match.country));
 });
 
+test("labels round 4 as 16 avos", () => {
+  const matches = createKnockoutStageMatches();
+
+  assert.equal(getKnockoutRoundLabel(4), "16 avos");
+  assert.ok(matches.filter((match) => match.round === 4).every((match) => match.phase === "16 avos"));
+  assert.equal(matches.find((match) => match.id === 73).date, "2026-06-28T16:00");
+  assert.equal(matches.find((match) => match.id === 88).stadium, "AT&T Stadium");
+});
+
 test("normalizes stored admin role as admin, all others as user", () => {
   const users = normalizeUsers([
     { id: "1", email: "dono@bolao.com", role: "admin" },
@@ -478,6 +489,26 @@ test("shared state merge preserves other users while publishing current user's l
   assert.equal(merged.participants.length, 2);
   assert.deepEqual(merged.predictions.p1.m1.home, "2");
   assert.deepEqual(merged.predictions.p2.m1.home, "0");
+});
+
+test("shared state merge keeps the latest edited prediction", () => {
+  const merged = mergePublicPoolState(
+    {
+      predictions: {
+        p1: { m1: { home: "3", away: "1", savedAt: "2026-06-12T12:05:00.000Z", updatedAt: "2026-06-12T12:05:00.000Z" } }
+      },
+      matches: []
+    },
+    {
+      predictions: {
+        p1: { m1: { home: "1", away: "1", savedAt: "2026-06-12T12:00:00.000Z", updatedAt: "2026-06-12T12:00:00.000Z" } }
+      },
+      matches: []
+    }
+  );
+
+  assert.deepEqual(merged.predictions.p1.m1.home, "3");
+  assert.deepEqual(merged.predictions.p1.m1.away, "1");
 });
 
 test("shared state merge never resurrects deleted users or participants", () => {
