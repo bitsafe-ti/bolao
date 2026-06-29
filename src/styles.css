@@ -336,7 +336,17 @@ select:focus {
   background: var(--dark-bg);
 }
 
+.auth-visual::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(30, 32, 38, 0.52);
+}
+
 .auth-visual img {
+  position: relative;
+  z-index: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
