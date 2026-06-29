@@ -192,6 +192,33 @@ function withTimeout(promise, timeoutMs, message) {
   return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
 }
 
+async function fetchAuthoritativePoolState() {
+  let remote = await withTimeout(
+    fetchPoolState(),
+    DATA_LOAD_TIMEOUT_MS,
+    "Tempo excedido ao carregar dados do banco."
+  );
+
+  if (ACTIVE_POOL_ID !== PRIMARY_POOL_ID && !wasDevPoolSeeded() && !hasMeaningfulPoolData(remote)) {
+    try {
+      const seededRemote = await withTimeout(
+        fetchPoolStateFromPool(PRIMARY_POOL_ID),
+        DATA_LOAD_TIMEOUT_MS,
+        "Tempo excedido ao copiar dados do ambiente principal."
+      );
+      if (hasMeaningfulPoolData(seededRemote)) {
+        remote = seededRemote;
+        try {
+          await persistPoolState(seededRemote);
+          markDevPoolSeeded();
+        } catch {}
+      }
+    } catch {}
+  }
+
+  return remote;
+}
+
 const userTabs = [
   { id: "predictions", label: "Palpites", icon: faFutbol },
   { id: "results", label: "Resultados", icon: faListCheck },
@@ -628,28 +655,7 @@ function App() {
       }
 
       try {
-        let remote = await withTimeout(
-          fetchPoolState(),
-          DATA_LOAD_TIMEOUT_MS,
-          "Tempo excedido ao carregar dados do banco."
-        );
-
-        if (ACTIVE_POOL_ID !== PRIMARY_POOL_ID && !wasDevPoolSeeded() && !hasMeaningfulPoolData(remote)) {
-          try {
-            const seededRemote = await withTimeout(
-              fetchPoolStateFromPool(PRIMARY_POOL_ID),
-              DATA_LOAD_TIMEOUT_MS,
-              "Tempo excedido ao copiar dados do ambiente principal."
-            );
-            if (hasMeaningfulPoolData(seededRemote)) {
-              remote = seededRemote;
-              try {
-                await persistPoolState(seededRemote);
-                markDevPoolSeeded();
-              } catch {}
-            }
-          } catch {}
-        }
+        const remote = await fetchAuthoritativePoolState();
 
         // Migrate any data saved by the old local-first architecture
         let legacyData = null;
@@ -821,6 +827,20 @@ function App() {
     return cleanedRemote;
   }
 
+  async function refreshPoolStateForAuth() {
+    setSharedStatus({ state: "loading", message: "Atualizando dados do banco antes do login..." });
+    const remote = await fetchAuthoritativePoolState();
+    const cleanedRemote = cleanPoolState(remote);
+    const authState = {
+      ...cleanedRemote,
+      users: normalizeUsers(cleanedRemote.users ?? [], SUPER_ADMIN_EMAILS)
+    };
+    saveCachedPoolState(authState);
+    setState((current) => applyRemoteData(current, authState));
+    setSharedStatus({ state: "success", message: "Dados sincronizados com o banco." });
+    return authState;
+  }
+
   function handleTabClick(tabId) {
     setTab(tabId);
     try { sessionStorage.setItem("bol-tab", tabId); } catch {}
@@ -962,7 +982,17 @@ function App() {
 
   async function loginUser({ email, password }) {
     const cleanEmail = email.trim().toLowerCase();
-    const user = state.users.find((item) => item.email === cleanEmail);
+    let authState = state;
+    if (!IS_LOCAL_ONLY_DEV) {
+      try {
+        authState = await refreshPoolStateForAuth();
+      } catch (error) {
+        setAuthError(`Nao consegui atualizar os dados do banco para entrar. Tente novamente. ${error.message}`);
+        return;
+      }
+    }
+
+    const user = authState.users.find((item) => String(item.email || "").toLowerCase() === cleanEmail);
     const validPassword = user ? await verifyPassword(user, password) : false;
     if (!user || !validPassword) {
       setAuthError("E-mail ou senha inválidos.");
@@ -982,14 +1012,20 @@ function App() {
     setLoginTransitionActive(true);
     await wait(LOGIN_TRANSITION_MS);
     saveSession(session);
+    const sessionState = cleanPoolState({
+      ...authState,
+      users: normalizeUsers(authState.users ?? [], SUPER_ADMIN_EMAILS),
+      ...session
+    });
     if (migratedUser) {
-      updateState((current) => ({
-        ...current,
-        ...session,
-        users: current.users.map((item) => (item.id === user.id ? migratedUser : item))
-      }));
+      const migratedState = {
+        ...sessionState,
+        users: sessionState.users.map((item) => (item.id === user.id ? migratedUser : item))
+      };
+      setState(migratedState);
+      void persistAndSync(migratedState);
     } else {
-      setState((current) => ({ ...current, ...session }));
+      setState(sessionState);
     }
     setLoginTransitionActive(false);
   }
