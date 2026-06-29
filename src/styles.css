@@ -340,7 +340,7 @@ select:focus {
   object-fit: cover;
   object-position: center;
   display: block;
-  filter: grayscale(1) brightness(0.45);
+  filter: grayscale(1) brightness(1);
 }
 
 .auth-card {
