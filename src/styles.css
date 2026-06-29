@@ -2635,6 +2635,7 @@ h3 {
 .prediction-card-overview {
   display: grid;
   align-content: start;
+  align-self: start;
   justify-items: stretch;
   gap: 12px;
   min-width: 0;
