@@ -550,6 +550,10 @@ select:focus {
     brightness(0.75);
 }
 
+.workspace > * {
+  flex-shrink: 0;
+}
+
 .workspace {
   display: flex;
   flex-direction: column;
