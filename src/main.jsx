@@ -2035,7 +2035,7 @@ function AuthScreen({ error, onLogin, onRegister }) {
     <main className="auth-page">
       <section className="auth-visual">
         <img
-          src={`${import.meta.env.BASE_URL}capa-bolao-login.png`}
+          src={`${import.meta.env.BASE_URL}capa-bolao.png`}
           alt="Bolão da Copa do Mundo 2026"
           fetchPriority="high"
         />
