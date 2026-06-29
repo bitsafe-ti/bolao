@@ -2281,7 +2281,7 @@ function TeamHistoryModal({ team, matches, onClose }) {
             <p className="eyebrow">Histórico</p>
             <h2 id="team-history-title"><TeamName teamId={team.id} fallback={team.name} /></h2>
           </div>
-          <button type="button" className="modal-close" aria-label="Fechar modal" onClick={onClose}>x</button>
+          <button type="button" className="modal-close" aria-label="Fechar modal" onClick={onClose}>×</button>
         </div>
         {teamMatches.length ? (
           <div className="team-history-list">
@@ -2555,16 +2555,16 @@ function GameRulesPage({ paidParticipants = 0 }) {
     <section className="panel rules-panel">
       <SectionHeader title="Regras do Jogo" />
       <div className="ranking-details rules-details">
-        <div className="ranking-summary">
-          <div>
+        <div className="ranking-summary rules-metrics">
+          <div className="rules-metric-card rules-metric-card-fee">
             <span>Valor por participante</span>
             <strong>{formatCurrency(ENTRY_FEE)}</strong>
           </div>
-          <div>
+          <div className="rules-metric-card rules-metric-card-total">
             <span>Total arrecadado</span>
             <strong>{formatCurrency(totalPoolValue)}</strong>
           </div>
-          <div>
+          <div className="rules-metric-card rules-metric-card-players">
             <span>Apostadores</span>
             <strong>{paidParticipants}</strong>
           </div>
@@ -3161,7 +3161,7 @@ function ScoringExamples() {
           <span>Palpite 2 x 1, resultado 2 x 1.</span>
         </div>
       </div>
-      <div className="scoring-card">
+      <div className="scoring-card scoring-card-winner">
         <div className="scoring-card-header">
           <strong>1</strong>
           <span>ponto</span>
@@ -3171,7 +3171,7 @@ function ScoringExamples() {
           <span>Acertou quem venceu, mesmo sem cravar o placar.</span>
         </div>
       </div>
-      <div className="scoring-card">
+      <div className="scoring-card scoring-card-draw">
         <div className="scoring-card-header">
           <strong>1</strong>
           <span>ponto</span>
