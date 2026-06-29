@@ -224,7 +224,8 @@ const userTabs = [
   { id: "results", label: "Resultados", icon: faListCheck },
   { id: "groups", label: "Grupos", icon: faLayerGroup },
   { id: "bracket", label: "Chaveamento", icon: faSitemap },
-  { id: "ranking", label: "Ranking", icon: faMedal }
+  { id: "ranking", label: "Ranking", icon: faMedal },
+  { id: "rules", label: "Regras", icon: faClipboardList }
 ];
 
 const adminTabs = [
@@ -852,7 +853,7 @@ function App() {
         workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
       });
     }
-    if (tabId === "groups" || tabId === "bracket" || tabId === "results" || tabId === "ranking") {
+    if (tabId === "groups" || tabId === "bracket" || tabId === "results" || tabId === "ranking" || tabId === "rules") {
       refreshPoolStateFromRemote().catch(() => {});
     }
   }
@@ -1871,6 +1872,8 @@ function App() {
 
         {tab === "ranking" && <RankingTable ranking={ranking} matches={state.matches} predictions={state.predictions} currentParticipant={activeParticipant} />}
 
+        {tab === "rules" && <GameRulesPage paidParticipants={ranking.length} />}
+
         <footer className="app-footer">
           <p>© 2026 Bolão Copa do Mundo · Desenvolvido por Guilherme Saraiva</p>
         </footer>
@@ -2525,30 +2528,6 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
           </table>
         </div>
       ) : <EmptyState text={ranking.length ? "Os três primeiros colocados aparecem no pódio." : "O ranking aparece quando houver participantes cadastrados."} />}
-      {!compact && (
-        <div className="ranking-details">
-          <h2 className="ranking-details-title">Informativo</h2>
-          <div className="ranking-summary">
-            <div>
-              <span>Valor por participante</span>
-              <strong>{formatCurrency(ENTRY_FEE)}</strong>
-            </div>
-            <div>
-              <span>Total arrecadado</span>
-              <strong>{formatCurrency(totalPoolValue)}</strong>
-            </div>
-            <div>
-              <span>Apostadores</span>
-              <strong>{paidParticipants}</strong>
-            </div>
-          </div>
-          <ScoringExamples />
-          <div className="ranking-info-grid">
-            <RankingTiebreakerCard />
-            <RankingPrizeNote />
-          </div>
-        </div>
-      )}
       {statsParticipant && (
         <ParticipantStatsModal
           participant={statsParticipant.participant}
@@ -2567,6 +2546,57 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
         />
       )}
     </section>
+  );
+}
+
+function GameRulesPage({ paidParticipants = 0 }) {
+  const totalPoolValue = paidParticipants * ENTRY_FEE;
+  return (
+    <section className="panel rules-panel">
+      <SectionHeader title="Regras do Jogo" />
+      <div className="ranking-details rules-details">
+        <div className="ranking-summary">
+          <div>
+            <span>Valor por participante</span>
+            <strong>{formatCurrency(ENTRY_FEE)}</strong>
+          </div>
+          <div>
+            <span>Total arrecadado</span>
+            <strong>{formatCurrency(totalPoolValue)}</strong>
+          </div>
+          <div>
+            <span>Apostadores</span>
+            <strong>{paidParticipants}</strong>
+          </div>
+        </div>
+        <ScoringExamples />
+        <VoteAdjustmentPolicy />
+        <div className="ranking-info-grid">
+          <RankingTiebreakerCard />
+          <RankingPrizeNote />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function VoteAdjustmentPolicy() {
+  return (
+    <div className="rule-policy-card">
+      <div className="rule-policy-heading">
+        <span>Restrição de voto</span>
+        <strong>Ajuste de palpites após o prazo</strong>
+      </div>
+      <p>
+        Depois que o voto estiver restrito pelo início do jogo, bloqueio manual da rodada ou encerramento do prazo,
+        palpites só poderão ser ajustados mediante evidência de erro do sistema.
+      </p>
+      <ul>
+        <li>O participante deve apresentar a evidência do erro para análise administrativa.</li>
+        <li>A alteração deve corrigir apenas o impacto comprovado pelo erro identificado.</li>
+        <li>Sem evidência de falha do sistema, o palpite registrado permanece válido.</li>
+      </ul>
+    </div>
   );
 }
 

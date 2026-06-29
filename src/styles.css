@@ -4026,6 +4026,10 @@ h3 {
   margin-top: 32px;
 }
 
+.rules-details {
+  margin-top: 0;
+}
+
 .ranking-details-title {
   margin: 0 0 16px;
 }
@@ -4782,6 +4786,52 @@ h3 {
 .ranking-prize-note strong {
   color: var(--text);
   font-size: 1rem;
+  line-height: 1.45;
+}
+
+.rule-policy-card {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--danger);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(30, 32, 38, 0.04);
+}
+
+.rule-policy-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.rule-policy-heading span {
+  color: var(--danger);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rule-policy-heading strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.rule-policy-card p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.rule-policy-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
   line-height: 1.45;
 }
 
