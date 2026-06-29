@@ -3155,7 +3155,7 @@ function ScoringExamples() {
         </div>
         <div className="scoring-card-copy">
           <strong>Placar cravado</strong>
-          <span>Palpite 2 x 1, resultado 2 x 1.</span>
+          <span>Palpite e resultado idênticos — inclusive em empates. Ex: palpite 1 x 1, resultado 1 x 1.</span>
         </div>
       </div>
       <div className="scoring-card scoring-card-winner">
