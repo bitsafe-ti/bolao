@@ -1812,12 +1812,9 @@ function App() {
                           predictions={state.predictions}
                         />
                       ) : (
-                        <div className="prediction-card-overview private" role="note">
-                          <div className="prediction-card-private-notice">
-                            <strong>Palpites protegidos</strong>
-                            <span>Os palpites dos outros participantes serão exibidos somente após o início deste jogo.</span>
-                          </div>
-                        </div>
+                        <p className="prediction-private-notice" role="note">
+                          Os palpites dos participantes serão revelados após o início deste jogo.
+                        </p>
                       )}
                     </article>
                   );

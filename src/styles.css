@@ -2636,55 +2636,46 @@ h3 {
   display: grid;
   align-content: start;
   justify-items: stretch;
-  gap: 10px;
-  border-left: 1px solid var(--line);
+  gap: 12px;
   min-width: 0;
-  padding-left: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
   text-align: center;
 }
 
-.prediction-card-overview.private {
-  align-content: center;
-  border-radius: 8px;
-  background: var(--secondary-soft);
-  padding: 24px;
-}
-
-.prediction-card-private-notice {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-}
-
-.prediction-card-private-notice strong {
-  color: var(--secondary);
-}
-
-.prediction-card-private-notice span {
-  max-width: 320px;
+.prediction-private-notice {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 4px 0;
+  margin: 0;
 }
 
 .prediction-card-overview-header {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--line);
 }
 
 .prediction-card-overview-header strong {
-  font-size: 0.88rem;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .prediction-card-overview-header span {
   border-radius: 999px;
   background: var(--secondary-soft);
   color: var(--secondary);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
-  padding: 5px 9px;
+  padding: 3px 9px;
   white-space: nowrap;
 }
 
@@ -2698,16 +2689,37 @@ h3 {
   table-layout: fixed;
 }
 
+.prediction-card-overview .compact-table thead tr {
+  border-bottom: 1px solid var(--line);
+}
+
 .prediction-card-overview .compact-table th,
 .prediction-card-overview .compact-table td {
-  padding: 10px 6px;
+  padding: 9px 4px;
   text-align: center;
+}
+
+.prediction-card-overview .compact-table th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.prediction-card-overview .compact-table tbody tr {
+  border-bottom: 1px solid var(--line);
+}
+
+.prediction-card-overview .compact-table tbody tr:last-child {
+  border-bottom: none;
 }
 
 .prediction-card-overview .compact-table th:nth-child(1),
 .prediction-card-overview .compact-table td:nth-child(1) {
   width: 44%;
   overflow-wrap: anywhere;
+  text-align: left;
 }
 
 .prediction-card-overview .compact-table th:nth-child(2),
@@ -5783,9 +5795,6 @@ tr:last-child td {
   }
 
   .prediction-card-overview {
-    border-left: 0;
-    border-top: 1px solid var(--line);
-    padding-left: 0;
     padding-top: 14px;
   }
 
