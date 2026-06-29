@@ -41,6 +41,16 @@
   --text-muted: #848e9c;
   --border: #e6e8ea;
   --surface-2: rgba(0, 0, 0, 0.03);
+  /* Type scale (base: 14px body) */
+  --font-2xs: 0.714rem;   /* 10px */
+  --font-xs:  0.786rem;   /* 11px */
+  --font-sm:  0.857rem;   /* 12px */
+  --font-base: 1rem;      /* 14px */
+  --font-md:  1.071rem;   /* 15px */
+  --font-lg:  1.143rem;   /* 16px */
+  --font-xl:  1.286rem;   /* 18px */
+  --font-2xl: 1.429rem;   /* 20px */
+  --font-3xl: 1.714rem;   /* 24px */
   font-family:
     "Inter",
     ui-sans-serif,
@@ -867,25 +877,22 @@ p {
 }
 
 h1 {
-  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   font-weight: 700;
-  font-size: 24px;
+  font-size: var(--font-3xl);
   line-height: 1.2;
   margin-bottom: 0;
 }
 
 h2 {
-  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   font-weight: 700;
-  font-size: 20px;
+  font-size: var(--font-2xl);
   line-height: 1.25;
   margin-bottom: 8px;
 }
 
 h3 {
-  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
-  font-size: 16px;
+  font-size: var(--font-lg);
   line-height: 1.3;
   margin-bottom: 4px;
 }
@@ -1141,7 +1148,7 @@ h3 {
 }
 
 .app-footer p {
-  font-size: 12px;
+  font-size: var(--font-sm);
   color: var(--text-muted);
   margin: 0;
 }
@@ -1167,6 +1174,7 @@ h3 {
 }
 
 .section-header p {
+  font-size: var(--font-sm);
   color: var(--muted);
   margin-bottom: 0;
   text-align: right;
@@ -2698,12 +2706,12 @@ h3 {
 
 .prediction-card-overview .compact-table th,
 .prediction-card-overview .compact-table td {
-  padding: 9px 4px;
+  padding: 10px 12px;
   text-align: center;
 }
 
 .prediction-card-overview .compact-table th {
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
@@ -2723,6 +2731,7 @@ h3 {
   width: 44%;
   overflow-wrap: anywhere;
   text-align: left;
+  padding-left: 4px;
 }
 
 .prediction-card-overview .compact-table th:nth-child(2),
@@ -3236,12 +3245,21 @@ h3 {
   table-layout: fixed;
 }
 
+.compact-table th {
+  font-size: var(--font-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
 .compact-table th,
 .compact-table td {
   overflow-wrap: break-word;
   word-break: break-word;
   vertical-align: middle;
   padding: 10px 12px;
+  font-size: var(--font-base);
 }
 
 .compact-table th:last-child,
