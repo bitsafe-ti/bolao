@@ -2668,7 +2668,7 @@ h3 {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
-  padding-bottom: 2px;
+  padding-bottom: 15px;
   border-bottom: 1px solid var(--line);
 }
 
