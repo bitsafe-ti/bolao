@@ -4789,6 +4789,219 @@ h3 {
   line-height: 1.45;
 }
 
+.rules-summary-cards {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.rule-summary-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(190px, 0.22fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, var(--primary));
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ffffff 0%, color-mix(in srgb, var(--primary) 3%, #ffffff) 100%);
+  box-shadow: 0 10px 24px rgba(30, 32, 38, 0.07);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.rule-summary-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--primary);
+}
+
+.rule-summary-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
+  box-shadow: 0 14px 30px rgba(30, 32, 38, 0.1);
+}
+
+.rule-summary-card-danger {
+  border-color: color-mix(in srgb, var(--danger) 18%, var(--line));
+  background: linear-gradient(135deg, #ffffff 0%, color-mix(in srgb, var(--danger) 5%, #ffffff) 100%);
+}
+
+.rule-summary-card-danger::before {
+  background: var(--danger);
+}
+
+.rule-summary-card-danger:hover {
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--line));
+}
+
+.rule-summary-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 18px 18px 18px 24px;
+  border-right: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  background: color-mix(in srgb, var(--primary) 6%, #ffffff);
+}
+
+.rule-summary-card-danger .rule-summary-card-heading {
+  background: color-mix(in srgb, var(--danger) 7%, #ffffff);
+}
+
+.rule-summary-card-heading > span {
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  padding: 6px 10px;
+  text-transform: uppercase;
+  text-align: center;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 18%, var(--line));
+}
+
+.rule-summary-card-danger .rule-summary-card-heading > span {
+  color: var(--danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 22%, var(--line));
+}
+
+.rule-summary-card-title {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 8%, #ffffff);
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.35;
+  padding: 8px 10px;
+}
+
+.rule-summary-card-danger .rule-summary-card-title {
+  background: color-mix(in srgb, var(--danger) 8%, #ffffff);
+}
+
+.rule-summary-card-body {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 20px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.rule-summary-card-body p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.rule-summary-card-danger .rule-summary-card-body {
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+  align-items: start;
+}
+
+.rule-summary-card-danger .rule-summary-card-title {
+  grid-column: 1 / -1;
+}
+
+.rule-summary-card-body ul,
+.rule-summary-card-body ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rule-summary-card-criteria .rule-summary-card-body ol,
+.rule-summary-card-prize .rule-summary-card-body ol {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rule-summary-card-prize .rule-summary-card-body ol {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rule-summary-card-body li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.rule-summary-card-body li::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.rule-summary-card-danger .rule-summary-card-body li::before {
+  background: var(--danger);
+}
+
+.rule-summary-card-body ol li::before {
+  content: none;
+}
+
+.rule-summary-card-body li > strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 10%, #ffffff);
+  color: var(--primary);
+  font-weight: 900;
+  font-size: 0.82rem;
+}
+
+.rule-summary-card-body li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .rule-summary-card {
+    grid-template-columns: 1fr;
+  }
+
+  .rule-summary-card-heading {
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  }
+
+  .rule-summary-card-criteria .rule-summary-card-body ol,
+  .rule-summary-card-prize .rule-summary-card-body ol {
+    grid-template-columns: 1fr;
+  }
+
+  .rule-summary-card-danger .rule-summary-card-body {
+    grid-template-columns: 1fr;
+  }
+}
+
 .rule-policy-card {
   display: grid;
   gap: 12px;

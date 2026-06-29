@@ -2570,32 +2570,59 @@ function GameRulesPage({ paidParticipants = 0 }) {
           </div>
         </div>
         <ScoringExamples />
-        <VoteAdjustmentPolicy />
-        <div className="ranking-info-grid">
-          <RankingTiebreakerCard />
-          <RankingPrizeNote />
-        </div>
+        <RuleSummaryCards />
       </div>
     </section>
   );
 }
 
-function VoteAdjustmentPolicy() {
+function RuleSummaryCards() {
   return (
-    <div className="rule-policy-card">
-      <div className="rule-policy-heading">
-        <span>Restrição de voto</span>
-        <strong>Ajuste de palpites após o prazo</strong>
-      </div>
-      <p>
-        Depois que o voto estiver restrito pelo início do jogo, bloqueio manual da rodada ou encerramento do prazo,
-        palpites só poderão ser ajustados mediante evidência de erro do sistema.
-      </p>
-      <ul>
-        <li>O participante deve apresentar a evidência do erro para análise administrativa.</li>
-        <li>A alteração deve corrigir apenas o impacto comprovado pelo erro identificado.</li>
-        <li>Sem evidência de falha do sistema, o palpite registrado permanece válido.</li>
-      </ul>
+    <div className="rules-summary-cards">
+      <article className="rule-summary-card rule-summary-card-danger">
+        <div className="rule-summary-card-heading">
+          <span>Restri&ccedil;&atilde;o de voto</span>
+        </div>
+        <div className="rule-summary-card-body">
+          <strong className="rule-summary-card-title">Ajuste de palpites ap&oacute;s o prazo</strong>
+          <p>
+            Depois que o voto estiver restrito pelo in&iacute;cio do jogo, bloqueio manual da rodada ou encerramento do prazo,
+            palpites s&oacute; poder&atilde;o ser ajustados mediante evid&ecirc;ncia de erro do sistema.
+          </p>
+          <ul>
+            <li>O participante deve apresentar a evid&ecirc;ncia do erro para an&aacute;lise administrativa.</li>
+            <li>A altera&ccedil;&atilde;o deve corrigir apenas o impacto comprovado pelo erro identificado.</li>
+            <li>Sem evid&ecirc;ncia de falha do sistema, o palpite registrado permanece v&aacute;lido.</li>
+          </ul>
+        </div>
+      </article>
+      <article className="rule-summary-card rule-summary-card-criteria">
+        <div className="rule-summary-card-heading">
+          <span>Crit&eacute;rios de desempate</span>
+        </div>
+        <div className="rule-summary-card-body">
+          <strong className="rule-summary-card-title">Se houver empate na pontua&ccedil;&atilde;o final</strong>
+          <ol>
+            <li><strong>1</strong><span>Maior n&uacute;mero de placares cravados.</span></li>
+            <li><strong>2</strong><span>Maior n&uacute;mero de acertos de 1 ponto.</span></li>
+            <li><strong>3</strong><span>Maior total de gols palpitados no torneio.</span></li>
+            <li><strong>4</strong><span>Persistindo o empate, prevalece a ordem alfab&eacute;tica.</span></li>
+          </ol>
+        </div>
+      </article>
+      <article className="rule-summary-card rule-summary-card-prize">
+        <div className="rule-summary-card-heading">
+          <span>Premia&ccedil;&atilde;o final</span>
+        </div>
+        <div className="rule-summary-card-body">
+          <strong className="rule-summary-card-title">O valor acumulado ser&aacute; dividido entre os tr&ecirc;s primeiros colocados ao final do campeonato.</strong>
+          <ol>
+            <li><strong>1&ordm;</strong><span>50% do total arrecadado.</span></li>
+            <li><strong>2&ordm;</strong><span>30% do total arrecadado.</span></li>
+            <li><strong>3&ordm;</strong><span>20% do total arrecadado.</span></li>
+          </ol>
+        </div>
+      </article>
     </div>
   );
 }
