@@ -541,6 +541,8 @@ select:focus {
 }
 
 .workspace {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   padding: 22px;
   height: 100vh;
@@ -1132,8 +1134,8 @@ h3 {
 }
 
 .app-footer {
-  margin-top: 48px;
-  padding: 16px 0 8px;
+  margin-top: auto;
+  padding: 24px 0 8px;
   border-top: 1px solid var(--border);
   text-align: center;
 }
