@@ -6,6 +6,8 @@ import {
   createKnockoutStageMatches,
   getActiveRound,
   getKnockoutRoundLabel,
+  getKnockoutWinnerSide,
+  getMatchKnockoutResult,
   getPredictionScrollTargetId,
   getLatestResultMatchId,
   getReleasedPredictionRound,
@@ -109,6 +111,34 @@ test("scores knockout classified side when the scoreline is wrong", () => {
   };
 
   assert.equal(scorePrediction(prediction, match), 3);
+});
+
+test("infers knockout winner and penalties from shootout goals", () => {
+  const match = {
+    id: 75,
+    round: 4,
+    date: "2026-06-30T22:00",
+    homeScore: "1",
+    awayScore: "1",
+    statusShort: "FT-Pens",
+    homeGoals: [
+      { name: "Mandante", minute: 72, penalty: false },
+      { name: "Mandante penalti 1", minute: 120, penalty: true },
+      { name: "Mandante penalti 2", minute: 120, penalty: true }
+    ],
+    awayGoals: [
+      { name: "Visitante", minute: 90, penalty: false },
+      { name: "Visitante penalti 1", minute: 120, penalty: true },
+      { name: "Visitante penalti 2", minute: 120, penalty: true },
+      { name: "Visitante penalti 3", minute: 120, penalty: true }
+    ]
+  };
+
+  const knockout = getMatchKnockoutResult(match);
+  assert.equal(getKnockoutWinnerSide(match), "away");
+  assert.equal(knockout.goesToPenalties, true);
+  assert.equal(knockout.penaltiesHome, 2);
+  assert.equal(knockout.penaltiesAway, 3);
 });
 
 test("does not apply knockout bonuses before the effective date", () => {

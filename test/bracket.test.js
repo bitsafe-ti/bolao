@@ -107,3 +107,33 @@ test("buildRoundOf32Bracket avanca classificado em empate decidido nos penaltis"
   assert.equal(match90.home.teamId, "B-2");
   assert.equal(match90.home.confirmed, true);
 });
+
+test("buildRoundOf32Bracket infere vencedor de penaltis pelos gols da disputa", () => {
+  const bracket = buildRoundOf32Bracket(makeGroups(), {
+    matches: [
+      {
+        id: 75,
+        homeTeamId: "F-1",
+        awayTeamId: "C-2",
+        homeScore: "1",
+        awayScore: "1",
+        statusShort: "FT-Pens",
+        homeGoals: [
+          { name: "Mandante", minute: 72, penalty: false },
+          { name: "Mandante penalti 1", minute: 120, penalty: true },
+          { name: "Mandante penalti 2", minute: 120, penalty: true }
+        ],
+        awayGoals: [
+          { name: "Visitante", minute: 90, penalty: false },
+          { name: "Visitante penalti 1", minute: 120, penalty: true },
+          { name: "Visitante penalti 2", minute: 120, penalty: true },
+          { name: "Visitante penalti 3", minute: 120, penalty: true }
+        ]
+      }
+    ]
+  });
+
+  const match90 = bracket.rounds.roundOf16.find((match) => match.id === 90);
+  assert.equal(match90.away.teamId, "C-2");
+  assert.equal(match90.away.confirmed, true);
+});

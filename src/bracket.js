@@ -151,7 +151,23 @@ function hasFinalResult(match) {
 
   const status = String(match?.status || match?.statusShort || "").toLowerCase();
   if (!status) return true;
-  return ["finished", "ft", "aet", "pen", "awd", "wo"].includes(status);
+  return ["finished", "ft", "aet", "pen", "awd", "wo"].includes(status) || status.includes("pen");
+}
+
+function getPenaltyShootoutScore(match) {
+  const explicitHome = parseScore(match?.penaltiesHome);
+  const explicitAway = parseScore(match?.penaltiesAway);
+  if (explicitHome !== null && explicitAway !== null) {
+    return { home: explicitHome, away: explicitAway };
+  }
+
+  const countPenaltyGoals = (goals = []) => goals.filter((goal) => {
+    const minute = Number(goal?.minute);
+    return goal?.penalty && Number.isFinite(minute) && minute >= 120;
+  }).length;
+  const home = countPenaltyGoals(match?.homeGoals);
+  const away = countPenaltyGoals(match?.awayGoals);
+  return home || away ? { home, away } : null;
 }
 
 function getMatchWinnerSide(match) {
@@ -159,7 +175,11 @@ function getMatchWinnerSide(match) {
   if (["home", "away"].includes(match?.qualifiedSide)) return match.qualifiedSide;
   const homeScore = parseScore(match?.homeScore);
   const awayScore = parseScore(match?.awayScore);
-  if (homeScore === awayScore) return null;
+  if (homeScore === awayScore) {
+    const penalties = getPenaltyShootoutScore(match);
+    if (!penalties || penalties.home === penalties.away) return null;
+    return penalties.home > penalties.away ? "home" : "away";
+  }
   return homeScore > awayScore ? "home" : "away";
 }
 

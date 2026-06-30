@@ -64,11 +64,38 @@ export function normalizeKnockoutPrediction(prediction = {}) {
   };
 }
 
+function isPenaltyStatus(match) {
+  return [match?.status, match?.statusShort]
+    .map((status) => String(status || "").toLowerCase())
+    .some((status) => status === "pen" || status.includes("pen"));
+}
+
+function getPenaltyShootoutScore(match) {
+  const explicitHome = parseScore(match?.penaltiesHome);
+  const explicitAway = parseScore(match?.penaltiesAway);
+  if (explicitHome !== null && explicitAway !== null) {
+    return { home: explicitHome, away: explicitAway };
+  }
+
+  const countPenaltyGoals = (goals = []) => goals.filter((goal) => {
+    const minute = Number(goal?.minute);
+    return goal?.penalty && Number.isFinite(minute) && minute >= 120;
+  }).length;
+  const home = countPenaltyGoals(match?.homeGoals);
+  const away = countPenaltyGoals(match?.awayGoals);
+  return home || away ? { home, away } : null;
+}
+
 export function getKnockoutWinnerSide(match) {
   if (["home", "away"].includes(match?.qualifiedSide)) return match.qualifiedSide;
   const actualHome = parseScore(match?.homeScore);
   const actualAway = parseScore(match?.awayScore);
-  if (actualHome === null || actualAway === null || actualHome === actualAway) return "";
+  if (actualHome === null || actualAway === null) return "";
+  if (actualHome === actualAway) {
+    const penalties = getPenaltyShootoutScore(match);
+    if (!penalties || penalties.home === penalties.away) return "";
+    return penalties.home > penalties.away ? "home" : "away";
+  }
   return actualHome > actualAway ? "home" : "away";
 }
 
@@ -84,12 +111,14 @@ export function getPredictionQualifiedSide(prediction, match) {
 
 export function getMatchKnockoutResult(match) {
   const status = String(match?.status || match?.statusShort || "").toLowerCase();
+  const penalties = getPenaltyShootoutScore(match);
+  const wentToPenalties = Boolean(match?.goesToPenalties) || isPenaltyStatus(match) || Boolean(penalties);
   return {
-    goesToExtraTime: Boolean(match?.goesToExtraTime) || ["aet", "pen"].includes(status),
-    goesToPenalties: Boolean(match?.goesToPenalties) || status === "pen",
+    goesToExtraTime: Boolean(match?.goesToExtraTime) || wentToPenalties || ["aet", "pen"].includes(status),
+    goesToPenalties: wentToPenalties,
     qualifiedSide: getKnockoutWinnerSide(match),
-    penaltiesHome: match?.penaltiesHome ?? "",
-    penaltiesAway: match?.penaltiesAway ?? ""
+    penaltiesHome: match?.penaltiesHome || penalties?.home || "",
+    penaltiesAway: match?.penaltiesAway || penalties?.away || ""
   };
 }
 
@@ -100,7 +129,7 @@ export function isMatchResultFinal(match) {
 
   const status = String(match?.status || match?.statusShort || "").toLowerCase();
   if (!status) return true;
-  if (["finished", "ft", "aet", "pen", "awd", "wo"].includes(status)) return true;
+  if (["finished", "ft", "aet", "pen", "awd", "wo"].includes(status) || status.includes("pen")) return true;
 
   // If the match has scores but the status wasn't updated to a finished value
   // (e.g. sync worker stored scores while the provider returned an unexpected statusShort),
