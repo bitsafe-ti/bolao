@@ -10,6 +10,7 @@ import {
   getMatchKnockoutResult,
   getPredictionScrollTargetId,
   getLatestResultMatchId,
+  getPredictionQualifiedSide,
   getReleasedPredictionRound,
   hasMatchStarted,
   normalizeUsers,
@@ -139,6 +140,31 @@ test("infers knockout winner and penalties from shootout goals", () => {
   assert.equal(knockout.goesToPenalties, true);
   assert.equal(knockout.penaltiesHome, 2);
   assert.equal(knockout.penaltiesAway, 3);
+});
+
+test("infers predicted knockout classified side from score or penalties", () => {
+  const match = { id: 76, round: 4, date: "2026-06-30T22:00" };
+
+  assert.equal(getPredictionQualifiedSide({ home: "2", away: "1" }, match), "home");
+  assert.equal(getPredictionQualifiedSide({
+    home: "1",
+    away: "1",
+    knockout: {
+      goesToExtraTime: true,
+      goesToPenalties: true,
+      penaltiesHome: "3",
+      penaltiesAway: "4"
+    }
+  }, match), "away");
+  assert.equal(getPredictionQualifiedSide({
+    home: "1",
+    away: "1",
+    knockout: {
+      qualifiedSide: "home",
+      goesToExtraTime: true,
+      goesToPenalties: false
+    }
+  }, match), "");
 });
 
 test("does not apply knockout bonuses before the effective date", () => {

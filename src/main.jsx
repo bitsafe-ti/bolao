@@ -280,6 +280,10 @@ function parseScoreValue(value) {
   return Number.isInteger(score) ? score : null;
 }
 
+function parsePredictionScoreValue(value) {
+  return value === "" || value === null || value === undefined ? 0 : parseScoreValue(value);
+}
+
 function maskEmail(email = "") {
   const [name = "", domain = ""] = String(email).split("@");
   if (!name || !domain) return "";
@@ -439,6 +443,7 @@ function App() {
   const [selectedResultRound, setSelectedResultRound] = useState(null);
   const [draftPredictions, setDraftPredictions] = useState({});
   const [pendingPredictionUpdate, setPendingPredictionUpdate] = useState(null);
+  const [predictionNotice, setPredictionNotice] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -1268,15 +1273,38 @@ function App() {
 
   function updateDraftPrediction(participantId, matchId, field, value) {
     const key = getPredictionKey(participantId, matchId);
+    const match = state.matches.find((item) => item.id === matchId);
     const storedPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
-    setDraftPredictions((current) => ({
-      ...current,
-      [key]: { ...emptyPrediction, ...storedPrediction, ...current[key], [field]: value }
-    }));
+    setDraftPredictions((current) => {
+      const draft = { ...emptyPrediction, ...storedPrediction, ...current[key], [field]: value };
+      if (isKnockoutMatch(match)) {
+        const knockout = {
+          ...emptyKnockoutPrediction,
+          ...normalizeKnockoutPrediction(storedPrediction),
+          ...(current[key]?.knockout ? normalizeKnockoutPrediction(current[key]) : {})
+        };
+        const predictedHome = parsePredictionScoreValue(draft.home);
+        const predictedAway = parsePredictionScoreValue(draft.away);
+        if (predictedHome !== null && predictedAway !== null && predictedHome !== predictedAway) {
+          draft.knockout = {
+            ...emptyKnockoutPrediction,
+            qualifiedSide: predictedHome > predictedAway ? "home" : "away"
+          };
+        } else if (predictedHome !== null && predictedAway !== null) {
+          draft.knockout = { ...knockout, qualifiedSide: "" };
+        }
+      }
+      return {
+        ...current,
+        [key]: draft
+      };
+    });
   }
 
   function updateDraftKnockoutPrediction(participantId, matchId, field, value) {
+    if (field === "qualifiedSide") return;
     const key = getPredictionKey(participantId, matchId);
+    const match = state.matches.find((item) => item.id === matchId);
     const storedPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
     setDraftPredictions((current) => {
       const draft = { ...emptyPrediction, ...storedPrediction, ...current[key] };
@@ -1286,8 +1314,29 @@ function App() {
         ...(current[key]?.knockout ? normalizeKnockoutPrediction(current[key]) : {}),
         [field]: value
       };
+      const predictedHome = parsePredictionScoreValue(draft.home);
+      const predictedAway = parsePredictionScoreValue(draft.away);
+      if (predictedHome === null || predictedAway === null || predictedHome !== predictedAway) {
+        return {
+          ...current,
+          [key]: {
+            ...draft,
+            knockout: {
+              ...emptyKnockoutPrediction,
+              qualifiedSide: predictedHome !== null && predictedAway !== null
+                ? predictedHome > predictedAway ? "home" : "away"
+                : ""
+            }
+          }
+        };
+      }
       if (field === "goesToPenalties" && value) knockout.goesToExtraTime = true;
       if (field === "goesToExtraTime" && !value) knockout.goesToPenalties = false;
+      if (!knockout.goesToPenalties) {
+        knockout.penaltiesHome = "";
+        knockout.penaltiesAway = "";
+      }
+      knockout.qualifiedSide = getPredictionQualifiedSide({ ...draft, knockout }, match);
       return {
         ...current,
         [key]: { ...draft, knockout }
@@ -1345,22 +1394,40 @@ function App() {
       const knockout = normalizeKnockoutPrediction(draft);
       const predictedHome = parseScoreValue(normalizedDraft.home);
       const predictedAway = parseScoreValue(normalizedDraft.away);
-      let qualifiedSide = knockout.qualifiedSide;
-      if (!qualifiedSide && predictedHome !== null && predictedAway !== null && predictedHome !== predictedAway) {
-        qualifiedSide = predictedHome > predictedAway ? "home" : "away";
-      }
-      if (!qualifiedSide) {
-        window.alert("Escolha quem se classifica neste jogo de mata-mata.");
+      if (predictedHome === null || predictedAway === null) {
+        setPredictionNotice({
+          title: "Placar incompleto",
+          message: "Informe o placar do palpite antes de salvar."
+        });
         return;
       }
+      const isDrawPrediction = predictedHome === predictedAway;
+      const penaltiesHome = parseScoreValue(knockout.penaltiesHome);
+      const penaltiesAway = parseScoreValue(knockout.penaltiesAway);
+      if (isDrawPrediction && !knockout.goesToPenalties) {
+        setPredictionNotice({
+          title: "Defina a decisao",
+          message: "Como o placar ficou empatado, marque penaltis e informe o placar da disputa para definir o classificado."
+        });
+        return;
+      }
+      if (isDrawPrediction && (penaltiesHome === null || penaltiesAway === null || penaltiesHome === penaltiesAway)) {
+        setPredictionNotice({
+          title: "Penaltis indefinidos",
+          message: "Informe um placar de penaltis diferente para definir o classificado."
+        });
+        return;
+      }
+      const qualifiedSide = isDrawPrediction
+        ? penaltiesHome > penaltiesAway ? "home" : "away"
+        : predictedHome > predictedAway ? "home" : "away";
       normalizedDraft.knockout = {
         ...emptyKnockoutPrediction,
-        ...knockout,
-        goesToExtraTime: Boolean(knockout.goesToExtraTime || knockout.goesToPenalties),
-        goesToPenalties: Boolean(knockout.goesToPenalties),
+        goesToExtraTime: isDrawPrediction ? Boolean(knockout.goesToExtraTime || knockout.goesToPenalties) : false,
+        goesToPenalties: isDrawPrediction ? Boolean(knockout.goesToPenalties) : false,
         qualifiedSide,
-        penaltiesHome: knockout.goesToPenalties ? (knockout.penaltiesHome !== "" ? knockout.penaltiesHome : "0") : "",
-        penaltiesAway: knockout.goesToPenalties ? (knockout.penaltiesAway !== "" ? knockout.penaltiesAway : "0") : ""
+        penaltiesHome: isDrawPrediction && knockout.goesToPenalties ? String(penaltiesHome) : "",
+        penaltiesAway: isDrawPrediction && knockout.goesToPenalties ? String(penaltiesAway) : ""
       };
     }
 
@@ -1569,6 +1636,13 @@ function App() {
           update={pendingPredictionUpdate}
           onCancel={() => setPendingPredictionUpdate(null)}
           onConfirm={() => commitPredictionUpdate(pendingPredictionUpdate)}
+        />
+      )}
+
+      {predictionNotice && (
+        <PredictionNoticeModal
+          notice={predictionNotice}
+          onClose={() => setPredictionNotice(null)}
         />
       )}
 
@@ -2107,6 +2181,39 @@ function PredictionUpdateConfirmModal({ update, onCancel, onConfirm }) {
   );
 }
 
+function PredictionNoticeModal({ notice, onClose }) {
+  return (
+    <div className="modal-backdrop prediction-confirm-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="modal-card prediction-notice-modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="prediction-notice-title"
+        aria-describedby="prediction-notice-message"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="prediction-notice-heading">
+          <span className="prediction-notice-icon" aria-hidden="true">
+            <FontAwesomeIcon icon={faListCheck} />
+          </span>
+          <div>
+            <p className="eyebrow">Palpite de mata-mata</p>
+            <h2 id="prediction-notice-title">{notice.title}</h2>
+          </div>
+        </div>
+
+        <p id="prediction-notice-message" className="prediction-notice-copy">
+          {notice.message}
+        </p>
+
+        <div className="modal-actions prediction-notice-actions">
+          <button type="button" onClick={onClose}>Entendi</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function AuthScreen({ error, onLogin, onRegister }) {
   const [mode, setMode] = useState("login");
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -2458,52 +2565,52 @@ function MatchSideTeam({ match, side }) {
 
 function KnockoutPredictionFields({ match, prediction, disabled = false, onChange }) {
   const knockout = normalizeKnockoutPrediction(prediction);
-  const qualifiedSide = getPredictionQualifiedSide(prediction, match);
+  const decisionPrediction = {
+    ...prediction,
+    home: prediction?.home === "" || prediction?.home === undefined ? "0" : prediction?.home,
+    away: prediction?.away === "" || prediction?.away === undefined ? "0" : prediction?.away,
+    knockout
+  };
+  const qualifiedSide = getPredictionQualifiedSide(decisionPrediction, match);
   const homeName = getMatchSideName(match, "home");
   const awayName = getMatchSideName(match, "away");
+  const predictedHome = parsePredictionScoreValue(prediction?.home);
+  const predictedAway = parsePredictionScoreValue(prediction?.away);
+  const hasScorePrediction = predictedHome !== null && predictedAway !== null;
+  const isDrawPrediction = hasScorePrediction && predictedHome === predictedAway;
+  const decisionDisabled = disabled || !isDrawPrediction;
+  const effectiveExtraTime = isDrawPrediction && knockout.goesToExtraTime;
+  const effectivePenalties = isDrawPrediction && knockout.goesToPenalties;
 
   return (
     <div className="knockout-prediction-fields">
       <div className="knockout-toggle-row" role="group" aria-label="Votos de mata-mata">
-        <label className="knockout-toggle">
+        <label className={`knockout-toggle${decisionDisabled ? " disabled" : ""}`}>
           <input
             type="checkbox"
-            checked={knockout.goesToExtraTime}
-            disabled={disabled}
+            checked={effectiveExtraTime}
+            disabled={decisionDisabled}
             onChange={(event) => onChange("goesToExtraTime", event.target.checked)}
           />
           Prorrogacao
         </label>
-        <label className="knockout-toggle">
+        <label className={`knockout-toggle${decisionDisabled ? " disabled" : ""}`}>
           <input
             type="checkbox"
-            checked={knockout.goesToPenalties}
-            disabled={disabled}
+            checked={effectivePenalties}
+            disabled={decisionDisabled}
             onChange={(event) => onChange("goesToPenalties", event.target.checked)}
           />
           Penaltis
         </label>
       </div>
-      <div className="knockout-qualified-picker" role="group" aria-label="Classificado">
+      <div className="knockout-qualified-picker" aria-label="Classificado automatico">
         <span>Classificado</span>
-        <button
-          type="button"
-          className={qualifiedSide === "home" ? "selected" : ""}
-          disabled={disabled}
-          onClick={() => onChange("qualifiedSide", "home")}
-        >
-          <MatchSideTeam match={match} side="home" />
-        </button>
-        <button
-          type="button"
-          className={qualifiedSide === "away" ? "selected" : ""}
-          disabled={disabled}
-          onClick={() => onChange("qualifiedSide", "away")}
-        >
-          <MatchSideTeam match={match} side="away" />
-        </button>
+        <div className={`knockout-qualified-auto${qualifiedSide ? " selected" : " pending"}`}>
+          {qualifiedSide ? <MatchSideTeam match={match} side={qualifiedSide} /> : "Aguardando decisao"}
+        </div>
       </div>
-      {knockout.goesToPenalties && (
+      {effectivePenalties && (
         <div className="knockout-penalty-score">
           <ScoreInput label={`Penaltis de ${homeName}`} disabled={disabled} value={knockout.penaltiesHome} onChange={(value) => onChange("penaltiesHome", value)} />
           <span>x</span>

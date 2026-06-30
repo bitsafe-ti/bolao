@@ -1497,6 +1497,12 @@ h3 {
   overflow: hidden;
 }
 
+.prediction-notice-modal {
+  width: min(100%, 440px);
+  padding: 0;
+  overflow: hidden;
+}
+
 .prediction-confirm-heading {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -1506,9 +1512,28 @@ h3 {
   padding: 22px 22px 18px;
 }
 
+.prediction-notice-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 24%, var(--line));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 10%, transparent), transparent 56%),
+    var(--surface);
+  padding: 22px 22px 18px;
+}
+
 .prediction-confirm-heading h2 {
   margin: 2px 0 0;
   font-size: 1.24rem;
+  line-height: 1.2;
+}
+
+.prediction-notice-heading h2 {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: 1.18rem;
   line-height: 1.2;
 }
 
@@ -1521,6 +1546,38 @@ h3 {
   background: var(--primary-soft);
   color: var(--primary);
   font-size: 1.15rem;
+}
+
+.prediction-notice-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 1.1rem;
+}
+
+.prediction-notice-copy {
+  margin: 0;
+  color: var(--muted-light);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.45;
+  padding: 22px 24px 6px;
+}
+
+.prediction-notice-actions {
+  justify-content: flex-end;
+  margin: 0;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  padding: 16px 22px 20px;
+}
+
+.prediction-notice-actions button {
+  min-width: 112px;
 }
 
 .prediction-confirm-match {
@@ -2659,6 +2716,11 @@ h3 {
   accent-color: var(--primary);
 }
 
+.knockout-toggle.disabled {
+  color: var(--muted);
+  opacity: 0.62;
+}
+
 .knockout-qualified-picker > span {
   width: 100%;
   color: var(--muted);
@@ -2667,7 +2729,11 @@ h3 {
   text-transform: uppercase;
 }
 
-.knockout-qualified-picker button {
+.knockout-qualified-picker button,
+.knockout-qualified-auto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 34px;
   max-width: 180px;
   border: 1px solid var(--line);
@@ -2679,19 +2745,28 @@ h3 {
   padding: 6px 12px;
 }
 
-.knockout-qualified-picker button.selected {
+.knockout-qualified-picker button.selected,
+.knockout-qualified-auto.selected {
   border-color: var(--primary);
   background: var(--primary-soft);
   color: var(--primary);
 }
 
-.knockout-qualified-picker button .team-name {
+.knockout-qualified-auto.pending {
+  border-color: var(--line);
+  background: var(--soft);
+  color: var(--muted);
+}
+
+.knockout-qualified-picker button .team-name,
+.knockout-qualified-auto .team-name {
   justify-content: center;
   gap: 8px;
   min-width: 0;
 }
 
-.knockout-qualified-picker button .flag {
+.knockout-qualified-picker button .flag,
+.knockout-qualified-auto .flag {
   width: 26px;
   height: 18px;
 }

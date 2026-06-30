@@ -101,11 +101,17 @@ export function getKnockoutWinnerSide(match) {
 
 export function getPredictionQualifiedSide(prediction, match) {
   const knockout = normalizeKnockoutPrediction(prediction);
-  if (knockout.qualifiedSide) return knockout.qualifiedSide;
   if (!isKnockoutMatch(match)) return "";
   const predictedHome = parseScore(prediction?.home);
   const predictedAway = parseScore(prediction?.away);
-  if (predictedHome === null || predictedAway === null || predictedHome === predictedAway) return "";
+  if (predictedHome === null || predictedAway === null) return "";
+  if (predictedHome === predictedAway) {
+    if (!knockout.goesToPenalties) return "";
+    const penaltiesHome = parseScore(knockout.penaltiesHome);
+    const penaltiesAway = parseScore(knockout.penaltiesAway);
+    if (penaltiesHome === null || penaltiesAway === null || penaltiesHome === penaltiesAway) return "";
+    return penaltiesHome > penaltiesAway ? "home" : "away";
+  }
   return predictedHome > predictedAway ? "home" : "away";
 }
 
