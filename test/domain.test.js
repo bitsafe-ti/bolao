@@ -14,7 +14,8 @@ import {
   purgeClearedOpeningPredictions,
   purgeExpiredPredictions,
   purgeFutureRoundPredictions,
-  scorePrediction
+  scorePrediction,
+  scorePredictionDetails
 } from "../src/domain.js";
 
 import { applyResultUpdates } from "../src/resultsSync.js";
@@ -50,6 +51,62 @@ test("counts non-exact draw as one-point ranking hit", () => {
 
 test("scores wrong outcome with zero points", () => {
   assert.equal(scorePrediction({ home: 3, away: 1 }, { homeScore: 1, awayScore: 2 }), 0);
+});
+
+test("scores knockout prediction with classified side and decision bonuses", () => {
+  const match = {
+    id: 73,
+    round: 4,
+    homeScore: "1",
+    awayScore: "1",
+    status: "pen",
+    qualifiedSide: "home",
+    goesToExtraTime: true,
+    goesToPenalties: true,
+    penaltiesHome: "4",
+    penaltiesAway: "3"
+  };
+  const prediction = {
+    home: "1",
+    away: "1",
+    knockout: {
+      qualifiedSide: "home",
+      goesToExtraTime: true,
+      goesToPenalties: true,
+      penaltiesHome: "4",
+      penaltiesAway: "3"
+    }
+  };
+
+  const details = scorePredictionDetails(prediction, match);
+  assert.equal(scorePrediction(prediction, match), 6);
+  assert.equal(details.exactScore, true);
+  assert.equal(details.extraTimeHit, true);
+  assert.equal(details.penaltiesHit, true);
+});
+
+test("scores knockout classified side when the scoreline is wrong", () => {
+  const match = {
+    id: 74,
+    round: 4,
+    homeScore: "2",
+    awayScore: "1",
+    status: "aet",
+    qualifiedSide: "home",
+    goesToExtraTime: true,
+    goesToPenalties: false
+  };
+  const prediction = {
+    home: "1",
+    away: "0",
+    knockout: {
+      qualifiedSide: "home",
+      goesToExtraTime: true,
+      goesToPenalties: false
+    }
+  };
+
+  assert.equal(scorePrediction(prediction, match), 3);
 });
 
 test("scores no points before actual result exists", () => {

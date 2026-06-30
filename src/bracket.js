@@ -156,6 +156,7 @@ function hasFinalResult(match) {
 
 function getMatchWinnerSide(match) {
   if (!hasFinalResult(match)) return null;
+  if (["home", "away"].includes(match?.qualifiedSide)) return match.qualifiedSide;
   const homeScore = parseScore(match?.homeScore);
   const awayScore = parseScore(match?.awayScore);
   if (homeScore === awayScore) return null;

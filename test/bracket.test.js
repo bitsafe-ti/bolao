@@ -87,3 +87,23 @@ test("buildRoundOf32Bracket avanca vencedores dos 16 avos para as oitavas", () =
   assert.equal(match90.away.label, "Vencedor do Jogo 75");
   assert.equal(match90.away.confirmed, false);
 });
+
+test("buildRoundOf32Bracket avanca classificado em empate decidido nos penaltis", () => {
+  const bracket = buildRoundOf32Bracket(makeGroups(), {
+    matches: [
+      {
+        id: 73,
+        homeTeamId: "A-2",
+        awayTeamId: "B-2",
+        homeScore: "1",
+        awayScore: "1",
+        status: "pen",
+        qualifiedSide: "away"
+      }
+    ]
+  });
+
+  const match90 = bracket.rounds.roundOf16.find((match) => match.id === 90);
+  assert.equal(match90.home.teamId, "B-2");
+  assert.equal(match90.home.confirmed, true);
+});

@@ -8,10 +8,20 @@ export const APP_VERSION = 3;
 export const scoringRules = [
   { label: "Placar cravado", points: 3 },
   { label: "Ganhador ou empate correto", points: 1 },
+  { label: "Mata-mata: classificado correto", points: 1 },
+  { label: "Mata-mata: prorrogacao correta", points: 1 },
+  { label: "Mata-mata: penaltis corretos", points: 1 },
   { label: "Palpite errado", points: 0 }
 ];
 
 export const emptyPrediction = { home: "", away: "" };
+export const emptyKnockoutPrediction = {
+  goesToExtraTime: false,
+  goesToPenalties: false,
+  qualifiedSide: "",
+  penaltiesHome: "",
+  penaltiesAway: ""
+};
 export const clearedOpeningPredictionMatchIds = ["group-a-1", "group-a-2", "group-b-1", "group-d-1"];
 
 export function makeId(prefix) {
@@ -29,6 +39,50 @@ export function getOutcome(home, away) {
   if (home > away) return "home";
   if (home < away) return "away";
   return "draw";
+}
+
+export function isKnockoutMatch(match) {
+  return Number(match?.round) > 3;
+}
+
+export function normalizeKnockoutPrediction(prediction = {}) {
+  const knockout = prediction?.knockout ?? {};
+  return {
+    goesToExtraTime: Boolean(knockout.goesToExtraTime),
+    goesToPenalties: Boolean(knockout.goesToPenalties),
+    qualifiedSide: ["home", "away"].includes(knockout.qualifiedSide) ? knockout.qualifiedSide : "",
+    penaltiesHome: knockout.penaltiesHome ?? "",
+    penaltiesAway: knockout.penaltiesAway ?? ""
+  };
+}
+
+export function getKnockoutWinnerSide(match) {
+  if (["home", "away"].includes(match?.qualifiedSide)) return match.qualifiedSide;
+  const actualHome = parseScore(match?.homeScore);
+  const actualAway = parseScore(match?.awayScore);
+  if (actualHome === null || actualAway === null || actualHome === actualAway) return "";
+  return actualHome > actualAway ? "home" : "away";
+}
+
+export function getPredictionQualifiedSide(prediction, match) {
+  const knockout = normalizeKnockoutPrediction(prediction);
+  if (knockout.qualifiedSide) return knockout.qualifiedSide;
+  if (!isKnockoutMatch(match)) return "";
+  const predictedHome = parseScore(prediction?.home);
+  const predictedAway = parseScore(prediction?.away);
+  if (predictedHome === null || predictedAway === null || predictedHome === predictedAway) return "";
+  return predictedHome > predictedAway ? "home" : "away";
+}
+
+export function getMatchKnockoutResult(match) {
+  const status = String(match?.status || match?.statusShort || "").toLowerCase();
+  return {
+    goesToExtraTime: Boolean(match?.goesToExtraTime) || ["aet", "pen"].includes(status),
+    goesToPenalties: Boolean(match?.goesToPenalties) || status === "pen",
+    qualifiedSide: getKnockoutWinnerSide(match),
+    penaltiesHome: match?.penaltiesHome ?? "",
+    penaltiesAway: match?.penaltiesAway ?? ""
+  };
 }
 
 export function isMatchResultFinal(match) {
@@ -63,25 +117,71 @@ export function isMatchLive(match) {
   return ["live", "1h", "ht", "2h", "et", "bt", "p", "int"].includes(status);
 }
 
-export function scorePrediction(prediction, match) {
+export function scorePredictionDetails(prediction, match) {
   const predictedHome = parseScore(prediction?.home);
   const predictedAway = parseScore(prediction?.away);
   const actualHome = parseScore(match?.homeScore);
   const actualAway = parseScore(match?.awayScore);
+  const details = {
+    total: 0,
+    scorePoints: 0,
+    qualifiedPoints: 0,
+    extraTimePoints: 0,
+    penaltiesPoints: 0,
+    exactScore: false,
+    resultHit: false,
+    qualifiedHit: false,
+    extraTimeHit: false,
+    penaltiesHit: false
+  };
 
   if (
     (!isMatchResultFinal(match) && !isMatchLive(match)) ||
     [predictedHome, predictedAway, actualHome, actualAway].some((score) => score === null)
   ) {
-    return 0;
+    return details;
   }
 
   const predictedOutcome = getOutcome(predictedHome, predictedAway);
   const actualOutcome = getOutcome(actualHome, actualAway);
+  const isKnockout = isKnockoutMatch(match);
 
-  if (predictedHome === actualHome && predictedAway === actualAway) return 3;
-  if (predictedOutcome !== actualOutcome) return 0;
-  return 1;
+  if (predictedHome === actualHome && predictedAway === actualAway) {
+    details.scorePoints = 3;
+    details.exactScore = true;
+  } else if (!isKnockout && predictedOutcome === actualOutcome) {
+    details.scorePoints = 1;
+    details.resultHit = true;
+  }
+
+  if (isKnockout) {
+    const predictedQualifiedSide = getPredictionQualifiedSide(prediction, match);
+    const actualQualifiedSide = getKnockoutWinnerSide(match);
+    if (predictedQualifiedSide && predictedQualifiedSide === actualQualifiedSide) {
+      details.qualifiedPoints = 1;
+      details.qualifiedHit = true;
+    }
+  }
+
+  if (isKnockout) {
+    const predictedKnockout = normalizeKnockoutPrediction(prediction);
+    const actualKnockout = getMatchKnockoutResult(match);
+    if (predictedKnockout.goesToExtraTime === actualKnockout.goesToExtraTime) {
+      details.extraTimePoints = 1;
+      details.extraTimeHit = true;
+    }
+    if (predictedKnockout.goesToPenalties === actualKnockout.goesToPenalties) {
+      details.penaltiesPoints = 1;
+      details.penaltiesHit = true;
+    }
+  }
+
+  details.total = details.scorePoints + details.qualifiedPoints + details.extraTimePoints + details.penaltiesPoints;
+  return details;
+}
+
+export function scorePrediction(prediction, match) {
+  return scorePredictionDetails(prediction, match).total;
 }
 
 export function hasSavedPrediction(prediction) {
@@ -173,10 +273,10 @@ export function calculateRanking(participants, matches, predictions) {
     .map((participant) => {
       const participantPredictions = predictions?.[participant.id] ?? {};
       const perMatch = matches.map((match) => {
-        const points = isMatchResultFinal(match)
-          ? scorePrediction(participantPredictions?.[match.id], match)
-          : 0;
-        return { matchId: match.id, points };
+        const details = isMatchResultFinal(match)
+          ? scorePredictionDetails(participantPredictions?.[match.id], match)
+          : { exactScore: false, resultHit: false, qualifiedHit: false };
+        return { matchId: match.id, points: details.total ?? 0, details };
       });
 
       const totalGoalsPredicted = Object.values(participantPredictions).reduce((sum, p) => {
@@ -188,8 +288,8 @@ export function calculateRanking(participants, matches, predictions) {
       return {
         ...participant,
         total: perMatch.reduce((sum, item) => sum + item.points, 0),
-        exactScores: perMatch.filter((item) => item.points === 3).length,
-        winnerHits: perMatch.filter((item) => item.points === 1).length,
+        exactScores: perMatch.filter((item) => item.details.exactScore).length,
+        winnerHits: perMatch.filter((item) => item.details.resultHit || item.details.qualifiedHit).length,
         scoredMatches: perMatch.filter((item) => item.points > 0).length,
         predictedMatches: matches.filter((match) => hasSavedPrediction(participantPredictions?.[match.id])).length,
         totalGoalsPredicted
@@ -211,7 +311,24 @@ function slotLabel(slot) {
 }
 
 export function createKnockoutStageMatches() {
-  const base = { date: null, ground: null, city: null, stadium: null, country: null, homeTeamId: null, awayTeamId: null, homeScore: "", awayScore: "", homeGoals: [], awayGoals: [] };
+  const base = {
+    date: null,
+    ground: null,
+    city: null,
+    stadium: null,
+    country: null,
+    homeTeamId: null,
+    awayTeamId: null,
+    homeScore: "",
+    awayScore: "",
+    homeGoals: [],
+    awayGoals: [],
+    goesToExtraTime: false,
+    goesToPenalties: false,
+    qualifiedSide: "",
+    penaltiesHome: "",
+    penaltiesAway: ""
+  };
   return [
     ...ROUND_OF_32_MATCHES.map((m) => {
       const schedule = ROUND_OF_32_SCHEDULE[m.id] ?? {};
