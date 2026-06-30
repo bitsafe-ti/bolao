@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fetchApiFootballResults, normalizeApiFootballFixture, normalizeEspnEvent, normalizeFixtureStatus } from "../workers/live-results/provider.js";
-import { shouldSyncLiveResults } from "../workers/live-results/sync.js";
+import { fetchApiFootballResults, fetchResultSource, normalizeApiFootballFixture, normalizeEspnEvent, normalizeFixtureStatus } from "../workers/live-results/provider.js";
+import { getLiveResultSyncDates, shouldSyncLiveResults } from "../workers/live-results/sync.js";
 import { mergeMatchesPreservingResults } from "../functions/api/pool-state/[poolId].js";
 import { applyResultUpdates } from "../src/resultsSync.js";
 
@@ -148,6 +148,45 @@ test("normalizes ESPN live score and goal events", () => {
   assert.equal(match.resultSource, "espn");
 });
 
+test("fetches ESPN results across requested sync dates", async (context) => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  context.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (url) => {
+    const requestUrl = new URL(url);
+    const date = requestUrl.searchParams.get("dates");
+    calls.push(date);
+    const events = date === "20260629"
+      ? [{
+          id: "760999",
+          date: "2026-06-30T01:00Z",
+          status: {
+            type: { name: "STATUS_FINAL_PEN", completed: true, shortDetail: "FT-Pens" }
+          },
+          competitions: [{
+            competitors: [
+              { homeAway: "home", score: "1", team: { id: "1", displayName: "Netherlands" } },
+              { homeAway: "away", score: "1", team: { id: "2", displayName: "Morocco" } }
+            ],
+            details: []
+          }]
+        }]
+      : [];
+    return new Response(JSON.stringify({ events }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+
+  const result = await fetchResultSource({}, new Date("2026-06-30T11:20:00.000Z"), {
+    dates: ["2026-06-29", "2026-06-30"]
+  });
+
+  assert.deepEqual(calls, ["20260629", "20260630"]);
+  assert.equal(result.source, "espn");
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].homeTeamId, "netherlands");
+  assert.equal(result.matches[0].status, "finished");
+  assert.equal(result.matches[0].statusShort, "FT-Pens");
+});
+
 test("updates simultaneous live matches without mixing their scores", () => {
   const matches = [
     {
@@ -220,6 +259,15 @@ test("sync window includes nearby and live matches but skips finished matches", 
   assert.equal(shouldSyncLiveResults([{ date: "2026-06-11T19:00:00.000Z", status: "live" }], now), true);
   assert.equal(shouldSyncLiveResults([{ date: "2026-06-11T19:00:00.000Z", status: "finished" }], now), false);
   assert.equal(shouldSyncLiveResults([{ date: "2026-06-12T19:00:00.000Z", status: "scheduled" }], now), false);
+});
+
+test("sync dates include previous-day live matches after midnight", () => {
+  const dates = getLiveResultSyncDates([
+    { date: "2026-06-29T22:00", status: "live" },
+    { date: "2026-06-30T18:00", status: "scheduled" }
+  ], new Date("2026-06-30T11:20:00.000Z"));
+
+  assert.deepEqual(dates, ["2026-06-29", "2026-06-30"]);
 });
 
 test("interprets stored kickoff times as Sao Paulo local time", () => {

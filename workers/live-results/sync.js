@@ -1,5 +1,5 @@
 import { applyResultUpdates } from "../../src/resultsSync.js";
-import { fetchResultSource } from "./provider.js";
+import { fetchResultSource, formatSaoPauloDate } from "./provider.js";
 
 const SYNC_BEFORE_KICKOFF_MS = 30 * 60 * 1000;
 const SYNC_AFTER_KICKOFF_MS = 4 * 60 * 60 * 1000;
@@ -18,15 +18,27 @@ function parseSaoPauloKickoff(value) {
   return Date.parse(`${text.length === 16 ? `${text}:00` : text}-03:00`);
 }
 
-export function shouldSyncLiveResults(matches, now = new Date()) {
+function isSyncCandidate(match, now = new Date()) {
   const nowTime = now.getTime();
-  return (matches ?? []).some((match) => {
-    if (isFinished(match) || ["cancelled", "postponed"].includes(match?.status)) return false;
-    if (match?.status === "live") return true;
-    const kickoff = parseSaoPauloKickoff(match?.date);
-    if (Number.isNaN(kickoff)) return false;
-    return nowTime >= kickoff - SYNC_BEFORE_KICKOFF_MS && nowTime <= kickoff + SYNC_AFTER_KICKOFF_MS;
-  });
+  if (isFinished(match) || ["cancelled", "postponed"].includes(match?.status)) return false;
+  if (match?.status === "live") return true;
+  const kickoff = parseSaoPauloKickoff(match?.date);
+  if (Number.isNaN(kickoff)) return false;
+  return nowTime >= kickoff - SYNC_BEFORE_KICKOFF_MS && nowTime <= kickoff + SYNC_AFTER_KICKOFF_MS;
+}
+
+export function shouldSyncLiveResults(matches, now = new Date()) {
+  return (matches ?? []).some((match) => isSyncCandidate(match, now));
+}
+
+export function getLiveResultSyncDates(matches, now = new Date()) {
+  const dates = new Set([formatSaoPauloDate(now)]);
+  for (const match of matches ?? []) {
+    if (!isSyncCandidate(match, now)) continue;
+    const matchDate = String(match?.date || "").slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(matchDate)) dates.add(matchDate);
+  }
+  return [...dates].sort();
 }
 
 async function ensureSchema(db) {
@@ -91,7 +103,7 @@ export async function syncPoolResults(env, scheduledTime = Date.now(), options =
       return { status: "outside-window", changed: 0, source: "none" };
     }
 
-    source ??= await fetchResultSource(env, now);
+    source ??= await fetchResultSource(env, now, { dates: getLiveResultSyncDates(snapshot.state.matches, now) });
     const update = applyResultUpdates(snapshot.state.matches ?? [], source.matches);
     const syncedAt = new Date().toISOString();
     const nextState = {

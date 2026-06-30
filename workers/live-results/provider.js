@@ -5,7 +5,7 @@ const LIVE_STATUSES = new Set(["1H", "HT", "2H", "ET", "BT", "P", "INT", "LIVE"]
 const POSTPONED_STATUSES = new Set(["PST", "SUSP"]);
 const CANCELLED_STATUSES = new Set(["CANC", "ABD"]);
 
-function formatSaoPauloDate(date) {
+export function formatSaoPauloDate(date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
     year: "numeric",
@@ -212,7 +212,7 @@ export async function fetchApiFootballResults(env, now = new Date()) {
   const baseUrl = env.API_FOOTBALL_BASE_URL || "https://v3.football.api-sports.io";
   const league = env.API_FOOTBALL_LEAGUE_ID || "1";
   const season = env.API_FOOTBALL_SEASON || "2026";
-  const date = formatSaoPauloDate(now);
+  const date = typeof now === "string" ? now : formatSaoPauloDate(now);
   const apiKey = env.API_FOOTBALL_KEY;
 
   // A date-only query is valid for fixtures and avoids the provider rejecting
@@ -232,7 +232,7 @@ export async function fetchApiFootballResults(env, now = new Date()) {
 }
 
 export async function fetchEspnResults(now = new Date()) {
-  const date = formatSaoPauloDate(now).replaceAll("-", "");
+  const date = (typeof now === "string" ? now : formatSaoPauloDate(now)).replaceAll("-", "");
   const url = new URL("https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard");
   url.searchParams.set("dates", date);
   const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
@@ -241,13 +241,31 @@ export async function fetchEspnResults(now = new Date()) {
   return (payload.events ?? []).map(normalizeEspnEvent).filter(Boolean);
 }
 
-export async function fetchResultSource(env, now = new Date()) {
+function mergeProviderMatches(matchGroups) {
+  const byKey = new Map();
+  for (const match of matchGroups.flat()) {
+    const key = match.sourceFixtureId || `${match.homeTeamId}__${match.awayTeamId}__${match.date || ""}`;
+    byKey.set(key, match);
+  }
+  return [...byKey.values()];
+}
+
+async function fetchDates(dates, fetcher) {
+  const groups = [];
+  for (const date of dates) {
+    groups.push(await fetcher(date));
+  }
+  return mergeProviderMatches(groups);
+}
+
+export async function fetchResultSource(env, now = new Date(), options = {}) {
+  const dates = [...new Set(options.dates?.length ? options.dates : [formatSaoPauloDate(now)])];
   let fallbackReason;
   if (env.API_FOOTBALL_KEY) {
     try {
-      const matches = await fetchApiFootballResults(env, now);
+      const matches = await fetchDates(dates, (date) => fetchApiFootballResults(env, date));
       if (matches.length) return { matches, source: "api-football" };
-      fallbackReason = `api-football retornou 0 partidas para ${formatSaoPauloDate(now)}`;
+      fallbackReason = `api-football retornou 0 partidas para ${dates.join(", ")}`;
     } catch (error) {
       fallbackReason = error instanceof Error ? error.message : String(error);
     }
@@ -258,9 +276,9 @@ export async function fetchResultSource(env, now = new Date()) {
   }
 
   try {
-    const matches = await fetchEspnResults(now);
+    const matches = await fetchDates(dates, fetchEspnResults);
     if (matches.length) return { matches, source: "espn", fallbackReason };
-    fallbackReason = [fallbackReason, `espn retornou 0 partidas para ${formatSaoPauloDate(now)}`].filter(Boolean).join("; ");
+    fallbackReason = [fallbackReason, `espn retornou 0 partidas para ${dates.join(", ")}`].filter(Boolean).join("; ");
   } catch (error) {
     const espnReason = error instanceof Error ? error.message : String(error);
     fallbackReason = [fallbackReason, espnReason].filter(Boolean).join("; ");
