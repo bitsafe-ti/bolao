@@ -3087,6 +3087,68 @@ function formatMatchResult(match) {
   return extras.length ? `${home} x ${away} (${extras.join(", ")})` : `${home} x ${away}`;
 }
 
+function isPenaltyDecision(match) {
+  const statuses = [match?.status, match?.statusShort]
+    .map((status) => String(status || "").toLowerCase())
+    .filter(Boolean);
+  return Boolean(match?.goesToPenalties) || statuses.some((status) => status === "pen" || status.includes("pen"));
+}
+
+function getPenaltyShootoutScore(match) {
+  if (!isPenaltyDecision(match)) return null;
+  const explicitHome = parseScoreValue(match?.penaltiesHome);
+  const explicitAway = parseScoreValue(match?.penaltiesAway);
+  if (explicitHome !== null && explicitAway !== null) {
+    return { home: explicitHome, away: explicitAway };
+  }
+
+  const shootoutGoals = (goals = []) => goals.filter((goal) => {
+    const minute = Number(goal?.minute);
+    return goal?.penalty && Number.isFinite(minute) && minute >= 120;
+  }).length;
+  const home = shootoutGoals(match?.homeGoals);
+  const away = shootoutGoals(match?.awayGoals);
+  if (home || away) return { home, away };
+  return { home: "-", away: "-" };
+}
+
+function ResultKnockoutBreakdown({ match }) {
+  if (!isKnockoutMatch(match) || !isMatchResultFinal(match)) return null;
+  const home = match?.homeScore === "" || match?.homeScore === undefined ? "-" : match.homeScore;
+  const away = match?.awayScore === "" || match?.awayScore === undefined ? "-" : match.awayScore;
+  const penaltyScore = getPenaltyShootoutScore(match);
+  const knockout = getMatchKnockoutResult(match);
+  const qualifiedName = knockout.qualifiedSide ? getMatchSideName(match, knockout.qualifiedSide) : "";
+
+  if (!penaltyScore && !knockout.goesToExtraTime && !qualifiedName) return null;
+
+  return (
+    <div className="result-knockout-breakdown" aria-label="Detalhes do resultado de mata-mata">
+      <span className="result-breakdown-item">
+        <span>Partida</span>
+        <strong>{home} x {away}</strong>
+      </span>
+      {penaltyScore ? (
+        <span className="result-breakdown-item penalty">
+          <span>Penaltis</span>
+          <strong>{penaltyScore.home} x {penaltyScore.away}</strong>
+        </span>
+      ) : knockout.goesToExtraTime ? (
+        <span className="result-breakdown-item">
+          <span>Decisao</span>
+          <strong>Prorrogacao</strong>
+        </span>
+      ) : null}
+      {qualifiedName && (
+        <span className="result-breakdown-item qualified">
+          <span>Classificado</span>
+          <strong>{qualifiedName}</strong>
+        </span>
+      )}
+    </div>
+  );
+}
+
 const ResultCard = React.forwardRef(function ResultCard({ activeParticipant, match, isOpen, onToggle, predictions }, ref) {
   const {
     homeScore,
@@ -3124,9 +3186,7 @@ const ResultCard = React.forwardRef(function ResultCard({ activeParticipant, mat
             <strong>{awayScore === null ? "-" : awayScore}</strong>
           </div>
         </div>
-        {isKnockoutMatch(match) && isMatchResultFinal(match) && (
-          <span className="result-knockout-meta">{formatMatchResult(match)}</span>
-        )}
+        <ResultKnockoutBreakdown match={match} />
         <div className="result-user-prediction">
           <span>Seu palpite</span>
           <strong>{hasPrediction(userPrediction) ? formatPrediction(userPrediction, match) : "Sem palpite"}</strong>
@@ -3274,7 +3334,7 @@ function MatchPredictionOverview({ match, participants, predictions }) {
                   <UserAvatar user={participant} protect />
                   <strong>{participant.name}</strong>
                 </div>
-                <span className="prediction-pill participant-prediction-score">{formatPrediction(prediction, match)}</span>
+                <ParticipantPredictionSummary prediction={prediction} match={match} />
                 {feedback ? (
                   <span className={`prediction-feedback-pill compact ${feedback.className}`} title={feedback.description ?? feedback.label}>
                     {feedback.label}
@@ -3293,6 +3353,46 @@ function MatchPredictionOverview({ match, participants, predictions }) {
           <p>Os palpites aparecem aqui assim que algum participante salvar este jogo.</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function ParticipantPredictionSummary({ prediction, match }) {
+  if (!hasPrediction(prediction)) {
+    return <span className="participant-prediction-empty">Sem palpite</span>;
+  }
+
+  if (!isKnockoutMatch(match)) {
+    return (
+      <span className="prediction-pill participant-prediction-score">
+        {prediction.home} x {prediction.away}
+      </span>
+    );
+  }
+
+  const knockout = normalizeKnockoutPrediction(prediction);
+  const qualifiedSide = getPredictionQualifiedSide(prediction, match);
+  const qualifiedName = qualifiedSide ? getMatchSideName(match, qualifiedSide) : "Nao informado";
+
+  return (
+    <div className="participant-prediction-summary">
+      <span className="prediction-pill participant-prediction-score">
+        {prediction.home} x {prediction.away}
+      </span>
+      <div className="participant-prediction-tags" aria-label="Detalhes do palpite de mata-mata">
+        <span className={`participant-prediction-tag ${qualifiedSide ? "" : "muted"}`}>
+          <strong>Classifica</strong>
+          {qualifiedName}
+        </span>
+        <span className="participant-prediction-tag">
+          {knockout.goesToExtraTime ? "Prorrogacao" : "Sem prorrogacao"}
+        </span>
+        <span className="participant-prediction-tag">
+          {knockout.goesToPenalties
+            ? `Penaltis ${knockout.penaltiesHome || "0"} x ${knockout.penaltiesAway || "0"}`
+            : "Sem penaltis"}
+        </span>
+      </div>
     </div>
   );
 }

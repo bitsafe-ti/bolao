@@ -2767,14 +2767,14 @@ h3 {
 
 .participant-prediction-card {
   display: grid;
-  grid-template-columns: minmax(148px, 1fr) minmax(128px, 1.1fr) auto;
+  grid-template-columns: minmax(148px, 0.9fr) minmax(230px, 1.5fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.86);
-  padding: 10px;
+  padding: 12px;
 }
 
 .participant-prediction-person {
@@ -2803,10 +2803,59 @@ h3 {
   padding: 5px 8px;
 }
 
+.participant-prediction-summary {
+  display: grid;
+  align-items: center;
+  justify-items: start;
+  gap: 8px;
+  min-width: 0;
+}
+
 .participant-prediction-score {
   justify-self: start;
   max-width: 100%;
   text-align: left;
+  white-space: nowrap;
+}
+
+.participant-prediction-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.participant-prediction-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  border: 1px solid rgba(189, 33, 36, 0.14);
+  border-radius: 999px;
+  background: rgba(189, 33, 36, 0.07);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.15;
+  padding: 5px 8px;
+}
+
+.participant-prediction-tag strong {
+  color: var(--primary);
+  font-size: inherit;
+  font-weight: 900;
+}
+
+.participant-prediction-tag.muted {
+  border-color: var(--line);
+  background: var(--soft);
+  color: var(--muted);
+}
+
+.participant-prediction-empty {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .prediction-card-overview .prediction-feedback-pill.compact {
@@ -3107,13 +3156,56 @@ h3 {
   white-space: normal;
 }
 
-.result-knockout-meta {
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 800;
+.result-knockout-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: min(100%, 560px);
   margin-top: 6px;
-  max-width: min(100%, 420px);
-  text-align: center;
+}
+
+.result-breakdown-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  padding: 5px 10px;
+}
+
+.result-breakdown-item > span {
+  color: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.result-breakdown-item strong {
+  color: var(--text);
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.result-breakdown-item.penalty {
+  border-color: rgba(189, 33, 36, 0.18);
+  background: rgba(189, 33, 36, 0.08);
+  color: var(--primary);
+}
+
+.result-breakdown-item.penalty strong,
+.result-breakdown-item.qualified strong {
+  color: var(--primary);
+}
+
+.result-breakdown-item.qualified {
+  border-color: rgba(22, 163, 74, 0.18);
+  background: rgba(22, 163, 74, 0.08);
+  color: var(--success);
 }
 
 .result-card-date {
@@ -4477,7 +4569,7 @@ h3 {
 
 .audit-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -4681,9 +4773,9 @@ h3 {
   color: var(--primary);
 }
 
-@media (max-width: 860px) {
+@media (max-width: 760px) {
   .audit-cards-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
@@ -4697,10 +4789,6 @@ h3 {
   }
 
   .audit-cards-toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .audit-cards-grid {
     grid-template-columns: 1fr;
   }
 
@@ -6078,6 +6166,10 @@ tr:last-child td {
   .participant-prediction-card {
     grid-template-columns: 1fr;
     justify-items: stretch;
+  }
+
+  .participant-prediction-summary {
+    justify-items: start;
   }
 
   .participant-prediction-score,
