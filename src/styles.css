@@ -2837,51 +2837,51 @@ h3 {
 
 .participant-prediction-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .participant-prediction-card {
   display: grid;
-  grid-template-columns: minmax(148px, 0.9fr) minmax(230px, 1.5fr) auto;
+  grid-template-columns: minmax(176px, 0.86fr) minmax(0, 1.6fr) auto;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.86);
-  padding: 12px;
+  padding: 9px 10px;
 }
 
 .participant-prediction-person {
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 9px;
+  gap: 8px;
 }
 
 .participant-prediction-person .profile-avatar {
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
-  font-size: 0.78rem;
+  width: 32px;
+  height: 32px;
+  font-size: 0.74rem;
 }
 
 .participant-prediction-person strong {
   min-width: 0;
   color: var(--text);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   font-weight: 900;
   overflow-wrap: anywhere;
 }
 
 .prediction-card-overview .prediction-pill {
-  padding: 5px 8px;
+  padding: 4px 8px;
 }
 
 .participant-prediction-summary {
   display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  justify-items: start;
   gap: 8px;
   min-width: 0;
 }
@@ -2891,28 +2891,31 @@ h3 {
   max-width: 100%;
   text-align: left;
   white-space: nowrap;
+  font-size: 0.82rem;
 }
 
 .participant-prediction-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
 }
 
 .participant-prediction-tag {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   max-width: 100%;
   border: 1px solid rgba(189, 33, 36, 0.14);
   border-radius: 999px;
   background: rgba(189, 33, 36, 0.07);
   color: var(--primary);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 800;
   line-height: 1.15;
-  padding: 5px 8px;
+  padding: 4px 7px;
+  white-space: nowrap;
 }
 
 .participant-prediction-tag strong {
@@ -2934,9 +2937,9 @@ h3 {
 }
 
 .prediction-card-overview .prediction-feedback-pill.compact {
-  min-height: 28px;
-  min-width: 34px;
-  padding: 5px 8px;
+  min-height: 26px;
+  min-width: 32px;
+  padding: 4px 8px;
   white-space: nowrap;
 }
 
@@ -2944,13 +2947,13 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
+  min-height: 26px;
   border-radius: 999px;
   background: var(--soft);
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  padding: 5px 10px;
+  padding: 4px 9px;
   white-space: nowrap;
 }
 
