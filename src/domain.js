@@ -8,9 +8,6 @@ export const APP_VERSION = 3;
 export const scoringRules = [
   { label: "Placar cravado", points: 3 },
   { label: "Ganhador ou empate correto", points: 1 },
-  { label: "Mata-mata: classificado correto", points: 1 },
-  { label: "Mata-mata: prorrogacao correta", points: 1 },
-  { label: "Mata-mata: penaltis corretos", points: 1 },
   { label: "Palpite errado", points: 0 }
 ];
 
@@ -22,7 +19,6 @@ export const emptyKnockoutPrediction = {
   penaltiesHome: "",
   penaltiesAway: ""
 };
-export const KNOCKOUT_BONUS_EFFECTIVE_DATE = "2026-06-30";
 export const clearedOpeningPredictionMatchIds = ["group-a-1", "group-a-2", "group-b-1", "group-d-1"];
 
 export function makeId(prefix) {
@@ -44,13 +40,6 @@ export function getOutcome(home, away) {
 
 export function isKnockoutMatch(match) {
   return Number(match?.round) > 3;
-}
-
-export function isKnockoutBonusEligible(match) {
-  if (!isKnockoutMatch(match)) return false;
-  const matchDate = String(match?.date || "").slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(matchDate)) return true;
-  return matchDate >= KNOCKOUT_BONUS_EFFECTIVE_DATE;
 }
 
 export function normalizeKnockoutPrediction(prediction = {}) {
@@ -97,22 +86,6 @@ export function getKnockoutWinnerSide(match) {
     return penalties.home > penalties.away ? "home" : "away";
   }
   return actualHome > actualAway ? "home" : "away";
-}
-
-export function getPredictionQualifiedSide(prediction, match) {
-  const knockout = normalizeKnockoutPrediction(prediction);
-  if (!isKnockoutMatch(match)) return "";
-  const predictedHome = parseScore(prediction?.home);
-  const predictedAway = parseScore(prediction?.away);
-  if (predictedHome === null || predictedAway === null) return "";
-  if (predictedHome === predictedAway) {
-    if (!knockout.goesToPenalties) return "";
-    const penaltiesHome = parseScore(knockout.penaltiesHome);
-    const penaltiesAway = parseScore(knockout.penaltiesAway);
-    if (penaltiesHome === null || penaltiesAway === null || penaltiesHome === penaltiesAway) return "";
-    return penaltiesHome > penaltiesAway ? "home" : "away";
-  }
-  return predictedHome > predictedAway ? "home" : "away";
 }
 
 export function getMatchKnockoutResult(match) {
@@ -187,37 +160,13 @@ export function scorePredictionDetails(prediction, match) {
 
   const predictedOutcome = getOutcome(predictedHome, predictedAway);
   const actualOutcome = getOutcome(actualHome, actualAway);
-  const isKnockout = isKnockoutMatch(match);
-  const hasKnockoutBonuses = isKnockoutBonusEligible(match);
 
   if (predictedHome === actualHome && predictedAway === actualAway) {
     details.scorePoints = 3;
     details.exactScore = true;
-  } else if ((!isKnockout || !hasKnockoutBonuses) && predictedOutcome === actualOutcome) {
+  } else if (predictedOutcome === actualOutcome) {
     details.scorePoints = 1;
     details.resultHit = true;
-  }
-
-  if (hasKnockoutBonuses) {
-    const predictedQualifiedSide = getPredictionQualifiedSide(prediction, match);
-    const actualQualifiedSide = getKnockoutWinnerSide(match);
-    if (predictedQualifiedSide && predictedQualifiedSide === actualQualifiedSide) {
-      details.qualifiedPoints = 1;
-      details.qualifiedHit = true;
-    }
-  }
-
-  if (hasKnockoutBonuses) {
-    const predictedKnockout = normalizeKnockoutPrediction(prediction);
-    const actualKnockout = getMatchKnockoutResult(match);
-    if (predictedKnockout.goesToExtraTime === actualKnockout.goesToExtraTime) {
-      details.extraTimePoints = 1;
-      details.extraTimeHit = true;
-    }
-    if (predictedKnockout.goesToPenalties === actualKnockout.goesToPenalties) {
-      details.penaltiesPoints = 1;
-      details.penaltiesHit = true;
-    }
   }
 
   details.total = details.scorePoints + details.qualifiedPoints + details.extraTimePoints + details.penaltiesPoints;
@@ -333,7 +282,7 @@ export function calculateRanking(participants, matches, predictions) {
         ...participant,
         total: perMatch.reduce((sum, item) => sum + item.points, 0),
         exactScores: perMatch.filter((item) => item.details.exactScore).length,
-        winnerHits: perMatch.filter((item) => item.details.resultHit || item.details.qualifiedHit).length,
+        winnerHits: perMatch.filter((item) => item.details.resultHit).length,
         scoredMatches: perMatch.filter((item) => item.points > 0).length,
         predictedMatches: matches.filter((match) => hasSavedPrediction(participantPredictions?.[match.id])).length,
         totalGoalsPredicted

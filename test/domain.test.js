@@ -10,7 +10,6 @@ import {
   getMatchKnockoutResult,
   getPredictionScrollTargetId,
   getLatestResultMatchId,
-  getPredictionQualifiedSide,
   getReleasedPredictionRound,
   hasMatchStarted,
   normalizeUsers,
@@ -56,40 +55,39 @@ test("scores wrong outcome with zero points", () => {
   assert.equal(scorePrediction({ home: 3, away: 1 }, { homeScore: 1, awayScore: 2 }), 0);
 });
 
-test("scores knockout prediction with classified side and decision bonuses", () => {
+test("scores knockout prediction with final score through extra time", () => {
   const match = {
     id: 73,
     round: 4,
     date: "2026-06-30T14:00",
-    homeScore: "1",
+    homeScore: "2",
     awayScore: "1",
-    status: "pen",
+    status: "aet",
     qualifiedSide: "home",
     goesToExtraTime: true,
-    goesToPenalties: true,
-    penaltiesHome: "4",
-    penaltiesAway: "3"
+    goesToPenalties: false
   };
   const prediction = {
-    home: "1",
+    home: "2",
     away: "1",
     knockout: {
-      qualifiedSide: "home",
       goesToExtraTime: true,
       goesToPenalties: true,
-      penaltiesHome: "4",
-      penaltiesAway: "3"
+      qualifiedSide: "away",
+      penaltiesHome: "2",
+      penaltiesAway: "4"
     }
   };
 
   const details = scorePredictionDetails(prediction, match);
-  assert.equal(scorePrediction(prediction, match), 6);
+  assert.equal(scorePrediction(prediction, match), 3);
   assert.equal(details.exactScore, true);
-  assert.equal(details.extraTimeHit, true);
-  assert.equal(details.penaltiesHit, true);
+  assert.equal(details.extraTimeHit, false);
+  assert.equal(details.qualifiedHit, false);
+  assert.equal(details.penaltiesHit, false);
 });
 
-test("scores knockout classified side when the scoreline is wrong", () => {
+test("scores knockout winner normally after extra time", () => {
   const match = {
     id: 74,
     round: 4,
@@ -105,13 +103,18 @@ test("scores knockout classified side when the scoreline is wrong", () => {
     home: "1",
     away: "0",
     knockout: {
-      qualifiedSide: "home",
       goesToExtraTime: true,
-      goesToPenalties: false
+      goesToPenalties: false,
+      qualifiedSide: "away"
     }
   };
 
-  assert.equal(scorePrediction(prediction, match), 3);
+  const details = scorePredictionDetails(prediction, match);
+  assert.equal(scorePrediction(prediction, match), 1);
+  assert.equal(details.resultHit, true);
+  assert.equal(details.extraTimeHit, false);
+  assert.equal(details.qualifiedHit, false);
+  assert.equal(details.penaltiesHit, false);
 });
 
 test("infers knockout winner and penalties from shootout goals", () => {
@@ -142,32 +145,47 @@ test("infers knockout winner and penalties from shootout goals", () => {
   assert.equal(knockout.penaltiesAway, 3);
 });
 
-test("infers predicted knockout classified side from score or penalties", () => {
-  const match = { id: 76, round: 4, date: "2026-06-30T22:00" };
-
-  assert.equal(getPredictionQualifiedSide({ home: "2", away: "1" }, match), "home");
-  assert.equal(getPredictionQualifiedSide({
+test("ignores penalty shootout goals for exact knockout score", () => {
+  const match = {
+    id: 76,
+    round: 4,
+    date: "2026-06-30T22:00",
+    homeScore: "1",
+    awayScore: "1",
+    statusShort: "FT-Pens",
+    homeGoals: [
+      { name: "Mandante", minute: 72, penalty: false },
+      { name: "Mandante penalti 1", minute: 120, penalty: true },
+      { name: "Mandante penalti 2", minute: 120, penalty: true }
+    ],
+    awayGoals: [
+      { name: "Visitante", minute: 90, penalty: false },
+      { name: "Visitante penalti 1", minute: 120, penalty: true },
+      { name: "Visitante penalti 2", minute: 120, penalty: true },
+      { name: "Visitante penalti 3", minute: 120, penalty: true }
+    ]
+  };
+  const prediction = {
     home: "1",
     away: "1",
     knockout: {
       goesToExtraTime: true,
-      goesToPenalties: true,
-      penaltiesHome: "3",
-      penaltiesAway: "4"
-    }
-  }, match), "away");
-  assert.equal(getPredictionQualifiedSide({
-    home: "1",
-    away: "1",
-    knockout: {
+      goesToPenalties: false,
       qualifiedSide: "home",
-      goesToExtraTime: true,
-      goesToPenalties: false
+      penaltiesHome: "9",
+      penaltiesAway: "0"
     }
-  }, match), "");
+  };
+
+  const details = scorePredictionDetails(prediction, match);
+  assert.equal(scorePrediction(prediction, match), 3);
+  assert.equal(details.exactScore, true);
+  assert.equal(details.extraTimeHit, false);
+  assert.equal(details.qualifiedHit, false);
+  assert.equal(details.penaltiesHit, false);
 });
 
-test("does not apply knockout bonuses before the effective date", () => {
+test("keeps original knockout scoring regardless of match date", () => {
   const match = {
     id: 72,
     round: 4,
