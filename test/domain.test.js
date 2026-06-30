@@ -57,6 +57,7 @@ test("scores knockout prediction with classified side and decision bonuses", () 
   const match = {
     id: 73,
     round: 4,
+    date: "2026-06-30T14:00",
     homeScore: "1",
     awayScore: "1",
     status: "pen",
@@ -89,6 +90,7 @@ test("scores knockout classified side when the scoreline is wrong", () => {
   const match = {
     id: 74,
     round: 4,
+    date: "2026-06-30T18:00",
     homeScore: "2",
     awayScore: "1",
     status: "aet",
@@ -107,6 +109,36 @@ test("scores knockout classified side when the scoreline is wrong", () => {
   };
 
   assert.equal(scorePrediction(prediction, match), 3);
+});
+
+test("does not apply knockout bonuses before the effective date", () => {
+  const match = {
+    id: 72,
+    round: 4,
+    date: "2026-06-29T18:00",
+    homeScore: "1",
+    awayScore: "1",
+    status: "pen",
+    qualifiedSide: "home",
+    goesToExtraTime: true,
+    goesToPenalties: true
+  };
+  const prediction = {
+    home: "2",
+    away: "2",
+    knockout: {
+      qualifiedSide: "home",
+      goesToExtraTime: true,
+      goesToPenalties: true
+    }
+  };
+
+  const details = scorePredictionDetails(prediction, match);
+  assert.equal(scorePrediction(prediction, match), 1);
+  assert.equal(details.resultHit, true);
+  assert.equal(details.qualifiedHit, false);
+  assert.equal(details.extraTimeHit, false);
+  assert.equal(details.penaltiesHit, false);
 });
 
 test("scores no points before actual result exists", () => {

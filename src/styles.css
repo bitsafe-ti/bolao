@@ -5136,6 +5136,14 @@ h3 {
   line-height: 1.25;
 }
 
+.knockout-rules-heading p {
+  max-width: 860px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: var(--rules-text-size);
+  line-height: 1.45;
+}
+
 .knockout-rules-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

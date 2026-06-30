@@ -2823,6 +2823,7 @@ function KnockoutRulesSection() {
       <div className="knockout-rules-heading">
         <span>Mata-mata</span>
         <strong id="knockout-rules-title">Como funcionam os palpites eliminatorios</strong>
+        <p>Esses bonus valem somente para jogos a partir de 30/06/2026. Jogos de 29/06/2026 seguem a regra anterior de placar, vencedor ou empate.</p>
       </div>
       <div className="knockout-rules-grid">
         <article className="knockout-rule-card">
@@ -3454,7 +3455,7 @@ function ScoringExamples() {
         </div>
         <div className="scoring-card-copy">
           <strong>Mata-mata</strong>
-          <span>Classificado correto, prorrogacao correta e penaltis corretos somam bonus independentes.</span>
+          <span>A partir de 30/06/2026, classificado correto, prorrogacao correta e penaltis corretos somam bonus independentes.</span>
         </div>
       </div>
       <div className="scoring-card scoring-card-muted">

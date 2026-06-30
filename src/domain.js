@@ -22,6 +22,7 @@ export const emptyKnockoutPrediction = {
   penaltiesHome: "",
   penaltiesAway: ""
 };
+export const KNOCKOUT_BONUS_EFFECTIVE_DATE = "2026-06-30";
 export const clearedOpeningPredictionMatchIds = ["group-a-1", "group-a-2", "group-b-1", "group-d-1"];
 
 export function makeId(prefix) {
@@ -43,6 +44,13 @@ export function getOutcome(home, away) {
 
 export function isKnockoutMatch(match) {
   return Number(match?.round) > 3;
+}
+
+export function isKnockoutBonusEligible(match) {
+  if (!isKnockoutMatch(match)) return false;
+  const matchDate = String(match?.date || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(matchDate)) return true;
+  return matchDate >= KNOCKOUT_BONUS_EFFECTIVE_DATE;
 }
 
 export function normalizeKnockoutPrediction(prediction = {}) {
@@ -145,16 +153,17 @@ export function scorePredictionDetails(prediction, match) {
   const predictedOutcome = getOutcome(predictedHome, predictedAway);
   const actualOutcome = getOutcome(actualHome, actualAway);
   const isKnockout = isKnockoutMatch(match);
+  const hasKnockoutBonuses = isKnockoutBonusEligible(match);
 
   if (predictedHome === actualHome && predictedAway === actualAway) {
     details.scorePoints = 3;
     details.exactScore = true;
-  } else if (!isKnockout && predictedOutcome === actualOutcome) {
+  } else if ((!isKnockout || !hasKnockoutBonuses) && predictedOutcome === actualOutcome) {
     details.scorePoints = 1;
     details.resultHit = true;
   }
 
-  if (isKnockout) {
+  if (hasKnockoutBonuses) {
     const predictedQualifiedSide = getPredictionQualifiedSide(prediction, match);
     const actualQualifiedSide = getKnockoutWinnerSide(match);
     if (predictedQualifiedSide && predictedQualifiedSide === actualQualifiedSide) {
@@ -163,7 +172,7 @@ export function scorePredictionDetails(prediction, match) {
     }
   }
 
-  if (isKnockout) {
+  if (hasKnockoutBonuses) {
     const predictedKnockout = normalizeKnockoutPrediction(prediction);
     const actualKnockout = getMatchKnockoutResult(match);
     if (predictedKnockout.goesToExtraTime === actualKnockout.goesToExtraTime) {
