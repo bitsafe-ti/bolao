@@ -70,6 +70,7 @@ const PRIZE_DISTRIBUTION = [
   { label: "2º lugar", percent: 30 },
   { label: "3º lugar", percent: 20 }
 ];
+const AUTH_COVER_URL = `${import.meta.env.BASE_URL}capa-bolao-login.png`;
 const AUTH_LOGO_URL = `${import.meta.env.BASE_URL}logo_bolao_transparente.png`;
 const FAVICON_URL = `${import.meta.env.BASE_URL}gb.png`;
 const LOGIN_BALL_URL = `${import.meta.env.BASE_URL}favicon.png`;
@@ -2105,9 +2106,10 @@ function AuthScreen({ error, onLogin, onRegister }) {
     <main className="auth-page">
       <section className="auth-visual">
         <img
-          src={`${import.meta.env.BASE_URL}capa-bolao.png`}
+          src={AUTH_COVER_URL}
           alt="Bolão da Copa do Mundo 2026"
           fetchPriority="high"
+          loading="eager"
         />
       </section>
       <section className="auth-card">
@@ -3218,6 +3220,11 @@ function MatchPredictionOverview({ match, participants, predictions }) {
       </div>
       {offeredPredictions.length ? (
         <div className="participant-prediction-list">
+          <div className="participant-prediction-table-header" aria-hidden="true">
+            <span>Nome</span>
+            <span>Palpite</span>
+            <span>Pontos</span>
+          </div>
           {offeredPredictions.map(({ participant, prediction }) => {
             const feedback = getPredictionFeedback(prediction, match, { compact: true });
             return (
