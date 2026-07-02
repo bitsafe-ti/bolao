@@ -10,6 +10,8 @@ const sourceTeamIds = {
   Austria: "austria",
   Belgium: "belgium",
   "Bosnia & Herzegovina": "bosnia-herzegovina",
+  "Bosnia-Herzegovina": "bosnia-herzegovina",
+  "Bosnia and Herzegovina": "bosnia-herzegovina",
   Brazil: "brazil",
   Canada: "canada",
   "Cape Verde": "cape-verde",

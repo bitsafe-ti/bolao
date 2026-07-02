@@ -2,7 +2,7 @@ import { applyResultUpdates } from "../../src/resultsSync.js";
 import { fetchResultSource, formatSaoPauloDate } from "./provider.js";
 
 const SYNC_BEFORE_KICKOFF_MS = 30 * 60 * 1000;
-const SYNC_AFTER_KICKOFF_MS = 4 * 60 * 60 * 1000;
+const SYNC_AFTER_KICKOFF_MS = 18 * 60 * 60 * 1000;
 const MAX_WRITE_ATTEMPTS = 3;
 
 function isFinished(match) {

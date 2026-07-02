@@ -148,6 +148,28 @@ test("normalizes ESPN live score and goal events", () => {
   assert.equal(match.resultSource, "espn");
 });
 
+test("normalizes ESPN Bosnia-Herzegovina team alias", () => {
+  const match = normalizeEspnEvent({
+    id: "760494",
+    date: "2026-07-02T02:00Z",
+    status: {
+      type: { name: "STATUS_FULL_TIME", state: "post", completed: true, shortDetail: "FT" }
+    },
+    competitions: [{
+      competitors: [
+        { homeAway: "home", score: "2", team: { id: "660", displayName: "United States" } },
+        { homeAway: "away", score: "0", team: { id: "452", displayName: "Bosnia-Herzegovina" } }
+      ],
+      details: []
+    }]
+  });
+
+  assert.equal(match.homeTeamId, "united-states");
+  assert.equal(match.awayTeamId, "bosnia-herzegovina");
+  assert.deepEqual(match.score, [2, 0]);
+  assert.equal(match.status, "finished");
+});
+
 test("fetches ESPN results across requested sync dates", async (context) => {
   const originalFetch = globalThis.fetch;
   const calls = [];
@@ -273,7 +295,8 @@ test("sync dates include previous-day live matches after midnight", () => {
 test("interprets stored kickoff times as Sao Paulo local time", () => {
   const match = { date: "2026-06-11T16:00", status: "scheduled" };
   assert.equal(shouldSyncLiveResults([match], new Date("2026-06-11T18:40:00.000Z")), true);
-  assert.equal(shouldSyncLiveResults([match], new Date("2026-06-11T23:30:00.000Z")), false);
+  assert.equal(shouldSyncLiveResults([match], new Date("2026-06-12T12:30:00.000Z")), true);
+  assert.equal(shouldSyncLiveResults([match], new Date("2026-06-12T14:30:00.000Z")), false);
 });
 
 test("server merge preserves final results from stale client writes", () => {
