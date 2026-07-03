@@ -70,7 +70,7 @@ const PRIZE_DISTRIBUTION = [
   { label: "2º lugar", percent: 30 },
   { label: "3º lugar", percent: 20 }
 ];
-const AUTH_COVER_URL = `${import.meta.env.BASE_URL}capa-bolao-login.png`;
+const AUTH_COVER_URL = `${import.meta.env.BASE_URL}capa-bolao.png`;
 const AUTH_LOGO_URL = `${import.meta.env.BASE_URL}logo_bolao_transparente.png`;
 const FAVICON_URL = `${import.meta.env.BASE_URL}gb.png`;
 const LOGIN_BALL_URL = `${import.meta.env.BASE_URL}favicon.png`;
