@@ -2815,6 +2815,15 @@ h3 {
   right: 16px;
 }
 
+.team-history-context-note {
+  max-width: 560px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .team-history-analysis {
   display: grid;
   gap: 14px;
@@ -2843,6 +2852,15 @@ h3 {
   font-size: 1.08rem;
   font-weight: 900;
   line-height: 1.25;
+}
+
+.team-history-analysis-copy {
+  max-width: 620px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.42;
 }
 
 .team-history-analysis-head .team-name {
@@ -2908,6 +2926,39 @@ h3 {
   background: var(--muted);
 }
 
+.team-history-recommendation {
+  display: grid;
+  gap: 5px;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 7%, #ffffff);
+  padding: 12px;
+}
+
+.team-history-recommendation span {
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.team-history-recommendation strong {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.team-history-recommendation p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.42;
+}
+
 .team-history-stat-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2944,6 +2995,115 @@ h3 {
   line-height: 1.15;
 }
 
+.team-history-comparison {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.team-history-comparison-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(132px, 0.8fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.team-history-comparison-row:last-child {
+  border-bottom: 0;
+}
+
+.team-history-comparison-row span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.team-history-comparison-row strong {
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.team-history-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.team-history-form {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 10px 12px;
+}
+
+.team-history-form.active {
+  border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
+}
+
+.team-history-form > span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-history-form > strong {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.team-history-form-chips {
+  display: flex;
+  flex-shrink: 0;
+  gap: 5px;
+}
+
+.team-history-form-chip {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.team-history-form-chip.win {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.team-history-form-chip.draw {
+  background: var(--soft);
+  color: var(--muted);
+}
+
+.team-history-form-chip.loss {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
 .team-history-insights {
   display: grid;
   gap: 6px;
@@ -2953,6 +3113,20 @@ h3 {
   font-size: 0.84rem;
   font-weight: 700;
   line-height: 1.45;
+}
+
+.team-history-previous {
+  display: grid;
+  gap: 10px;
+}
+
+.team-history-previous h3 {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 0.96rem;
+  font-weight: 900;
+  line-height: 1.25;
 }
 
 .team-history-list {
@@ -3066,6 +3240,15 @@ h3 {
 
   .team-history-chance-row {
     grid-template-columns: minmax(70px, 0.8fr) minmax(100px, 1.4fr) 42px;
+  }
+
+  .team-history-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-history-comparison-row {
+    grid-template-columns: minmax(0, 1fr) minmax(108px, 0.8fr) minmax(0, 1fr);
+    padding-inline: 10px;
   }
 
   .team-history-list {

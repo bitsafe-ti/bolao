@@ -2341,11 +2341,14 @@ function PredictionTeamColumn({ side = "", teamId, fallback, onHistory }) {
 }
 
 function TeamHistoryModal({ team, currentMatch, matches, onClose }) {
-  const teamMatches = (matches ?? [])
+  const hasMatchContext = Boolean(currentMatch);
+  const historyBaseMatches = hasMatchContext ? getFinishedMatchesBefore(matches, currentMatch) : (matches ?? []);
+  const teamMatches = historyBaseMatches
     .filter((match) => match.homeTeamId === team.id || match.awayTeamId === team.id)
     .sort((a, b) => {
       const rA = getMatchRound(a) ?? 999;
       const rB = getMatchRound(b) ?? 999;
+      if (hasMatchContext) return (b.date || "").localeCompare(a.date || "") || rB - rA || String(b.id).localeCompare(String(a.id));
       return rA - rB || (a.date || "").localeCompare(b.date || "") || String(a.id).localeCompare(String(b.id));
     });
   const matchAnalysis = currentMatch ? buildMatchPossibilityAnalysis(currentMatch, matches) : null;
@@ -2355,14 +2358,17 @@ function TeamHistoryModal({ team, currentMatch, matches, onClose }) {
       <section className="modal-card team-history-modal" role="dialog" aria-modal="true" aria-labelledby="team-history-title" onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <p className="eyebrow">Histórico</p>
+            <p className="eyebrow">{hasMatchContext ? "Análise" : "Histórico"}</p>
             <h2 id="team-history-title"><TeamName teamId={team.id} fallback={team.name} /></h2>
+            {hasMatchContext && <p className="team-history-context-note">Baseada apenas em jogos anteriores finalizados antes deste confronto.</p>}
           </div>
           <button type="button" className="modal-close" aria-label="Fechar modal" onClick={onClose}>×</button>
         </div>
         {matchAnalysis && <MatchPossibilityAnalysis analysis={matchAnalysis} focusTeamId={team.id} />}
         {teamMatches.length ? (
-          <div className="team-history-list">
+          <section className="team-history-previous">
+            <h3>{hasMatchContext ? "Jogos anteriores usados como base" : "Jogos da seleção"}</h3>
+            <div className="team-history-list">
             {teamMatches.map((match) => {
               const { homeScore, awayScore, statusLabel, statusClass } = getResultMeta(match);
               return (
@@ -2392,9 +2398,10 @@ function TeamHistoryModal({ team, currentMatch, matches, onClose }) {
                 </article>
               );
             })}
-          </div>
+            </div>
+          </section>
         ) : (
-          <EmptyState text="Nenhum jogo encontrado para esta seleção." />
+          <EmptyState text={hasMatchContext ? "Nenhum jogo anterior finalizado para esta seleção." : "Nenhum jogo encontrado para esta seleção."} />
         )}
       </section>
     </div>
@@ -2414,12 +2421,13 @@ function MatchPossibilityAnalysis({ analysis, focusTeamId }) {
     <section className="team-history-analysis" aria-label="Analise de possibilidades do jogo">
       <div className="team-history-analysis-head">
         <div>
-          <p className="eyebrow">Analise do confronto</p>
+          <p className="eyebrow">Análise do confronto</p>
           <h3>
             <span className={homeFocused ? "focused-team" : ""}><TeamName teamId={analysis.homeTeamId} fallback="Mandante" /></span>
             <span className="team-history-analysis-versus">x</span>
             <span className={awayFocused ? "focused-team" : ""}><TeamName teamId={analysis.awayTeamId} fallback="Visitante" /></span>
           </h3>
+          <p className="team-history-analysis-copy">Estimativa calculada com jogos anteriores, aproveitamento, saldo de gols, forma recente e confronto direto.</p>
         </div>
         <span className="team-history-confidence">{analysis.confidenceLabel}</span>
       </div>
@@ -2436,10 +2444,31 @@ function MatchPossibilityAnalysis({ analysis, focusTeamId }) {
         ))}
       </div>
 
+      <div className="team-history-recommendation">
+        <span>Indicação</span>
+        <strong>{analysis.recommendation.title}</strong>
+        <p>{analysis.recommendation.description}</p>
+      </div>
+
       <div className="team-history-stat-grid">
         <TeamHistoryStat label="Aproveitamento" value={`${analysis.homeSummary.efficiency}%`} detail={analysis.homeSummary.label} active={homeFocused} />
         <TeamHistoryStat label="Confronto" value={analysis.headToHeadLabel} detail={analysis.sampleLabel} />
         <TeamHistoryStat label="Aproveitamento" value={`${analysis.awaySummary.efficiency}%`} detail={analysis.awaySummary.label} active={awayFocused} />
+      </div>
+
+      <div className="team-history-comparison" role="table" aria-label="Comparativo dos times em jogos anteriores">
+        {analysis.comparisonRows.map((row) => (
+          <div className="team-history-comparison-row" role="row" key={row.label}>
+            <strong role="cell">{row.home}</strong>
+            <span role="cell">{row.label}</span>
+            <strong role="cell">{row.away}</strong>
+          </div>
+        ))}
+      </div>
+
+      <div className="team-history-form-grid">
+        <TeamRecentFormSummary label={teamsById[analysis.homeTeamId]?.name ?? "Mandante"} form={analysis.homeSummary.recentForm} active={homeFocused} />
+        <TeamRecentFormSummary label={teamsById[analysis.awayTeamId]?.name ?? "Visitante"} form={analysis.awaySummary.recentForm} active={awayFocused} />
       </div>
 
       <ul className="team-history-insights">
@@ -2455,6 +2484,25 @@ function TeamHistoryStat({ label, value, detail, active = false }) {
       <span>{label}</span>
       <strong>{value}</strong>
       <small>{detail}</small>
+    </div>
+  );
+}
+
+function TeamRecentFormSummary({ label, form, active = false }) {
+  return (
+    <div className={`team-history-form ${active ? "active" : ""}`}>
+      <span>{label}</span>
+      {form.length ? (
+        <div className="team-history-form-chips">
+          {form.map((item) => (
+            <span className={`team-history-form-chip ${item.className}`} title={item.title} key={item.id}>
+              {item.result}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <strong>Sem jogos anteriores</strong>
+      )}
     </div>
   );
 }
@@ -2499,6 +2547,8 @@ function buildMatchPossibilityAnalysis(match, matches = []) {
       ? `${homeH2h.wins}-${homeH2h.draws}-${awayH2h.wins}`
       : "Sem jogos",
     sampleLabel: `${sampleSize} jogo${sampleSize === 1 ? "" : "s"} na base`,
+    comparisonRows: buildComparisonRows(homeSummary, awaySummary),
+    recommendation: buildMatchRecommendation({ homeName, awayName, homeSummary, awaySummary, chances, sampleSize }),
     insights: buildMatchInsights({
       homeName,
       awayName,
@@ -2531,7 +2581,8 @@ function summarizeTeamHistory(teamId, matches) {
     goalsAgainst: 0,
     points: 0,
     recentPoints: 0,
-    recentPlayed: 0
+    recentPlayed: 0,
+    recentForm: []
   };
   const sortedMatches = [...matches].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
@@ -2564,8 +2615,15 @@ function summarizeTeamHistory(teamId, matches) {
     const isHome = match.homeTeamId === teamId;
     const goalsFor = isHome ? homeScore : awayScore;
     const goalsAgainst = isHome ? awayScore : homeScore;
+    const result = goalsFor > goalsAgainst ? "V" : goalsFor === goalsAgainst ? "E" : "D";
     summary.recentPlayed += 1;
     summary.recentPoints += goalsFor > goalsAgainst ? 3 : goalsFor === goalsAgainst ? 1 : 0;
+    summary.recentForm.push({
+      id: match.id,
+      result,
+      className: result === "V" ? "win" : result === "E" ? "draw" : "loss",
+      title: `${result} ${goalsFor} x ${goalsAgainst} em ${formatDate(match.date)}`
+    });
   }
 
   return summary;
@@ -2577,9 +2635,56 @@ function toDisplaySummary(summary) {
   return {
     ...summary,
     efficiency,
+    goalDiff,
+    goalsForAverage: summary.played ? summary.goalsFor / summary.played : 0,
+    goalsAgainstAverage: summary.played ? summary.goalsAgainst / summary.played : 0,
     label: summary.played
       ? `${summary.wins}V ${summary.draws}E ${summary.losses}D, saldo ${goalDiff >= 0 ? "+" : ""}${goalDiff}`
       : "Sem jogos finalizados"
+  };
+}
+
+function buildComparisonRows(homeSummary, awaySummary) {
+  const homeDisplay = toDisplaySummary(homeSummary);
+  const awayDisplay = toDisplaySummary(awaySummary);
+  return [
+    { label: "Aproveitamento", home: `${homeDisplay.efficiency}%`, away: `${awayDisplay.efficiency}%` },
+    { label: "Gols feitos/jogo", home: formatDecimal(homeDisplay.goalsForAverage), away: formatDecimal(awayDisplay.goalsForAverage) },
+    { label: "Gols sofridos/jogo", home: formatDecimal(homeDisplay.goalsAgainstAverage), away: formatDecimal(awayDisplay.goalsAgainstAverage) },
+    { label: "Saldo", home: formatSignedNumber(homeDisplay.goalDiff), away: formatSignedNumber(awayDisplay.goalDiff) }
+  ];
+}
+
+function buildMatchRecommendation({ homeName, awayName, homeSummary, awaySummary, chances, sampleSize }) {
+  if (!sampleSize) {
+    return {
+      title: "Sem favorito pela base atual",
+      description: "Ainda nao ha jogos anteriores finalizados suficientes. Use a analise como ponto de partida e avalie o contexto do confronto."
+    };
+  }
+
+  const chanceDiff = chances.home - chances.away;
+  const drawRelevant = chances.draw >= 30;
+  if (Math.abs(chanceDiff) <= 7) {
+    return {
+      title: "Tendencia de jogo equilibrado",
+      description: drawRelevant
+        ? "O empate aparece forte na leitura, mas uma vitoria apertada para qualquer lado ainda e plausivel."
+        : "Os indicadores estao proximos. Vale analisar gols sofridos e forma recente antes de definir o palpite."
+    };
+  }
+
+  const favoriteName = chanceDiff > 0 ? homeName : awayName;
+  const favoriteSummary = chanceDiff > 0 ? homeSummary : awaySummary;
+  const otherSummary = chanceDiff > 0 ? awaySummary : homeSummary;
+  const advantage = Math.abs(chanceDiff) >= 16 ? "boa vantagem" : "leve vantagem";
+  const reason = (favoriteSummary.goalsFor - favoriteSummary.goalsAgainst) >= (otherSummary.goalsFor - otherSummary.goalsAgainst)
+    ? "melhor saldo na base anterior"
+    : "melhor aproveitamento recente";
+
+  return {
+    title: `${favoriteName} com ${advantage}`,
+    description: `A base aponta ${favoriteName} como tendencia pelo ${reason}. Nao ha sugestao de placar exato, apenas direcao para apoiar o voto.`
   };
 }
 
@@ -2636,6 +2741,15 @@ function buildMatchInsights({ homeName, awayName, homeSummary, awaySummary, chan
 
 function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function formatDecimal(value) {
+  return Number(value || 0).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
+function formatSignedNumber(value) {
+  const number = Number(value || 0);
+  return `${number > 0 ? "+" : ""}${number}`;
 }
 
 function Flag({ team }) {
