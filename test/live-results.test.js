@@ -289,7 +289,15 @@ test("sync dates include previous-day live matches after midnight", () => {
     { date: "2026-06-30T18:00", status: "scheduled" }
   ], new Date("2026-06-30T11:20:00.000Z"));
 
-  assert.deepEqual(dates, ["2026-06-29", "2026-06-30"]);
+  assert.deepEqual(dates, ["2026-06-28", "2026-06-29", "2026-06-30"]);
+});
+
+test("sync dates include provider previous day for Sao Paulo midnight matches", () => {
+  const dates = getLiveResultSyncDates([
+    { date: "2026-07-03T00:00", status: "scheduled" }
+  ], new Date("2026-07-03T11:35:00.000Z"));
+
+  assert.deepEqual(dates, ["2026-07-02", "2026-07-03"]);
 });
 
 test("interprets stored kickoff times as Sao Paulo local time", () => {

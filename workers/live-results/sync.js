@@ -18,6 +18,13 @@ function parseSaoPauloKickoff(value) {
   return Date.parse(`${text.length === 16 ? `${text}:00` : text}-03:00`);
 }
 
+function shiftDate(date, days) {
+  const shifted = new Date(`${date}T12:00:00.000Z`);
+  if (Number.isNaN(shifted.getTime())) return "";
+  shifted.setUTCDate(shifted.getUTCDate() + days);
+  return shifted.toISOString().slice(0, 10);
+}
+
 function isSyncCandidate(match, now = new Date()) {
   const nowTime = now.getTime();
   if (isFinished(match) || ["cancelled", "postponed"].includes(match?.status)) return false;
@@ -36,7 +43,10 @@ export function getLiveResultSyncDates(matches, now = new Date()) {
   for (const match of matches ?? []) {
     if (!isSyncCandidate(match, now)) continue;
     const matchDate = String(match?.date || "").slice(0, 10);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(matchDate)) dates.add(matchDate);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(matchDate)) {
+      dates.add(shiftDate(matchDate, -1));
+      dates.add(matchDate);
+    }
   }
   return [...dates].sort();
 }
