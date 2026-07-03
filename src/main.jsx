@@ -70,7 +70,6 @@ const PRIZE_DISTRIBUTION = [
   { label: "2º lugar", percent: 30 },
   { label: "3º lugar", percent: 20 }
 ];
-const AUTH_COVER_URL = `${import.meta.env.BASE_URL}capa-bolao.png`;
 const AUTH_LOGO_URL = `${import.meta.env.BASE_URL}logo_bolao_transparente.png`;
 const FAVICON_URL = `${import.meta.env.BASE_URL}gb.png`;
 const LOGIN_BALL_URL = `${import.meta.env.BASE_URL}favicon.png`;
@@ -2104,14 +2103,7 @@ function AuthScreen({ error, onLogin, onRegister }) {
   }
   return (
     <main className="auth-page">
-      <section className="auth-visual">
-        <img
-          src={AUTH_COVER_URL}
-          alt="Bolão da Copa do Mundo 2026"
-          fetchPriority="high"
-          loading="eager"
-        />
-      </section>
+      <section className="auth-visual" aria-hidden="true" />
       <section className="auth-card">
         <div className="auth-card-header">
           <img src={AUTH_LOGO_URL} alt="Bolão da Copa" className="auth-logo" />
