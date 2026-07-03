@@ -322,7 +322,7 @@ select:focus {
   margin: 0 auto;
   overflow: hidden;
   padding: 24px;
-  background: var(--primary);
+  background: #ffffff;
 }
 
 .auth-visual {
