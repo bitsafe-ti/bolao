@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "start": "npm run dev",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "build:cloudflare": "cross-env VITE_BASE_PATH=/ VITE_POOL_ID=copa-2026 vite build",

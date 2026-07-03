@@ -448,7 +448,7 @@ function App() {
   const userMenuRef = useRef(null);
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState(() => { try { return sessionStorage.getItem("bol-settings-tab") || "participants"; } catch { return "participants"; } });
-  const [historyTeamId, setHistoryTeamId] = useState("");
+  const [historyContext, setHistoryContext] = useState(null);
   const [clockNow, setClockNow] = useState(() => new Date());
   const [predictionScrollRequest, setPredictionScrollRequest] = useState(0);
   const [resultScrollRequest, setResultScrollRequest] = useState(0);
@@ -620,7 +620,11 @@ function App() {
   }, [state.participants, state.users]);
   const adminParticipantRows = userRows.filter((row) => row.role === "admin");
   const regularParticipantRows = userRows.filter((row) => row.role !== "admin");
-  const historyTeam = historyTeamId ? teamsById[historyTeamId] : null;
+  const historyTeam = historyContext?.teamId ? teamsById[historyContext.teamId] : null;
+  const historyStoredMatch = historyContext?.matchId
+    ? state.matches.find((match) => match.id === historyContext.matchId)
+    : null;
+  const historyMatch = historyStoredMatch ? getDisplayMatch(historyStoredMatch) : historyContext?.match ?? null;
 
   useEffect(() => {
     const now = Date.now();
@@ -1514,8 +1518,9 @@ function App() {
       {historyTeam && (
         <TeamHistoryModal
           team={historyTeam}
+          currentMatch={historyMatch}
           matches={state.matches}
-          onClose={() => setHistoryTeamId("")}
+          onClose={() => setHistoryContext(null)}
         />
       )}
 
@@ -1843,9 +1848,19 @@ function App() {
                         <div className="prediction-match-info">
                           <span className="badge">{getMatchPhaseDisplayName(match)}</span>
                           <div className="prediction-teams-grid">
-                            <PredictionTeamColumn side="home" teamId={match.homeTeamId} fallback={match.homeSlotLabel ?? match.home} onHistory={setHistoryTeamId} />
+                            <PredictionTeamColumn
+                              side="home"
+                              teamId={match.homeTeamId}
+                              fallback={match.homeSlotLabel ?? match.home}
+                              onHistory={(teamId) => setHistoryContext({ teamId, matchId: match.id, match })}
+                            />
                             <span className="prediction-versus">x</span>
-                            <PredictionTeamColumn side="away" teamId={match.awayTeamId} fallback={match.awaySlotLabel ?? match.away} onHistory={setHistoryTeamId} />
+                            <PredictionTeamColumn
+                              side="away"
+                              teamId={match.awayTeamId}
+                              fallback={match.awaySlotLabel ?? match.away}
+                              onHistory={(teamId) => setHistoryContext({ teamId, matchId: match.id, match })}
+                            />
                           </div>
                           <p>{formatDate(match.date)}</p>
                           <p className="match-location">{formatVenue(match)}</p>
@@ -2318,14 +2333,14 @@ function PredictionTeamColumn({ side = "", teamId, fallback, onHistory }) {
       <TeamName teamId={teamId} fallback={fallback} />
       {team && (
         <button type="button" className="ghost history-button" onClick={() => onHistory(teamId)}>
-          Histórico
+          Análise
         </button>
       )}
     </div>
   );
 }
 
-function TeamHistoryModal({ team, matches, onClose }) {
+function TeamHistoryModal({ team, currentMatch, matches, onClose }) {
   const teamMatches = (matches ?? [])
     .filter((match) => match.homeTeamId === team.id || match.awayTeamId === team.id)
     .sort((a, b) => {
@@ -2333,6 +2348,7 @@ function TeamHistoryModal({ team, matches, onClose }) {
       const rB = getMatchRound(b) ?? 999;
       return rA - rB || (a.date || "").localeCompare(b.date || "") || String(a.id).localeCompare(String(b.id));
     });
+  const matchAnalysis = currentMatch ? buildMatchPossibilityAnalysis(currentMatch, matches) : null;
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -2344,6 +2360,7 @@ function TeamHistoryModal({ team, matches, onClose }) {
           </div>
           <button type="button" className="modal-close" aria-label="Fechar modal" onClick={onClose}>×</button>
         </div>
+        {matchAnalysis && <MatchPossibilityAnalysis analysis={matchAnalysis} focusTeamId={team.id} />}
         {teamMatches.length ? (
           <div className="team-history-list">
             {teamMatches.map((match) => {
@@ -2382,6 +2399,243 @@ function TeamHistoryModal({ team, matches, onClose }) {
       </section>
     </div>
   );
+}
+
+function MatchPossibilityAnalysis({ analysis, focusTeamId }) {
+  const chanceRows = [
+    { key: "home", label: teamsById[analysis.homeTeamId]?.name ?? "Mandante", chance: analysis.chances.home },
+    { key: "draw", label: "Empate", chance: analysis.chances.draw },
+    { key: "away", label: teamsById[analysis.awayTeamId]?.name ?? "Visitante", chance: analysis.chances.away }
+  ];
+  const homeFocused = focusTeamId === analysis.homeTeamId;
+  const awayFocused = focusTeamId === analysis.awayTeamId;
+
+  return (
+    <section className="team-history-analysis" aria-label="Analise de possibilidades do jogo">
+      <div className="team-history-analysis-head">
+        <div>
+          <p className="eyebrow">Analise do confronto</p>
+          <h3>
+            <span className={homeFocused ? "focused-team" : ""}><TeamName teamId={analysis.homeTeamId} fallback="Mandante" /></span>
+            <span className="team-history-analysis-versus">x</span>
+            <span className={awayFocused ? "focused-team" : ""}><TeamName teamId={analysis.awayTeamId} fallback="Visitante" /></span>
+          </h3>
+        </div>
+        <span className="team-history-confidence">{analysis.confidenceLabel}</span>
+      </div>
+
+      <div className="team-history-chances">
+        {chanceRows.map((row) => (
+          <div className={`team-history-chance-row ${row.key}`} key={row.key}>
+            <span>{row.label}</span>
+            <div className="team-history-chance-track" aria-hidden="true">
+              <span className="team-history-chance-fill" style={{ width: `${row.chance}%` }} />
+            </div>
+            <strong>{row.chance}%</strong>
+          </div>
+        ))}
+      </div>
+
+      <div className="team-history-stat-grid">
+        <TeamHistoryStat label="Aproveitamento" value={`${analysis.homeSummary.efficiency}%`} detail={analysis.homeSummary.label} active={homeFocused} />
+        <TeamHistoryStat label="Confronto" value={analysis.headToHeadLabel} detail={analysis.sampleLabel} />
+        <TeamHistoryStat label="Aproveitamento" value={`${analysis.awaySummary.efficiency}%`} detail={analysis.awaySummary.label} active={awayFocused} />
+      </div>
+
+      <ul className="team-history-insights">
+        {analysis.insights.map((insight) => <li key={insight}>{insight}</li>)}
+      </ul>
+    </section>
+  );
+}
+
+function TeamHistoryStat({ label, value, detail, active = false }) {
+  return (
+    <div className={`team-history-stat ${active ? "active" : ""}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
+  );
+}
+
+function buildMatchPossibilityAnalysis(match, matches = []) {
+  const homeTeamId = match?.homeTeamId;
+  const awayTeamId = match?.awayTeamId;
+  if (!homeTeamId || !awayTeamId) return null;
+
+  const previousMatches = getFinishedMatchesBefore(matches, match);
+  const headToHeadMatches = previousMatches.filter((item) => {
+    const ids = [item.homeTeamId, item.awayTeamId];
+    return ids.includes(homeTeamId) && ids.includes(awayTeamId);
+  });
+  const homeSummary = summarizeTeamHistory(homeTeamId, previousMatches);
+  const awaySummary = summarizeTeamHistory(awayTeamId, previousMatches);
+  const homeH2h = summarizeTeamHistory(homeTeamId, headToHeadMatches);
+  const awayH2h = summarizeTeamHistory(awayTeamId, headToHeadMatches);
+  const homeRating = getTeamHistoryRating(homeSummary);
+  const awayRating = getTeamHistoryRating(awaySummary);
+  const headToHeadAdjustment = getHeadToHeadAdjustment(homeH2h, awayH2h);
+  const chances = calculateMatchChances(homeRating + headToHeadAdjustment, awayRating - headToHeadAdjustment, {
+    hasSample: homeSummary.played > 0 || awaySummary.played > 0
+  });
+  const homeName = teamsById[homeTeamId]?.name ?? "Mandante";
+  const awayName = teamsById[awayTeamId]?.name ?? "Visitante";
+  const sampleSize = previousMatches.filter((item) => (
+    item.homeTeamId === homeTeamId ||
+    item.awayTeamId === homeTeamId ||
+    item.homeTeamId === awayTeamId ||
+    item.awayTeamId === awayTeamId
+  )).length;
+
+  return {
+    homeTeamId,
+    awayTeamId,
+    homeSummary: toDisplaySummary(homeSummary),
+    awaySummary: toDisplaySummary(awaySummary),
+    chances,
+    confidenceLabel: sampleSize >= 6 ? "Base forte" : sampleSize >= 3 ? "Base moderada" : "Base inicial",
+    headToHeadLabel: headToHeadMatches.length
+      ? `${homeH2h.wins}-${homeH2h.draws}-${awayH2h.wins}`
+      : "Sem jogos",
+    sampleLabel: `${sampleSize} jogo${sampleSize === 1 ? "" : "s"} na base`,
+    insights: buildMatchInsights({
+      homeName,
+      awayName,
+      homeSummary,
+      awaySummary,
+      chances,
+      headToHeadMatches
+    })
+  };
+}
+
+function getFinishedMatchesBefore(matches, currentMatch) {
+  const currentTime = Date.parse(currentMatch?.date || "");
+  return (matches ?? []).filter((match) => {
+    if (!match || match.id === currentMatch?.id || !isMatchResultFinal(match)) return false;
+    if (!match.homeTeamId || !match.awayTeamId) return false;
+    const matchTime = Date.parse(match.date || "");
+    if (!Number.isNaN(currentTime) && !Number.isNaN(matchTime)) return matchTime < currentTime;
+    return true;
+  });
+}
+
+function summarizeTeamHistory(teamId, matches) {
+  const summary = {
+    played: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    points: 0,
+    recentPoints: 0,
+    recentPlayed: 0
+  };
+  const sortedMatches = [...matches].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+  for (const match of sortedMatches) {
+    if (match.homeTeamId !== teamId && match.awayTeamId !== teamId) continue;
+    const homeScore = parseScoreValue(match.homeScore);
+    const awayScore = parseScoreValue(match.awayScore);
+    if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore)) continue;
+    const isHome = match.homeTeamId === teamId;
+    const goalsFor = isHome ? homeScore : awayScore;
+    const goalsAgainst = isHome ? awayScore : homeScore;
+    const points = goalsFor > goalsAgainst ? 3 : goalsFor === goalsAgainst ? 1 : 0;
+
+    summary.played += 1;
+    summary.goalsFor += goalsFor;
+    summary.goalsAgainst += goalsAgainst;
+    summary.points += points;
+    if (points === 3) summary.wins += 1;
+    else if (points === 1) summary.draws += 1;
+    else summary.losses += 1;
+  }
+
+  const recentMatches = sortedMatches
+    .filter((match) => match.homeTeamId === teamId || match.awayTeamId === teamId)
+    .slice(-3);
+  for (const match of recentMatches) {
+    const homeScore = parseScoreValue(match.homeScore);
+    const awayScore = parseScoreValue(match.awayScore);
+    if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore)) continue;
+    const isHome = match.homeTeamId === teamId;
+    const goalsFor = isHome ? homeScore : awayScore;
+    const goalsAgainst = isHome ? awayScore : homeScore;
+    summary.recentPlayed += 1;
+    summary.recentPoints += goalsFor > goalsAgainst ? 3 : goalsFor === goalsAgainst ? 1 : 0;
+  }
+
+  return summary;
+}
+
+function toDisplaySummary(summary) {
+  const efficiency = summary.played ? Math.round((summary.points / (summary.played * 3)) * 100) : 50;
+  const goalDiff = summary.goalsFor - summary.goalsAgainst;
+  return {
+    ...summary,
+    efficiency,
+    label: summary.played
+      ? `${summary.wins}V ${summary.draws}E ${summary.losses}D, saldo ${goalDiff >= 0 ? "+" : ""}${goalDiff}`
+      : "Sem jogos finalizados"
+  };
+}
+
+function getTeamHistoryRating(summary) {
+  if (!summary.played) return 0;
+  const pointsRate = summary.points / (summary.played * 3);
+  const recentRate = summary.recentPlayed ? summary.recentPoints / (summary.recentPlayed * 3) : pointsRate;
+  const goalDiffPerGame = (summary.goalsFor - summary.goalsAgainst) / summary.played;
+  return ((pointsRate - 0.5) * 1.35) + (Math.tanh(goalDiffPerGame / 2) * 0.55) + ((recentRate - 0.5) * 0.45);
+}
+
+function getHeadToHeadAdjustment(homeSummary, awaySummary) {
+  const played = Math.max(homeSummary.played, awaySummary.played);
+  if (!played) return 0;
+  const homeRate = homeSummary.points / Math.max(1, homeSummary.played * 3);
+  const awayRate = awaySummary.points / Math.max(1, awaySummary.played * 3);
+  return (homeRate - awayRate) * 0.22;
+}
+
+function calculateMatchChances(homeRating, awayRating, { hasSample }) {
+  if (!hasSample) return { home: 35, draw: 30, away: 35 };
+  const diff = homeRating - awayRating;
+  const closeFactor = 1 - Math.min(Math.abs(diff) / 1.7, 1);
+  const draw = Math.round(clampNumber(22 + (closeFactor * 10), 16, 34));
+  const decisivePool = 100 - draw;
+  const homeShare = 1 / (1 + Math.exp(-diff * 1.35));
+  const home = Math.round(decisivePool * homeShare);
+  return { home, draw, away: 100 - draw - home };
+}
+
+function buildMatchInsights({ homeName, awayName, homeSummary, awaySummary, chances, headToHeadMatches }) {
+  const insights = [];
+  const chanceDiff = chances.home - chances.away;
+  if (Math.abs(chanceDiff) <= 7) {
+    insights.push("Cenario equilibrado: o historico registrado nao abre vantagem clara para nenhum lado.");
+  } else {
+    insights.push(`${chanceDiff > 0 ? homeName : awayName} chega com maior possibilidade pelo desempenho registrado ate aqui.`);
+  }
+
+  const homeAvgGoals = homeSummary.played ? homeSummary.goalsFor / homeSummary.played : 0;
+  const awayAvgGoals = awaySummary.played ? awaySummary.goalsFor / awaySummary.played : 0;
+  if (homeSummary.played || awaySummary.played) {
+    const attackLeader = homeAvgGoals >= awayAvgGoals ? homeName : awayName;
+    insights.push(`${attackLeader} tem a melhor media ofensiva na base usada para esta analise.`);
+  } else {
+    insights.push("Ainda nao ha jogos finalizados suficientes, entao a leitura inicial parte de um confronto neutro.");
+  }
+
+  insights.push(headToHeadMatches.length
+    ? `Confronto direto considerado em ${headToHeadMatches.length} jogo${headToHeadMatches.length === 1 ? "" : "s"} anterior${headToHeadMatches.length === 1 ? "" : "es"}.`
+    : "Sem confronto direto anterior registrado antes deste jogo.");
+  return insights;
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function Flag({ team }) {
@@ -3208,7 +3462,6 @@ function MatchPredictionOverview({ match, participants, predictions }) {
     <div className="prediction-card-overview">
       <div className="prediction-card-overview-header">
         <strong>Palpites dos participantes</strong>
-        <span>{offeredPredictions.length} palpite{offeredPredictions.length === 1 ? "" : "s"}</span>
       </div>
       {offeredPredictions.length ? (
         <div className="participant-prediction-list">
