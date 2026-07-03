@@ -449,6 +449,7 @@ function App() {
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState(() => { try { return sessionStorage.getItem("bol-settings-tab") || "participants"; } catch { return "participants"; } });
   const [historyContext, setHistoryContext] = useState(null);
+  const [analysisContext, setAnalysisContext] = useState(null);
   const [clockNow, setClockNow] = useState(() => new Date());
   const [predictionScrollRequest, setPredictionScrollRequest] = useState(0);
   const [resultScrollRequest, setResultScrollRequest] = useState(0);
@@ -625,6 +626,10 @@ function App() {
     ? state.matches.find((match) => match.id === historyContext.matchId)
     : null;
   const historyMatch = historyStoredMatch ? getDisplayMatch(historyStoredMatch) : historyContext?.match ?? null;
+  const analysisStoredMatch = analysisContext?.matchId
+    ? state.matches.find((match) => match.id === analysisContext.matchId)
+    : null;
+  const analysisMatch = analysisStoredMatch ? getDisplayMatch(analysisStoredMatch) : analysisContext?.match ?? null;
 
   useEffect(() => {
     const now = Date.now();
@@ -1524,6 +1529,14 @@ function App() {
         />
       )}
 
+      {analysisMatch && (
+        <MatchAnalysisModal
+          match={analysisMatch}
+          matches={state.matches}
+          onClose={() => setAnalysisContext(null)}
+        />
+      )}
+
       {notifPopup && (
         <NotificationPopupModal
           notification={notifPopup}
@@ -1854,7 +1867,14 @@ function App() {
                               fallback={match.homeSlotLabel ?? match.home}
                               onHistory={(teamId) => setHistoryContext({ teamId, matchId: match.id, match })}
                             />
-                            <span className="prediction-versus">x</span>
+                            <div className="prediction-center-column">
+                              <span className="prediction-versus">x</span>
+                              {match.homeTeamId && match.awayTeamId && (
+                                <button type="button" className="ghost analysis-button" onClick={() => setAnalysisContext({ matchId: match.id, match })}>
+                                  Análise
+                                </button>
+                              )}
+                            </div>
                             <PredictionTeamColumn
                               side="away"
                               teamId={match.awayTeamId}
@@ -2333,7 +2353,7 @@ function PredictionTeamColumn({ side = "", teamId, fallback, onHistory }) {
       <TeamName teamId={teamId} fallback={fallback} />
       {team && (
         <button type="button" className="ghost history-button" onClick={() => onHistory(teamId)}>
-          Análise
+          Histórico
         </button>
       )}
     </div>
@@ -2351,20 +2371,18 @@ function TeamHistoryModal({ team, currentMatch, matches, onClose }) {
       if (hasMatchContext) return (b.date || "").localeCompare(a.date || "") || rB - rA || String(b.id).localeCompare(String(a.id));
       return rA - rB || (a.date || "").localeCompare(b.date || "") || String(a.id).localeCompare(String(b.id));
     });
-  const matchAnalysis = currentMatch ? buildMatchPossibilityAnalysis(currentMatch, matches) : null;
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section className="modal-card team-history-modal" role="dialog" aria-modal="true" aria-labelledby="team-history-title" onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <p className="eyebrow">{hasMatchContext ? "Análise" : "Histórico"}</p>
+            <p className="eyebrow">Histórico</p>
             <h2 id="team-history-title"><TeamName teamId={team.id} fallback={team.name} /></h2>
-            {hasMatchContext && <p className="team-history-context-note">Baseada apenas em jogos anteriores finalizados antes deste confronto.</p>}
+            {hasMatchContext && <p className="team-history-context-note">Jogos anteriores finalizados antes deste confronto.</p>}
           </div>
           <button type="button" className="modal-close" aria-label="Fechar modal" onClick={onClose}>×</button>
         </div>
-        {matchAnalysis && <MatchPossibilityAnalysis analysis={matchAnalysis} focusTeamId={team.id} />}
         {teamMatches.length ? (
           <section className="team-history-previous">
             <h3>{hasMatchContext ? "Jogos anteriores usados como base" : "Jogos da seleção"}</h3>
@@ -2402,6 +2420,34 @@ function TeamHistoryModal({ team, currentMatch, matches, onClose }) {
           </section>
         ) : (
           <EmptyState text={hasMatchContext ? "Nenhum jogo anterior finalizado para esta seleção." : "Nenhum jogo encontrado para esta seleção."} />
+        )}
+      </section>
+    </div>
+  );
+}
+
+function MatchAnalysisModal({ match, matches, onClose }) {
+  const analysis = buildMatchPossibilityAnalysis(match, matches);
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="modal-card team-history-modal team-analysis-modal" role="dialog" aria-modal="true" aria-labelledby="match-analysis-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">Análise</p>
+            <h2 id="match-analysis-title">
+              <TeamName teamId={match.homeTeamId} fallback={match.homeSlotLabel ?? match.home ?? "Mandante"} />
+              <span className="team-analysis-title-versus">x</span>
+              <TeamName teamId={match.awayTeamId} fallback={match.awaySlotLabel ?? match.away ?? "Visitante"} />
+            </h2>
+            <p className="team-history-context-note">Baseada apenas em jogos anteriores finalizados antes deste confronto.</p>
+          </div>
+          <button type="button" className="modal-close" aria-label="Fechar modal" onClick={onClose}>×</button>
+        </div>
+        {analysis ? (
+          <MatchPossibilityAnalysis analysis={analysis} />
+        ) : (
+          <EmptyState text="Seleções indefinidas para análise deste confronto." />
         )}
       </section>
     </div>

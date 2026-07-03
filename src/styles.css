@@ -2586,13 +2586,21 @@ h3 {
   text-align: left;
 }
 
+.prediction-center-column {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 74px;
+}
+
 .prediction-versus {
   color: var(--muted);
   font-weight: 800;
   padding-top: 8px;
 }
 
-.history-button {
+.history-button,
+.analysis-button {
   min-height: 30px;
   padding: 4px 10px;
   font-size: 0.78rem;
@@ -2824,6 +2832,19 @@ h3 {
   line-height: 1.4;
 }
 
+.team-analysis-modal .modal-header h2 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.team-analysis-title-versus {
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
 .team-history-analysis {
   display: grid;
   gap: 14px;
@@ -2832,6 +2853,10 @@ h3 {
   border-radius: 8px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 6%, #ffffff), rgba(255, 255, 255, 0.96));
   padding: 16px;
+}
+
+.team-analysis-modal .team-history-analysis {
+  margin-bottom: 0;
 }
 
 .team-history-analysis-head {
