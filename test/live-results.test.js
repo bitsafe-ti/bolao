@@ -38,6 +38,30 @@ test("normalizes API-Football live fixtures and goal events", () => {
   assert.equal(fixture.homeGoals[0].name, "Santiago Gimenez");
 });
 
+test("normalizes API-Football knockout winner and penalty shootout", () => {
+  const fixture = normalizeApiFootballFixture({
+    fixture: {
+      id: 789,
+      date: "2026-07-03T18:00:00+00:00",
+      status: { short: "PEN", elapsed: 120 },
+      venue: { name: "AT&T Stadium", city: "Arlington" }
+    },
+    teams: {
+      home: { id: 1, name: "Australia", winner: false },
+      away: { id: 2, name: "Egypt", winner: true }
+    },
+    goals: { home: 1, away: 1 },
+    score: { penalty: { home: 2, away: 4 } },
+    events: []
+  });
+
+  assert.equal(fixture.status, "finished");
+  assert.equal(fixture.qualifiedSide, "away");
+  assert.equal(fixture.goesToPenalties, true);
+  assert.equal(fixture.penaltiesHome, "2");
+  assert.equal(fixture.penaltiesAway, "4");
+});
+
 test("maps provider statuses to application statuses", () => {
   assert.equal(normalizeFixtureStatus("NS"), "scheduled");
   assert.equal(normalizeFixtureStatus("HT"), "live");
@@ -148,6 +172,31 @@ test("normalizes ESPN live score and goal events", () => {
   assert.equal(match.resultSource, "espn");
 });
 
+test("normalizes ESPN knockout winner and penalty shootout", () => {
+  const match = normalizeEspnEvent({
+    id: "760499",
+    date: "2026-07-03T18:00Z",
+    status: {
+      type: { name: "STATUS_FINAL_PEN", completed: true, detail: "FT-Pens", shortDetail: "FT-Pens" }
+    },
+    competitions: [{
+      competitors: [
+        { homeAway: "home", score: "1", winner: false, shootoutScore: 2, team: { id: "628", displayName: "Australia" } },
+        { homeAway: "away", score: "1", winner: true, shootoutScore: 4, team: { id: "2620", displayName: "Egypt" } }
+      ],
+      details: []
+    }]
+  });
+
+  assert.equal(match.status, "finished");
+  assert.equal(match.statusShort, "FT-Pens");
+  assert.equal(match.qualifiedSide, "away");
+  assert.equal(match.goesToExtraTime, true);
+  assert.equal(match.goesToPenalties, true);
+  assert.equal(match.penaltiesHome, "2");
+  assert.equal(match.penaltiesAway, "4");
+});
+
 test("normalizes ESPN Bosnia-Herzegovina team alias", () => {
   const match = normalizeEspnEvent({
     id: "760494",
@@ -207,6 +256,39 @@ test("fetches ESPN results across requested sync dates", async (context) => {
   assert.equal(result.matches[0].homeTeamId, "netherlands");
   assert.equal(result.matches[0].status, "finished");
   assert.equal(result.matches[0].statusShort, "FT-Pens");
+});
+
+test("enriches finished knockout matches with provider winner metadata", () => {
+  const result = applyResultUpdates([
+    {
+      id: 88,
+      homeTeamId: "australia",
+      awayTeamId: "egypt",
+      homeScore: "1",
+      awayScore: "1",
+      status: "finished",
+      statusShort: "FT-Pens"
+    }
+  ], [
+    {
+      homeTeamId: "australia",
+      awayTeamId: "egypt",
+      score: [1, 1],
+      status: "finished",
+      statusShort: "FT-Pens",
+      qualifiedSide: "away",
+      goesToExtraTime: true,
+      goesToPenalties: true,
+      penaltiesHome: "2",
+      penaltiesAway: "4"
+    }
+  ]);
+
+  assert.equal(result.changed, 1);
+  assert.equal(result.matches[0].qualifiedSide, "away");
+  assert.equal(result.matches[0].goesToPenalties, true);
+  assert.equal(result.matches[0].penaltiesHome, "2");
+  assert.equal(result.matches[0].penaltiesAway, "4");
 });
 
 test("updates simultaneous live matches without mixing their scores", () => {

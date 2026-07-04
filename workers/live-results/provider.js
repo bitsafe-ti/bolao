@@ -57,6 +57,17 @@ function normalizeGoalEvents(events, homeProviderId, awayProviderId) {
   return goals;
 }
 
+function parseProviderScore(value) {
+  const score = Number(value);
+  return Number.isInteger(score) && score >= 0 ? score : null;
+}
+
+function getProviderWinnerSide(home, away) {
+  if (home?.winner === true || home?.advance === true) return "home";
+  if (away?.winner === true || away?.advance === true) return "away";
+  return "";
+}
+
 export function normalizeApiFootballFixture(item) {
   const homeTeamId = getSourceTeamId(item?.teams?.home?.name);
   const awayTeamId = getSourceTeamId(item?.teams?.away?.name);
@@ -68,6 +79,11 @@ export function normalizeApiFootballFixture(item) {
   const awayScore = item.goals?.away;
   const hasScore = Number.isInteger(homeScore) && Number.isInteger(awayScore);
   const goals = normalizeGoalEvents(item.events, item.teams.home.id, item.teams.away.id);
+  const penaltiesHome = parseProviderScore(item.score?.penalty?.home);
+  const penaltiesAway = parseProviderScore(item.score?.penalty?.away);
+  const hasPenaltyScore = penaltiesHome !== null && penaltiesAway !== null;
+  const goesToPenalties = statusShort === "PEN" || hasPenaltyScore;
+  const qualifiedSide = getProviderWinnerSide(item.teams.home, item.teams.away);
 
   return {
     homeTeamId,
@@ -82,7 +98,12 @@ export function normalizeApiFootballFixture(item) {
     elapsed: item.fixture?.status?.elapsed ?? null,
     resultSource: "api-football",
     homeGoals: goals.home,
-    awayGoals: goals.away
+    awayGoals: goals.away,
+    goesToExtraTime: statusShort === "AET" || goesToPenalties || undefined,
+    goesToPenalties: goesToPenalties || undefined,
+    qualifiedSide: qualifiedSide || undefined,
+    penaltiesHome: hasPenaltyScore ? String(penaltiesHome) : undefined,
+    penaltiesAway: hasPenaltyScore ? String(penaltiesAway) : undefined
   };
 }
 
@@ -129,6 +150,18 @@ export function normalizeEspnEvent(event) {
   const awayScore = Number(away.score);
   const hasScore = [homeScore, awayScore].every(Number.isInteger) && ["live", "finished"].includes(status);
   const goals = normalizeEspnGoalEvents(competition.details, home.team?.id, away.team?.id);
+  const statusText = [
+    statusType.name,
+    statusType.description,
+    statusType.detail,
+    statusType.shortDetail
+  ].map((value) => String(value || "").toLowerCase()).join(" ");
+  const penaltiesHome = parseProviderScore(home.shootoutScore);
+  const penaltiesAway = parseProviderScore(away.shootoutScore);
+  const hasPenaltyScore = penaltiesHome !== null && penaltiesAway !== null;
+  const goesToPenalties = hasPenaltyScore || statusText.includes("pen");
+  const goesToExtraTime = goesToPenalties || statusText.includes("aet") || statusText.includes("extra time");
+  const qualifiedSide = getProviderWinnerSide(home, away);
 
   return {
     homeTeamId,
@@ -145,7 +178,12 @@ export function normalizeEspnEvent(event) {
       : null,
     resultSource: "espn",
     homeGoals: goals.home,
-    awayGoals: goals.away
+    awayGoals: goals.away,
+    goesToExtraTime: goesToExtraTime || undefined,
+    goesToPenalties: goesToPenalties || undefined,
+    qualifiedSide: qualifiedSide || undefined,
+    penaltiesHome: hasPenaltyScore ? String(penaltiesHome) : undefined,
+    penaltiesAway: hasPenaltyScore ? String(penaltiesAway) : undefined
   };
 }
 

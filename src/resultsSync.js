@@ -166,6 +166,33 @@ function isFinishedStatus(match) {
   return ["finished", "ft", "aet", "pen", "awd", "wo"].includes(status);
 }
 
+function parseStoredScore(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const score = Number(value);
+  return Number.isInteger(score) && score >= 0 ? String(score) : null;
+}
+
+function applyKnockoutMetadataPatch(patch, match, source) {
+  if (source.goesToExtraTime === true) patch.goesToExtraTime = true;
+  if (source.goesToPenalties === true) patch.goesToPenalties = true;
+  if (["home", "away"].includes(source.qualifiedSide)) patch.qualifiedSide = source.qualifiedSide;
+
+  const penaltiesHome = parseStoredScore(source.penaltiesHome);
+  const penaltiesAway = parseStoredScore(source.penaltiesAway);
+  if (penaltiesHome !== null && penaltiesAway !== null) {
+    patch.penaltiesHome = penaltiesHome;
+    patch.penaltiesAway = penaltiesAway;
+  }
+
+  return [
+    "goesToExtraTime",
+    "goesToPenalties",
+    "qualifiedSide",
+    "penaltiesHome",
+    "penaltiesAway"
+  ].some((field) => patch[field] !== undefined && patch[field] !== match[field]);
+}
+
 export function applyResultUpdates(matches, sourceMatches) {
   const sourceByTeams = Object.fromEntries(
     sourceMatches.map((match) => [`${match.homeTeamId}__${match.awayTeamId}`, match])
@@ -205,6 +232,7 @@ export function applyResultUpdates(matches, sourceMatches) {
       patch.statusShort !== match.statusShort ||
       patch.elapsed !== (match.elapsed ?? null) ||
       patch.resultSource !== match.resultSource;
+    resultChanged = applyKnockoutMetadataPatch(patch, match, source) || resultChanged;
 
     if (Array.isArray(source.score) && !isFinishedStatus(match)) {
       const homeScore = String(source.score[0]);
