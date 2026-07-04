@@ -102,9 +102,15 @@ const RESULT_FIELDS = [
 function preserveResultFields(target, source) {
   const merged = { ...target };
   for (const field of RESULT_FIELDS) {
-    if (source[field] !== undefined) merged[field] = source[field];
+    if (hasMeaningfulResultValue(source[field])) merged[field] = source[field];
   }
   return merged;
+}
+
+function hasMeaningfulResultValue(value) {
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "boolean") return value === true;
+  return value !== undefined && value !== null && value !== "";
 }
 
 export function mergeMatchesPreservingResults(currentMatches = [], nextMatches = []) {

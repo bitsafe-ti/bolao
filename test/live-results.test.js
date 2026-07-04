@@ -406,6 +406,40 @@ test("server merge preserves final results from stale client writes", () => {
   assert.equal(merged.phase, "Grupo A");
 });
 
+test("server merge allows finished knockout metadata to be completed later", () => {
+  const current = [{
+    id: "m1",
+    homeScore: "1",
+    awayScore: "1",
+    status: "finished",
+    statusShort: "FT-Pens",
+    qualifiedSide: "",
+    penaltiesHome: "",
+    penaltiesAway: "",
+    resultUpdatedAt: "2026-07-03T21:00:00.000Z"
+  }];
+  const incoming = [{
+    id: "m1",
+    homeScore: "1",
+    awayScore: "1",
+    status: "finished",
+    statusShort: "FT-Pens",
+    qualifiedSide: "away",
+    goesToPenalties: true,
+    penaltiesHome: "2",
+    penaltiesAway: "4",
+    resultUpdatedAt: "2026-07-03T21:10:00.000Z"
+  }];
+  const [merged] = mergeMatchesPreservingResults(current, incoming);
+
+  assert.equal(merged.homeScore, "1");
+  assert.equal(merged.awayScore, "1");
+  assert.equal(merged.qualifiedSide, "away");
+  assert.equal(merged.goesToPenalties, true);
+  assert.equal(merged.penaltiesHome, "2");
+  assert.equal(merged.penaltiesAway, "4");
+});
+
 test("server merge preserves the newest live score", () => {
   const current = [{
     id: "m1",
