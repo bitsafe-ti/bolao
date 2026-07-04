@@ -449,6 +449,19 @@ test("labels round 4 as 16 avos", () => {
   assert.equal(matches.find((match) => match.id === 88).stadium, "AT&T Stadium");
 });
 
+test("creates complete knockout schedule with dates and venues", () => {
+  const matches = createKnockoutStageMatches();
+  const scheduledMatches = matches.filter((match) => match.round >= 4);
+
+  assert.equal(scheduledMatches.length, 32);
+  assert.ok(scheduledMatches.every((match) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(match.date)));
+  assert.ok(scheduledMatches.every((match) => match.ground && match.city && match.stadium && match.country));
+  assert.equal(matches.find((match) => match.id === 89).date, "2026-07-04T18:00");
+  assert.equal(matches.find((match) => match.id === 101).ground, "Dallas (Arlington)");
+  assert.equal(matches.find((match) => match.id === 103).phase, "Disputa de 3º lugar");
+  assert.equal(matches.find((match) => match.id === 104).stadium, "MetLife Stadium");
+});
+
 test("normalizes stored admin role as admin, all others as user", () => {
   const users = normalizeUsers([
     { id: "1", email: "dono@bolao.com", role: "admin" },

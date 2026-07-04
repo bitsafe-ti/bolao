@@ -41,6 +41,26 @@ export const ROUND_OF_32_SCHEDULE = {
   87: { date: "2026-07-03T22:30", ground: "Kansas City" }
 };
 
+export const KNOCKOUT_STAGE_SCHEDULE = {
+  ...ROUND_OF_32_SCHEDULE,
+  89: { date: "2026-07-04T18:00", ground: "Philadelphia" },
+  90: { date: "2026-07-04T14:00", ground: "Houston" },
+  91: { date: "2026-07-05T17:00", ground: "New York/New Jersey (East Rutherford)" },
+  92: { date: "2026-07-05T21:00", ground: "Mexico City" },
+  93: { date: "2026-07-06T16:00", ground: "Dallas (Arlington)" },
+  94: { date: "2026-07-06T21:00", ground: "Seattle" },
+  95: { date: "2026-07-07T13:00", ground: "Atlanta" },
+  96: { date: "2026-07-07T17:00", ground: "Vancouver" },
+  97: { date: "2026-07-09T17:00", ground: "Boston (Foxborough)" },
+  98: { date: "2026-07-10T16:00", ground: "Los Angeles (Inglewood)" },
+  99: { date: "2026-07-11T18:00", ground: "Miami (Miami Gardens)" },
+  100: { date: "2026-07-11T22:00", ground: "Kansas City" },
+  101: { date: "2026-07-14T16:00", ground: "Dallas (Arlington)" },
+  102: { date: "2026-07-15T16:00", ground: "Atlanta" },
+  103: { date: "2026-07-18T18:00", ground: "Miami (Miami Gardens)" },
+  104: { date: "2026-07-19T16:00", ground: "New York/New Jersey (East Rutherford)" }
+};
+
 export const KNOCKOUT_PATH = {
   roundOf16: [
     { id: 89, sources: [74, 77] },
@@ -62,6 +82,7 @@ export const KNOCKOUT_PATH = {
     { id: 101, sources: [97, 98] },
     { id: 102, sources: [99, 100] }
   ],
+  thirdPlace: [{ id: 103, sources: [101, 102] }],
   final: [{ id: 104, sources: [101, 102] }]
 };
 
@@ -238,6 +259,16 @@ export function buildRoundOf32Bracket(groups, options = {}) {
       ? { ...winner, confirmed: true, label: winner.name || winner.label || `Vencedor do Jogo ${sourceId}` }
       : { teamId: "", name: "", label: `Vencedor do Jogo ${sourceId}`, confirmed: false };
   };
+  const loserSlot = (sourceId) => {
+    const source = resolvedById.get(sourceId);
+    const storedMatch = storedMatchesById.get(sourceId);
+    const winnerSide = getMatchWinnerSide(storedMatch);
+    const loserSide = winnerSide === "home" ? "away" : winnerSide === "away" ? "home" : "";
+    const loser = loserSide ? source?.[loserSide] : null;
+    return loser?.teamId
+      ? { ...loser, confirmed: true, label: loser.name || loser.label || `Perdedor do Jogo ${sourceId}` }
+      : { teamId: "", name: "", label: `Perdedor do Jogo ${sourceId}`, confirmed: false };
+  };
   const makeFutureMatches = (matches) => matches.map((match) => {
     const projected = {
       id: match.id,
@@ -253,6 +284,16 @@ export function buildRoundOf32Bracket(groups, options = {}) {
   const quarterFinals = makeFutureMatches(KNOCKOUT_PATH.quarterFinals);
   const semiFinals = makeFutureMatches(KNOCKOUT_PATH.semiFinals);
   const final = makeFutureMatches(KNOCKOUT_PATH.final);
+  const thirdPlace = KNOCKOUT_PATH.thirdPlace.map((match) => {
+    const projected = {
+      id: match.id,
+      home: loserSlot(match.sources[0]),
+      away: loserSlot(match.sources[1]),
+      sources: match.sources
+    };
+    resolvedById.set(match.id, projected);
+    return projected;
+  });
   final[0].winner = winnerSlot(final[0].id);
 
   return {
@@ -263,6 +304,7 @@ export function buildRoundOf32Bracket(groups, options = {}) {
       roundOf16,
       quarterFinals,
       semiFinals,
+      thirdPlace,
       final
     },
     thirdPlacedTeams,

@@ -548,6 +548,7 @@ function App() {
       ...rounds.roundOf16,
       ...rounds.quarterFinals,
       ...rounds.semiFinals,
+      ...rounds.thirdPlace,
       ...rounds.final
     ];
     return new Map(bracketMatches.map((match) => [String(match.id), match]));
@@ -661,6 +662,7 @@ function App() {
         ...knockoutBracket.rounds.roundOf16,
         ...knockoutBracket.rounds.quarterFinals,
         ...knockoutBracket.rounds.semiFinals,
+        ...knockoutBracket.rounds.thirdPlace,
         ...knockoutBracket.rounds.final
       ];
       const bracketById = new Map(bracketMatches.map((match) => [Number(match.id), match]));

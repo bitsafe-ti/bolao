@@ -1,6 +1,6 @@
 import { getTeamsByGroup, worldCupTeams } from "./teams.js";
 import { getVenueByGround } from "./venues.js";
-import { ROUND_OF_32_MATCHES, ROUND_OF_32_SCHEDULE, KNOCKOUT_PATH } from "./bracket.js";
+import { ROUND_OF_32_MATCHES, KNOCKOUT_STAGE_SCHEDULE, KNOCKOUT_PATH } from "./bracket.js";
 
 export const STORAGE_KEY = "bolao-copa-2026:v1";
 export const APP_VERSION = 3;
@@ -322,25 +322,25 @@ export function createKnockoutStageMatches() {
     penaltiesHome: "",
     penaltiesAway: ""
   };
+  const makeScheduledMatch = (match, defaults) => {
+    const schedule = KNOCKOUT_STAGE_SCHEDULE[match.id] ?? {};
+    const venue = getVenueByGround(schedule.ground);
+    return {
+      ...base,
+      ...schedule,
+      ...venue,
+      ...defaults,
+      id: match.id
+    };
+  };
+
   return [
-    ...ROUND_OF_32_MATCHES.map((m) => {
-      const schedule = ROUND_OF_32_SCHEDULE[m.id] ?? {};
-      const venue = getVenueByGround(schedule.ground);
-      return {
-        ...base,
-        ...schedule,
-        ...venue,
-        id: m.id,
-        phase: "16 avos",
-        round: 4,
-        homeSlotLabel: slotLabel(m.home),
-        awaySlotLabel: slotLabel(m.away)
-      };
-    }),
-    ...KNOCKOUT_PATH.roundOf16.map((m) => ({ ...base, id: m.id, phase: "Oitavas de Final", round: 5, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` })),
-    ...KNOCKOUT_PATH.quarterFinals.map((m) => ({ ...base, id: m.id, phase: "Quartas de Final", round: 6, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` })),
-    ...KNOCKOUT_PATH.semiFinals.map((m) => ({ ...base, id: m.id, phase: "Semifinal", round: 7, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` })),
-    ...KNOCKOUT_PATH.final.map((m) => ({ ...base, id: m.id, phase: "Final", round: 8, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` }))
+    ...ROUND_OF_32_MATCHES.map((m) => makeScheduledMatch(m, { phase: "16 avos", round: 4, homeSlotLabel: slotLabel(m.home), awaySlotLabel: slotLabel(m.away) })),
+    ...KNOCKOUT_PATH.roundOf16.map((m) => makeScheduledMatch(m, { phase: "Oitavas de Final", round: 5, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` })),
+    ...KNOCKOUT_PATH.quarterFinals.map((m) => makeScheduledMatch(m, { phase: "Quartas de Final", round: 6, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` })),
+    ...KNOCKOUT_PATH.semiFinals.map((m) => makeScheduledMatch(m, { phase: "Semifinal", round: 7, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` })),
+    ...KNOCKOUT_PATH.thirdPlace.map((m) => makeScheduledMatch(m, { phase: "Disputa de 3º lugar", round: 8, homeSlotLabel: `Perdedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Perdedor do Jogo ${m.sources[1]}` })),
+    ...KNOCKOUT_PATH.final.map((m) => makeScheduledMatch(m, { phase: "Final", round: 8, homeSlotLabel: `Vencedor do Jogo ${m.sources[0]}`, awaySlotLabel: `Vencedor do Jogo ${m.sources[1]}` }))
   ];
 }
 
