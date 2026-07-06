@@ -457,6 +457,7 @@ test("creates complete knockout schedule with dates and venues", () => {
   assert.ok(scheduledMatches.every((match) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(match.date)));
   assert.ok(scheduledMatches.every((match) => match.ground && match.city && match.stadium && match.country));
   assert.equal(matches.find((match) => match.id === 89).date, "2026-07-04T18:00");
+  assert.equal(matches.find((match) => match.id === 92).date, "2026-07-05T22:00");
   assert.equal(matches.find((match) => match.id === 101).ground, "Dallas (Arlington)");
   assert.equal(matches.find((match) => match.id === 103).phase, "Disputa de 3º lugar");
   assert.equal(matches.find((match) => match.id === 104).stadium, "MetLife Stadium");

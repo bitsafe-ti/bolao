@@ -46,7 +46,7 @@ export const KNOCKOUT_STAGE_SCHEDULE = {
   89: { date: "2026-07-04T18:00", ground: "Philadelphia" },
   90: { date: "2026-07-04T14:00", ground: "Houston" },
   91: { date: "2026-07-05T17:00", ground: "New York/New Jersey (East Rutherford)" },
-  92: { date: "2026-07-05T21:00", ground: "Mexico City" },
+  92: { date: "2026-07-05T22:00", ground: "Mexico City" },
   93: { date: "2026-07-06T16:00", ground: "Dallas (Arlington)" },
   94: { date: "2026-07-06T21:00", ground: "Seattle" },
   95: { date: "2026-07-07T13:00", ground: "Atlanta" },
