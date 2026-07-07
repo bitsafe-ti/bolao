@@ -4260,7 +4260,7 @@ const AUDIT_ACTION_CLASS = {
 
 function AuditLogPanel({ logs }) {
   const [filter, setFilter] = useState("all");
-  const allLogs = logs ?? [];
+  const allLogs = (logs ?? []).filter((log) => !log.internalOnly);
   const filtered = filter === "all" ? allLogs : allLogs.filter((log) => log.action === filter);
   const actionCounts = allLogs.reduce((acc, log) => {
     acc[log.action] = (acc[log.action] ?? 0) + 1;
