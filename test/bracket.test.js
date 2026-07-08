@@ -59,7 +59,9 @@ test("buildRoundOf32Bracket monta os 16 confrontos sem repetir terceiros", () =>
     {
       id: 73,
       home: { teamId: "A-2", name: "A Segundo", label: "2º Grupo A", group: "A", position: 2, confirmed: true },
-      away: { teamId: "B-2", name: "B Segundo", label: "2º Grupo B", group: "B", position: 2, confirmed: true }
+      away: { teamId: "B-2", name: "B Segundo", label: "2º Grupo B", group: "B", position: 2, confirmed: true },
+      date: null,
+      pending: true
     }
   );
 });

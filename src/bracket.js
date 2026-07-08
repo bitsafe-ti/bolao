@@ -245,7 +245,9 @@ export function buildRoundOf32Bracket(groups, options = {}) {
     return {
       id: match.id,
       home: storedMatch?.homeTeamId ? { ...home, teamId: storedMatch.homeTeamId, confirmed: true } : home,
-      away: storedMatch?.awayTeamId ? { ...away, teamId: storedMatch.awayTeamId, confirmed: true } : away
+      away: storedMatch?.awayTeamId ? { ...away, teamId: storedMatch.awayTeamId, confirmed: true } : away,
+      date: storedMatch?.date ?? null,
+      pending: !hasFinalResult(storedMatch)
     };
   });
 
@@ -270,11 +272,14 @@ export function buildRoundOf32Bracket(groups, options = {}) {
       : { teamId: "", name: "", label: `Perdedor do Jogo ${sourceId}`, confirmed: false };
   };
   const makeFutureMatches = (matches) => matches.map((match) => {
+    const storedMatch = storedMatchesById.get(match.id);
     const projected = {
       id: match.id,
       home: winnerSlot(match.sources[0]),
       away: winnerSlot(match.sources[1]),
-      sources: match.sources
+      sources: match.sources,
+      date: storedMatch?.date ?? null,
+      pending: !hasFinalResult(storedMatch)
     };
     resolvedById.set(match.id, projected);
     return projected;
@@ -285,11 +290,14 @@ export function buildRoundOf32Bracket(groups, options = {}) {
   const semiFinals = makeFutureMatches(KNOCKOUT_PATH.semiFinals);
   const final = makeFutureMatches(KNOCKOUT_PATH.final);
   const thirdPlace = KNOCKOUT_PATH.thirdPlace.map((match) => {
+    const storedMatch = storedMatchesById.get(match.id);
     const projected = {
       id: match.id,
       home: loserSlot(match.sources[0]),
       away: loserSlot(match.sources[1]),
-      sources: match.sources
+      sources: match.sources,
+      date: storedMatch?.date ?? null,
+      pending: !hasFinalResult(storedMatch)
     };
     resolvedById.set(match.id, projected);
     return projected;

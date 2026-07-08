@@ -4268,6 +4268,13 @@ h3 {
   font-size: 0.55rem;
 }
 
+.bracket-match-date {
+  font-weight: 700;
+  font-size: 0.55rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .bracket-team {
   display: flex;
   align-items: center;

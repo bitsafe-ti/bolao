@@ -4075,20 +4075,6 @@ function KnockoutBracketBoard({ bracket }) {
         caption="Confrontos dos 16 avos definidos pela classificação dos grupos."
       />
 
-      <p className="knockout-note">
-        A ordem considera pontos, saldo de gols, gols marcados e vitórias. Enquanto houver jogos pendentes,
-        qualquer resultado novo pode alterar os classificados e os confrontos projetados.
-      </p>
-
-      <div className={`knockout-status ${bracket.groupsComplete ? "confirmed" : "projected"}`}>
-        <span>{bracket.groupsComplete ? "Classificação encerrada" : "Projeção ao vivo"}</span>
-        <strong>
-          {bracket.groupsComplete
-            ? "Os classificados da fase de grupos estão definidos."
-            : "O chaveamento será confirmado quando todos os jogos da 3ª rodada terminarem."}
-        </strong>
-      </div>
-
       <section className="knockout-tree-section" aria-labelledby="knockout-tree-title">
         <div className="knockout-subheading">
           <div>
@@ -4163,6 +4149,11 @@ function BracketMatchCard({ match, final = false }) {
     <article className={`bracket-match-card${final ? " final" : ""}`}>
       <header>
         <span>Jogo {match.id}</span>
+        {match.pending && match.date && (
+          <span className="bracket-match-date">
+            {new Date(match.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+          </span>
+        )}
       </header>
       {[match.home, match.away].map((slot, index) => (
         <div className={`bracket-team${!slot.confirmed ? " pending" : ""}`} key={`${match.id}-${index}`}>
