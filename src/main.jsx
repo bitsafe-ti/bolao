@@ -587,7 +587,6 @@ function App() {
     .map(getDisplayMatch)
     .sort((a, b) => (a.date || "").localeCompare(b.date || "") || String(a.id).localeCompare(String(b.id)));
   const resultScrollTargetId = useMemo(() => getLatestResultMatchId(resultMatches), [resultMatches]);
-  const resultSyncIntervalText = "O servidor verifica os jogos a cada minuto e esta tela recebe os dados em até 30 segundos.";
   const userRows = useMemo(() => {
     const participantById = new Map(state.participants.map((participant) => [participant.id, participant]));
     const linkedParticipantIds = new Set(state.users.map((user) => user.participantId).filter(Boolean));
@@ -1937,10 +1936,6 @@ function App() {
         {tab === "results" && (
           <section className="panel">
             <SectionHeader title="Resultados dos Jogos" />
-            <div className={`sync-strip ${syncStatus.state}`}>
-              <strong>{syncStatus.message}</strong>
-              <span>{state.lastResultSyncAt ? `Última checagem do servidor: ${formatDate(state.lastResultSyncAt)}. ${resultSyncIntervalText}` : resultSyncIntervalText}</span>
-            </div>
             <div className="prediction-toolbar">
               <label className="select-label">
                 Rodada
