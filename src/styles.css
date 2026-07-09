@@ -1320,6 +1320,12 @@ h3 {
   width: 100%;
 }
 
+.profile-page-intro {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+
 .profile-form {
   gap: 18px;
 }

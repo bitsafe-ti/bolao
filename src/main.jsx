@@ -1639,7 +1639,6 @@ function App() {
         {tab === "settings" && isAdmin && (
           <div className={`settings-layout${settingsTab === "audit" ? " settings-layout-scroll" : ""}`}>
             <div className="settings-header">
-              <p className="settings-header-title">Configurações</p>
               <nav className="settings-tabs-nav" aria-label="Seções de configurações">
                 {settingsTabs.map((item) => (
                   <button
@@ -1807,7 +1806,6 @@ function App() {
 
         {tab === "predictions" && (
           <section className="panel predictions-panel">
-            <SectionHeader title="Palpites" />
             <div className="prediction-toolbar single">
               <label className="select-label">
                 Rodada
@@ -1935,7 +1933,6 @@ function App() {
 
         {tab === "results" && (
           <section className="panel">
-            <SectionHeader title="Resultados dos Jogos" />
             <div className="prediction-toolbar">
               <label className="select-label">
                 Rodada
@@ -2256,12 +2253,8 @@ function ProfilePage({ user, participant, onSave }) {
   const previewUser = { ...user, name: form.name, avatarUrl: form.avatarUrl };
 
   return (
-    <section className="panel profile-page" aria-labelledby="profile-page-title">
-      <SectionHeader
-        title="Meu perfil"
-        caption="Atualize sua foto, seus dados de acesso e suas informações pessoais."
-        titleId="profile-page-title"
-      />
+    <section className="panel profile-page" aria-label="Meu perfil">
+      <p className="profile-page-intro">Atualize sua foto, seus dados de acesso e suas informações pessoais.</p>
       <form className="modal-form profile-form" onSubmit={submitProfile}>
           <div className="profile-photo-section">
             <UserAvatar user={previewUser} large />
@@ -2964,7 +2957,7 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
   const [statsParticipant, setStatsParticipant] = useState(null);
   return (
     <section className="panel table-panel">
-      <SectionHeader title={compact ? "Top 5" : "Ranking"} />
+      {compact && <SectionHeader title="Top 5" />}
       {hasLiveMatches && (
         <div className="live-ranking-notice">
           <span className="live-dot" /> Pontuação parcial ao vivo — atualiza a cada 30s
@@ -3038,7 +3031,6 @@ function GameRulesPage({ paidParticipants = 0 }) {
   const totalPoolValue = paidParticipants * ENTRY_FEE;
   return (
     <section className="panel rules-panel">
-      <SectionHeader title="Regras do Jogo" />
       <div className="ranking-details rules-details">
         <div className="ranking-summary rules-metrics">
           <div className="rules-metric-card rules-metric-card-fee">
@@ -4012,7 +4004,6 @@ function ParticipantStatsModal({ participant, position, matches, predictions, on
 function GroupStandingsBoard({ groups }) {
   return (
     <section className="panel">
-      <SectionHeader title="Classificação dos Grupos" />
       <div className="groups-standings-layout">
         {groups.map((group) => (
           <section className="group-standings-card" key={group.group}>
@@ -4070,11 +4061,6 @@ function KnockoutBracketBoard({ bracket }) {
 
   return (
     <section className="panel knockout-panel">
-      <SectionHeader
-        title="Chaveamento"
-        caption="Confrontos dos 16 avos definidos pela classificação dos grupos."
-      />
-
       <section className="knockout-tree-section" aria-labelledby="knockout-tree-title">
         <div className="knockout-subheading">
           <div>
