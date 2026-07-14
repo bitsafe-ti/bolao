@@ -413,6 +413,14 @@ function makeAuditEntry(actor, action, details = "") {
   return { id: makeId("audit"), createdAt: new Date().toISOString(), actor, action, details };
 }
 
+function isNotificationVisibleForUser(notification, currentUser) {
+  const audience = notification?.audience || "all";
+  if (audience === "admin") return currentUser?.role === "admin";
+  if (audience === "user") return notification?.userId === currentUser?.id;
+  if (audience === "participant") return notification?.participantId === currentUser?.participantId;
+  return true;
+}
+
 const sortedWorldCupTeams = [...worldCupTeams].sort((a, b) => a.name.localeCompare(b.name));
 
 function KnockoutMatchTeamRow({ match, onUpdate }) {
@@ -529,7 +537,12 @@ function App() {
   const notifRef = useRef(null);
   const shownNotifIdsRef = useRef(null);
 
-  const notifications = (state.notifications ?? []).slice().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  const currentUser = state.users.find((user) => user.id === state.currentUserId);
+  const isAdmin = currentUser?.role === "admin";
+  const notifications = (state.notifications ?? [])
+    .filter((notification) => isNotificationVisibleForUser(notification, currentUser))
+    .slice()
+    .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   const unreadCount = notifications.filter((n) => !readNotifIds.has(n.id)).length;
 
   function markAllRead() {
@@ -575,8 +588,6 @@ function App() {
   const handledPredictionScrollRef = useRef("");
   const handledResultScrollRef = useRef("");
 
-  const currentUser = state.users.find((user) => user.id === state.currentUserId);
-  const isAdmin = currentUser?.role === "admin";
   const userParticipant = state.participants.find((participant) => participant.id === currentUser?.participantId);
   const activeParticipant = isAdmin
     ? state.participants.find((participant) => participant.id === state.activeParticipantId) ??
@@ -1021,6 +1032,11 @@ function App() {
     }
   }
 
+  function openPaymentTab() {
+    setTab("payment");
+    try { sessionStorage.setItem("bol-tab", "payment"); } catch {}
+  }
+
   // Optimistically update state then persist to Cloudflare D1
   function updateState(recipe) {
     // Compute nextState using the current closure value of `state` so it is
@@ -1133,6 +1149,7 @@ function App() {
       saveCachedPoolState(savedSessionState);
       await wait(LOGIN_TRANSITION_MS);
       saveSession(session);
+      openPaymentTab();
       setState(savedSessionState);
       if (IS_LOCAL_ONLY_DEV) {
         setSharedStatus({ state: "success", message: "Modo dev local: cadastro salvo neste navegador." });
@@ -1176,6 +1193,7 @@ function App() {
     setLoginTransitionActive(true);
     await wait(LOGIN_TRANSITION_MS);
     saveSession(session);
+    openPaymentTab();
     const sessionState = cleanPoolState({
       ...authState,
       users: normalizeUsers(authState.users ?? [], SUPER_ADMIN_EMAILS),
@@ -1469,6 +1487,18 @@ function App() {
     if (!participantId) return;
     const participant = state.participants.find((item) => item.id === participantId);
     const now = new Date().toISOString();
+    const participantName = participant?.name ?? currentUser?.name ?? "Participante";
+    const adminNotification = {
+      id: makeId("notif"),
+      audience: "admin",
+      kind: "payment_pending_review",
+      participantId,
+      title: "Pagamento aguardando aprovacao",
+      body: `${participantName} informou o pagamento de R$ ${ENTRY_FEE}. Confira a aba Premiacao para aprovar.`,
+      createdAt: now,
+      authorId: currentUser?.id,
+      authorName: participantName
+    };
     updateState((current) => appendAuditLog(
       {
         ...current,
@@ -1485,9 +1515,10 @@ function App() {
             updatedAt: now,
             createdAt: current.payments?.[participantId]?.createdAt || now
           }
-        }
+        },
+        notifications: [adminNotification, ...(current.notifications ?? [])].slice(0, 300)
       },
-      makeAuditEntry(participant?.name ?? currentUser?.name ?? "Participante", "payment_manual_notified", "pagamento informado para conferencia manual")
+      makeAuditEntry(participantName, "payment_manual_notified", "pagamento informado para conferencia manual")
     ));
     setSharedStatus({ state: "success", message: "Pagamento informado. Aguarde a aprovacao do admin." });
   }
