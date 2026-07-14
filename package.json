@@ -5,14 +5,14 @@
   "type": "module",
   "scripts": {
     "start": "npm run dev",
-    "dev": "vite --host 127.0.0.1",
+    "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "build": "vite build",
     "build:cloudflare": "cross-env VITE_BASE_PATH=/ VITE_POOL_ID=copa-2026 vite build",
-    "pages:dev": "npm run build:cloudflare && wrangler pages dev dist --d1 DB=bolao-copa2026 --persist-to .wrangler/state",
+    "pages:dev": "cross-env VITE_BASE_PATH=/ VITE_POOL_ID=copa-2026-local vite build && wrangler pages dev dist --d1 DB=bolao-copa2026 --persist-to .wrangler/state --port 5173",
     "deploy:pages": "npm run build:cloudflare && wrangler pages deploy dist",
     "deploy:results-worker": "wrangler deploy --config workers/live-results/wrangler.jsonc",
     "deploy:cloudflare": "npm run deploy:pages && npm run deploy:results-worker",
-    "preview": "vite preview --host 127.0.0.1",
+    "preview": "vite preview --host 127.0.0.1 --port 5173 --strictPort",
     "test": "node --test"
   },
   "dependencies": {

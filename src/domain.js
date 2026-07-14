@@ -11,6 +11,8 @@ export const scoringRules = [
   { label: "Palpite errado", points: 0 }
 ];
 
+export const FINAL_PAYMENT_REQUIRED_FROM_ROUND = 8;
+export const CONFIRMED_PAYMENT_STATUSES = new Set(["paid", "confirmed", "received", "CONFIRMED", "RECEIVED"]);
 export const emptyPrediction = { home: "", away: "" };
 export const emptyKnockoutPrediction = {
   goesToExtraTime: false,
@@ -464,6 +466,8 @@ export function createInitialState() {
     participants: [],
     matches: [...createGroupStageMatches(), ...createKnockoutStageMatches()],
     predictions: {},
+    payments: {},
+    paymentEvents: [],
     auditLogs: [],
     notifications: [],
     deletedUserIds: [],
@@ -479,6 +483,16 @@ export function getMatchRound(match) {
   if (match.round) return Number(match.round);
   const m = match.phase?.match(/Rodada\s+(\d+)/i);
   return m ? Number(m[1]) : null;
+}
+
+export function isPaymentRequiredForMatch(match) {
+  const round = getMatchRound(match);
+  return Number.isFinite(round) && round >= FINAL_PAYMENT_REQUIRED_FROM_ROUND;
+}
+
+export function hasConfirmedEntryPayment(payments = {}, participantId = "") {
+  const payment = payments?.[participantId];
+  return CONFIRMED_PAYMENT_STATUSES.has(payment?.status);
 }
 
 export function getActiveRound(matches) {

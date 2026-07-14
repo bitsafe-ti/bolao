@@ -1,2 +1,8 @@
 # Local-only secret for the scheduled results Worker.
 API_FOOTBALL_KEY=replace-with-your-api-football-key
+
+# Optional static manual payment settings.
+VITE_STATIC_PAYMENT_URL=https://nubank.com.br/cobranca/Zoee9cYYfZ9xjptu
+VITE_STATIC_PIX_QR_URL=/pix-qrcode.png
+VITE_STATIC_PIX_PAYLOAD=00020126580014BR.GOV.BCB.PIX013635d09e1e-00ae-4a33-a12d-e17c95f68ee8520400005303986540520.005802BR592566.627.591 GUILHERME SARA6009SAO PAULO61080540900062250521MlOIPJx75GufWKD9xjptu63048B7C
+VITE_STATIC_PIX_RECEIVER=Bolao Grupo BIT

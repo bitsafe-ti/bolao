@@ -7,6 +7,8 @@ const EMPTY_STATE = {
   users: [],
   participants: [],
   predictions: {},
+  payments: {},
+  paymentEvents: [],
   auditLogs: [],
   notifications: [],
   matches: [],
@@ -16,6 +18,11 @@ const EMPTY_STATE = {
   deletedUserIds: [],
   deletedParticipantIds: []
 };
+
+function stripSensitiveParticipantData(participant = {}) {
+  const { prizePayout: _prizePayout, ...safeParticipant } = participant;
+  return safeParticipant;
+}
 
 function getPoolStateUrl(documentId = DOCUMENT_ID) {
   return `${API_BASE_URL}/api/pool-state/${encodeURIComponent(documentId)}`;
@@ -46,8 +53,10 @@ async function requestJson(url, options = {}) {
 export function getPublicPoolState(state) {
   return {
     users: state.users ?? [],
-    participants: state.participants ?? [],
+    participants: (state.participants ?? []).map(stripSensitiveParticipantData),
     predictions: state.predictions ?? {},
+    payments: state.payments ?? {},
+    paymentEvents: state.paymentEvents ?? [],
     auditLogs: state.auditLogs ?? [],
     notifications: state.notifications ?? [],
     matches: state.matches ?? [],
@@ -98,6 +107,15 @@ function mergePredictionMaps(currentPredictions = {}, sharedPredictions = {}, pr
     }
   }
   return merged;
+}
+
+function mergePaymentMaps(currentPayments = {}, sharedPayments = {}, prefer = "shared") {
+  const participantIds = new Set([...Object.keys(currentPayments), ...Object.keys(sharedPayments)]);
+  return Object.fromEntries(
+    [...participantIds]
+      .map((participantId) => [participantId, pickNewest(currentPayments[participantId], sharedPayments[participantId], prefer)])
+      .filter(([, payment]) => Boolean(payment))
+  );
 }
 
 function mergeDeletedIds(currentIds = [], sharedIds = []) {
@@ -188,6 +206,9 @@ function filterDeleted(state) {
   const predictions = Object.fromEntries(
     Object.entries(state.predictions ?? {}).filter(([participantId]) => !deletedParticipantIds.has(participantId))
   );
+  const payments = Object.fromEntries(
+    Object.entries(state.payments ?? {}).filter(([participantId]) => !deletedParticipantIds.has(participantId))
+  );
   return {
     ...state,
     users: (state.users ?? []).filter(
@@ -195,6 +216,7 @@ function filterDeleted(state) {
     ),
     participants: (state.participants ?? []).filter((participant) => !deletedParticipantIds.has(participant.id)),
     predictions,
+    payments,
     deletedUserIds: [...deletedUserIds],
     deletedParticipantIds: [...deletedParticipantIds]
   };
@@ -227,6 +249,8 @@ export function mergePublicPoolState(current, shared = {}, options = {}) {
     users,
     participants,
     predictions,
+    payments: mergePaymentMaps(current.payments ?? {}, shared.payments ?? {}, prefer),
+    paymentEvents: mergeById(current.paymentEvents ?? [], shared.paymentEvents ?? [], prefer).slice(0, 300),
     auditLogs: mergeAuditLogs(current.auditLogs, shared.auditLogs),
     notifications: mergeById(current.notifications ?? [], shared.notifications ?? [], prefer),
     matches: [...matchesById.values()],
@@ -284,6 +308,9 @@ export async function persistPoolState(nextState) {
     participants: (merged.participants ?? []).filter((participant) => !deletedParticipantSet.has(participant.id)),
     predictions: Object.fromEntries(
       Object.entries(merged.predictions ?? {}).filter(([participantId]) => !deletedParticipantSet.has(participantId))
+    ),
+    payments: Object.fromEntries(
+      Object.entries(merged.payments ?? {}).filter(([participantId]) => !deletedParticipantSet.has(participantId))
     ),
     deletedUserIds,
     deletedParticipantIds

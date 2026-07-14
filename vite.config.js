@@ -12,6 +12,6 @@ export default defineConfig(({ command }) => ({
   server: {
     host: "127.0.0.1",
     port: Number(process.env.PORT) || 5173,
-    strictPort: false
+    strictPort: true
   }
 }));

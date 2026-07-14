@@ -11,7 +11,9 @@ import {
   getPredictionScrollTargetId,
   getLatestResultMatchId,
   getReleasedPredictionRound,
+  hasConfirmedEntryPayment,
   hasMatchStarted,
+  isPaymentRequiredForMatch,
   normalizeUsers,
   purgeClearedOpeningPredictions,
   purgeExpiredPredictions,
@@ -347,6 +349,14 @@ test("counts participants with saved predictions for pool value", () => {
   assert.equal(ranking.find((participant) => participant.id === "c").predictedMatches, 0);
 });
 
+test("requires confirmed payment only for final round predictions", () => {
+  assert.equal(isPaymentRequiredForMatch({ round: 7 }), false);
+  assert.equal(isPaymentRequiredForMatch({ round: 8 }), true);
+  assert.equal(hasConfirmedEntryPayment({ p1: { status: "pending" } }, "p1"), false);
+  assert.equal(hasConfirmedEntryPayment({ p1: { status: "paid" } }, "p1"), true);
+  assert.equal(hasConfirmedEntryPayment({ p1: { status: "CONFIRMED" } }, "p1"), true);
+});
+
 test("positions predictions at the first live match while games are in progress", () => {
   const matches = [
     { id: "finished", date: "2026-06-22T12:00:00.000Z", homeScore: 2, awayScore: 0, status: "finished" },
@@ -574,8 +584,11 @@ test("does not change a finished score during later syncs", () => {
 
 test("public shared state includes predictions, participants and match results", () => {
   const state = {
-    participants: [{ id: "p1", name: "Ana" }],
+    participants: [{ id: "p1", name: "Ana", prizePayout: { pixKey: "secret-pix" }, prizePayoutStatus: { hasData: true } }],
     predictions: { p1: { m1: { home: "2", away: "1" } } },
+    payments: { p1: { status: "paid" } },
+    paymentEvents: [{ id: "pay-1", type: "PAYMENT_CONFIRMED" }],
+    prizePayouts: { p1: { pixKey: "secret-pix", holderDocument: "12345678901" } },
     matches: [{ id: "m1", homeScore: "2", awayScore: "1" }],
     lastResultSyncAt: "2026-06-12T12:00:00.000Z",
     lastResultSyncSource: "api-football",
@@ -586,8 +599,10 @@ test("public shared state includes predictions, participants and match results",
 
   assert.deepEqual(getPublicPoolState(state), {
     users: state.users,
-    participants: state.participants,
+    participants: [{ id: "p1", name: "Ana", prizePayoutStatus: { hasData: true } }],
     predictions: state.predictions,
+    payments: state.payments,
+    paymentEvents: state.paymentEvents,
     auditLogs: [],
     notifications: [],
     matches: state.matches,
@@ -686,6 +701,23 @@ test("shared state merge keeps the latest edited prediction", () => {
 
   assert.deepEqual(merged.predictions.p1.m1.home, "3");
   assert.deepEqual(merged.predictions.p1.m1.away, "1");
+});
+
+test("shared state merge carries confirmed payments", () => {
+  const merged = mergePublicPoolState(
+    {
+      payments: { p1: { status: "pending", updatedAt: "2026-07-18T12:00:00.000Z" } },
+      matches: []
+    },
+    {
+      payments: { p1: { status: "paid", updatedAt: "2026-07-18T12:05:00.000Z" } },
+      paymentEvents: [{ id: "evt-1", type: "PAYMENT_CONFIRMED", createdAt: "2026-07-18T12:05:00.000Z" }],
+      matches: []
+    }
+  );
+
+  assert.equal(merged.payments.p1.status, "paid");
+  assert.equal(merged.paymentEvents.length, 1);
 });
 
 test("shared state merge never resurrects deleted users or participants", () => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup, faSitemap, faMedal, faGear, faChevronLeft, faChevronRight, faRightFromBracket, faUser, faUsers, faCalendarDays, faClipboardList, faChartSimple, faBell, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faEye, faTrophy, faTrash, faFutbol, faListCheck, faLayerGroup, faSitemap, faMedal, faGear, faChevronLeft, faChevronRight, faRightFromBracket, faUser, faUsers, faCalendarDays, faClipboardList, faChartSimple, faBell, faXmark, faCreditCard } from "@fortawesome/free-solid-svg-icons";
 import {
   calculateRanking,
   APP_VERSION,
@@ -17,10 +17,12 @@ import {
   getLatestResultMatchId,
   getMatchRound,
   getReleasedPredictionRound,
+  hasConfirmedEntryPayment,
   hasMatchStarted,
   isKnockoutMatch,
   isMatchClosed,
   isMatchLive,
+  isPaymentRequiredForMatch,
   isMatchResultFinal,
   makeId,
   normalizeUsers,
@@ -65,6 +67,10 @@ const DEV_POOL_SEEDED_KEY = `bolao-copa-2026${STORAGE_SCOPE}:seeded`;
 const LEGACY_DATA_KEY = "bolao-copa-2026:v1";
 const DATA_LOAD_TIMEOUT_MS = 7000;
 const ENTRY_FEE = 20;
+const STATIC_PIX_QR_URL = import.meta.env.VITE_STATIC_PIX_QR_URL || `${import.meta.env.BASE_URL}pix-qrcode.png`;
+const STATIC_PAYMENT_URL = import.meta.env.VITE_STATIC_PAYMENT_URL || "https://nubank.com.br/cobranca/Zoee9cYYfZ9xjptu";
+const STATIC_PIX_PAYLOAD = import.meta.env.VITE_STATIC_PIX_PAYLOAD || "00020126580014BR.GOV.BCB.PIX013635d09e1e-00ae-4a33-a12d-e17c95f68ee8520400005303986540520.005802BR592566.627.591 GUILHERME SARA6009SAO PAULO61080540900062250521MlOIPJx75GufWKD9xjptu63048B7C";
+const STATIC_PIX_RECEIVER = import.meta.env.VITE_STATIC_PIX_RECEIVER || "Bolao Grupo BIT";
 const PRIZE_DISTRIBUTION = [
   { label: "1º lugar", percent: 50 },
   { label: "2º lugar", percent: 30 },
@@ -124,22 +130,38 @@ function loadCachedPoolState() {
   }
 }
 
+function stripSensitiveParticipantData(participant = {}) {
+  const { prizePayout: _prizePayout, ...safeParticipant } = participant;
+  return safeParticipant;
+}
+
+function stripSensitivePoolState(state = {}) {
+  const { prizePayouts: _prizePayouts, ...safeState } = state;
+  return {
+    ...safeState,
+    participants: (safeState.participants ?? []).map(stripSensitiveParticipantData)
+  };
+}
+
 function saveCachedPoolState(state) {
   try {
     if (!SHOULD_USE_POOL_CACHE) return;
+    const safeState = stripSensitivePoolState(state);
     localStorage.setItem(CACHE_KEY, JSON.stringify({
       cacheVersion: CACHE_SCHEMA_VERSION,
-      users: state.users ?? [],
-      participants: state.participants ?? [],
-      predictions: state.predictions ?? {},
-      auditLogs: state.auditLogs ?? [],
-      notifications: state.notifications ?? [],
-      matches: state.matches ?? [],
-      lastResultSyncAt: state.lastResultSyncAt ?? "",
-      lastResultSyncSource: state.lastResultSyncSource ?? "",
-      releasedPredictionRound: Number(state.releasedPredictionRound) || 1,
-      deletedUserIds: state.deletedUserIds ?? [],
-      deletedParticipantIds: state.deletedParticipantIds ?? []
+      users: safeState.users ?? [],
+      participants: safeState.participants ?? [],
+      predictions: safeState.predictions ?? {},
+      payments: safeState.payments ?? {},
+      paymentEvents: safeState.paymentEvents ?? [],
+      auditLogs: safeState.auditLogs ?? [],
+      notifications: safeState.notifications ?? [],
+      matches: safeState.matches ?? [],
+      lastResultSyncAt: safeState.lastResultSyncAt ?? "",
+      lastResultSyncSource: safeState.lastResultSyncSource ?? "",
+      releasedPredictionRound: Number(safeState.releasedPredictionRound) || 1,
+      deletedUserIds: safeState.deletedUserIds ?? [],
+      deletedParticipantIds: safeState.deletedParticipantIds ?? []
     }));
   } catch {}
 }
@@ -197,6 +219,44 @@ function withTimeout(promise, timeoutMs, message) {
   return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
 }
 
+async function requestPrizePayoutSave(participantId, payoutInfo = {}) {
+  const response = await fetch("/api/prizes/payouts", {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ poolId: ACTIVE_POOL_ID, participantId, payout: payoutInfo })
+  });
+
+  let payload = {};
+  try {
+    payload = await response.json();
+  } catch {}
+
+  if (!response.ok) {
+    throw new Error(payload.error || payload.message || "Nao foi possivel salvar os dados de premio.");
+  }
+
+  return payload;
+}
+
+async function requestPrizePayoutsAdmin() {
+  const response = await fetch(`/api/prizes/payouts?poolId=${encodeURIComponent(ACTIVE_POOL_ID)}`, {
+    method: "GET",
+    cache: "no-store"
+  });
+
+  let payload = {};
+  try {
+    payload = await response.json();
+  } catch {}
+
+  if (!response.ok) {
+    throw new Error(payload.error || payload.message || "Nao foi possivel carregar os dados bancarios.");
+  }
+
+  return payload;
+}
+
 async function fetchAuthoritativePoolState() {
   let remote = await withTimeout(
     fetchPoolState(),
@@ -226,6 +286,7 @@ async function fetchAuthoritativePoolState() {
 
 const userTabs = [
   { id: "predictions", label: "Palpites", icon: faFutbol },
+  { id: "payment", label: "Pagamento", icon: faCreditCard },
   { id: "results", label: "Resultados", icon: faListCheck },
   { id: "groups", label: "Grupos", icon: faLayerGroup },
   { id: "bracket", label: "Chaveamento", icon: faSitemap },
@@ -235,6 +296,7 @@ const userTabs = [
 
 const adminTabs = [
   ...userTabs,
+  { id: "prizes", label: "Premiacao", icon: faTrophy },
   { id: "settings", label: "Configurações", icon: faGear }
 ];
 
@@ -259,7 +321,9 @@ function applyRemoteData(current, remoteData, { prefer = "shared" } = {}) {
 }
 
 function cleanPoolState(state) {
-  return purgeClearedOpeningPredictions(purgeExpiredPredictions(purgeFutureRoundPredictions(ensureKnockoutMatches(state))));
+  return stripSensitivePoolState(
+    purgeClearedOpeningPredictions(purgeExpiredPredictions(purgeFutureRoundPredictions(ensureKnockoutMatches(stripSensitivePoolState(state)))))
+  );
 }
 
 function getRoundDisplayName(round) {
@@ -442,6 +506,7 @@ function App() {
   const [selectedResultRound, setSelectedResultRound] = useState(null);
   const [draftPredictions, setDraftPredictions] = useState({});
   const [pendingPredictionUpdate, setPendingPredictionUpdate] = useState(null);
+  const [paymentReminderDismissed, setPaymentReminderDismissed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -518,6 +583,10 @@ function App() {
       userParticipant ??
       state.participants[0]
     : userParticipant;
+  const finalMatch = state.matches.find((match) => Number(match.id) === 104 || String(match.phase || "").toLowerCase() === "final");
+  const finalTeamsDefined = Boolean(finalMatch?.homeTeamId && finalMatch?.awayTeamId);
+  const hasEntryPayment = Boolean(activeParticipant && hasConfirmedEntryPayment(state.payments, activeParticipant.id));
+  const isPaymentGateActive = Boolean(currentUser && activeParticipant && finalTeamsDefined && !hasEntryPayment);
   const visibleTabs = isAdmin ? adminTabs : userTabs;
   const adminParticipantIds = useMemo(
     () => new Set(state.users.filter((user) => user.role === "admin").map((user) => user.participantId).filter(Boolean)),
@@ -567,6 +636,15 @@ function App() {
   }
   const automaticRound = useMemo(() => getActiveRound(state.matches), [state.matches]);
   const activeRound = useMemo(() => getReleasedPredictionRound(state), [state.matches, state.releasedPredictionRound]);
+  const shouldShowPaymentReminder = Boolean(
+    currentUser &&
+    activeParticipant &&
+    !hasEntryPayment &&
+    !finalTeamsDefined &&
+    activeRound === 7 &&
+    tab !== "payment" &&
+    !paymentReminderDismissed
+  );
   const availableRounds = useMemo(() => {
     return [...new Set(
       state.matches.map((m) => getMatchRound(m)).filter((r) => r !== null && !Number.isNaN(r))
@@ -883,6 +961,16 @@ function App() {
     return () => window.cancelAnimationFrame(frameId);
   }, [activeResultRound, currentUser?.id, isLoading, resultScrollRequest, resultScrollTargetId, tab]);
 
+  useEffect(() => {
+    if (!isPaymentGateActive || tab === "payment") return;
+    setTab("payment");
+    try { sessionStorage.setItem("bol-tab", "payment"); } catch {}
+  }, [isPaymentGateActive, tab]);
+
+  useEffect(() => {
+    setPaymentReminderDismissed(false);
+  }, [currentUser?.id, activeRound, hasEntryPayment]);
+
 
   async function refreshPoolStateFromRemote() {
     const remote = await withTimeout(
@@ -911,6 +999,13 @@ function App() {
   }
 
   function handleTabClick(tabId) {
+    if (isPaymentGateActive && tabId !== "payment" && tabId !== "profile") {
+      setTab("payment");
+      try { sessionStorage.setItem("bol-tab", "payment"); } catch {}
+      setMobileMenuOpen(false);
+      setSharedStatus({ state: "error", message: "Confirme o pagamento para liberar o bolao." });
+      return;
+    }
     setTab(tabId);
     try { sessionStorage.setItem("bol-tab", tabId); } catch {}
     setMobileMenuOpen(false);
@@ -921,7 +1016,7 @@ function App() {
         workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
       });
     }
-    if (tabId === "groups" || tabId === "bracket" || tabId === "results" || tabId === "ranking" || tabId === "rules") {
+    if (tabId === "groups" || tabId === "bracket" || tabId === "results" || tabId === "ranking" || tabId === "rules" || tabId === "payment" || tabId === "prizes") {
       refreshPoolStateFromRemote().catch(() => {});
     }
   }
@@ -1331,6 +1426,10 @@ function App() {
     const match = state.matches.find((item) => item.id === matchId);
     const currentPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
     if (getMatchRound(match) > activeRound || isMatchClosed(match)) return;
+    if (isPaymentRequiredForMatch(match) && !hasConfirmedEntryPayment(state.payments, participantId)) {
+      setSharedStatus({ state: "error", message: "Pagamento necessario para palpitar nos jogos da final." });
+      return;
+    }
 
     const draft = getDraftPrediction(participantId, matchId, currentPrediction);
     // Treat blank input as 0 - user leaving the field empty means "zero gols"
@@ -1364,6 +1463,112 @@ function App() {
     }
 
     commitPredictionUpdate(update);
+  }
+
+  function notifyManualPayment(participantId) {
+    if (!participantId) return;
+    const participant = state.participants.find((item) => item.id === participantId);
+    const now = new Date().toISOString();
+    updateState((current) => appendAuditLog(
+      {
+        ...current,
+        payments: {
+          ...(current.payments ?? {}),
+          [participantId]: {
+            ...(current.payments?.[participantId] ?? {}),
+            participantId,
+            method: "manual_pix",
+            status: "pending_review",
+            value: ENTRY_FEE,
+            paymentUrl: STATIC_PAYMENT_URL,
+            notifiedAt: now,
+            updatedAt: now,
+            createdAt: current.payments?.[participantId]?.createdAt || now
+          }
+        }
+      },
+      makeAuditEntry(participant?.name ?? currentUser?.name ?? "Participante", "payment_manual_notified", "pagamento informado para conferencia manual")
+    ));
+    setSharedStatus({ state: "success", message: "Pagamento informado. Aguarde a aprovacao do admin." });
+  }
+
+  function updateManualPaymentStatus(participantId, status) {
+    if (!participantId || !isAdmin) return;
+    const participant = state.participants.find((item) => item.id === participantId);
+    const now = new Date().toISOString();
+    const approved = status === "paid";
+    updateState((current) => appendAuditLog(
+      {
+        ...current,
+        payments: {
+          ...(current.payments ?? {}),
+          [participantId]: {
+            ...(current.payments?.[participantId] ?? {}),
+            participantId,
+            method: "manual_pix",
+            status: approved ? "paid" : "pending_review",
+            value: ENTRY_FEE,
+            paymentUrl: current.payments?.[participantId]?.paymentUrl || STATIC_PAYMENT_URL,
+            approvedBy: approved ? currentUser?.name || "Admin" : "",
+            confirmedAt: approved ? now : "",
+            updatedAt: now,
+            createdAt: current.payments?.[participantId]?.createdAt || now
+          }
+        }
+      },
+      makeAuditEntry(
+        currentUser?.name ?? "Admin",
+        approved ? "payment_manual_approved" : "payment_manual_pending",
+        participant?.name ?? participantId
+      )
+    ));
+    setSharedStatus({
+      state: "success",
+      message: approved ? "Pagamento aprovado manualmente." : "Pagamento marcado como pendente."
+    });
+  }
+
+  async function savePrizePayout(participantId, payoutInfo) {
+    if (!participantId) return;
+    const holderName = String(payoutInfo.holderName || "").trim();
+    const holderDocument = String(payoutInfo.holderDocument || "").replace(/\D/g, "");
+    const pixKeyType = String(payoutInfo.pixKeyType || "cpf").trim();
+    const pixKey = String(payoutInfo.pixKey || "").trim();
+    const bankName = String(payoutInfo.bankName || "").trim();
+    const notes = String(payoutInfo.notes || "").trim();
+
+    if (!holderName) {
+      setSharedStatus({ state: "error", message: "Informe o nome do titular da conta de premio." });
+      return;
+    }
+    if (!holderDocument || ![11, 14].includes(holderDocument.length)) {
+      setSharedStatus({ state: "error", message: "Informe CPF ou CNPJ valido do titular." });
+      return;
+    }
+    if (!pixKey) {
+      setSharedStatus({ state: "error", message: "Informe a chave Pix para recebimento do premio." });
+      return;
+    }
+
+    setSharedStatus({ state: "loading", message: "Salvando dados de recebimento..." });
+    try {
+      const response = await requestPrizePayoutSave(participantId, {
+        holderName,
+        holderDocument,
+        pixKeyType,
+        pixKey,
+        bankName,
+        notes
+      });
+      if (response.state) {
+        const cleanedState = cleanPoolState(response.state);
+        setState((current) => applyRemoteData(current, cleanedState, { prefer: "shared" }));
+        saveCachedPoolState(cleanedState);
+      }
+      setSharedStatus({ state: "success", message: "Dados de recebimento do premio salvos com protecao." });
+    } catch (error) {
+      setSharedStatus({ state: "error", message: error.message });
+    }
   }
 
   async function resetPassword(userId, newPassword) {
@@ -1504,12 +1709,24 @@ function App() {
           <button type="button" className="menu-close" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)}>×</button>
         </div>
         <nav className="tabs" aria-label="Seções do bolão">
-          {visibleTabs.map((item) => (
-            <button type="button" className={tab === item.id ? "active" : ""} key={item.id} onClick={() => handleTabClick(item.id)} data-label={item.label} aria-current={tab === item.id ? "page" : undefined}>
-              {item.icon && <FontAwesomeIcon icon={item.icon} className="tab-icon" />}
-              <span className="tab-label">{item.label}</span>
-            </button>
-          ))}
+          {visibleTabs.map((item) => {
+            const isTabLocked = isPaymentGateActive && item.id !== "payment";
+            return (
+              <button
+                type="button"
+                className={`${tab === item.id ? "active" : ""}${isTabLocked ? " locked" : ""}`}
+                key={item.id}
+                onClick={() => handleTabClick(item.id)}
+                data-label={item.label}
+                aria-current={tab === item.id ? "page" : undefined}
+                aria-disabled={isTabLocked ? "true" : undefined}
+                title={isTabLocked ? "Pagamento pendente" : undefined}
+              >
+                {item.icon && <FontAwesomeIcon icon={item.icon} className="tab-icon" />}
+                <span className="tab-label">{item.label}</span>
+              </button>
+            );
+          })}
         </nav>
         <div className="sidebar-footer">
           <div className="sidebar-actions">
@@ -1543,6 +1760,16 @@ function App() {
           notification={notifPopup}
           onClose={() => setNotifPopup(null)}
           onMarkRead={() => { markRead(notifPopup.id); setNotifPopup(null); }}
+        />
+      )}
+
+      {shouldShowPaymentReminder && (
+        <PaymentReminderModal
+          onClose={() => setPaymentReminderDismissed(true)}
+          onGoToPayment={() => {
+            setPaymentReminderDismissed(true);
+            handleTabClick("payment");
+          }}
         />
       )}
 
@@ -1845,7 +2072,10 @@ function App() {
                   const isRoundLocked = activePredictionRound > activeRound;
                   const matchHasStarted = hasMatchStarted(match, clockNow);
                   const isKickoffLocked = isMatchClosed(match, clockNow);
-                  const isLocked = isRoundLocked || isKickoffLocked;
+                  const paymentRequired = isPaymentRequiredForMatch(match);
+                  const paymentConfirmed = !paymentRequired || hasConfirmedEntryPayment(state.payments, activeParticipant.id);
+                  const isPaymentLocked = paymentRequired && !paymentConfirmed;
+                  const isLocked = isRoundLocked || isKickoffLocked || isPaymentLocked;
                   const predictionFeedback = getPredictionFeedback(storedPrediction, match);
                   const homeTeamName = teamsById[match.homeTeamId]?.name ?? match.homeSlotLabel ?? match.home ?? "time da casa";
                   const awayTeamName = teamsById[match.awayTeamId]?.name ?? match.awaySlotLabel ?? match.away ?? "time visitante";
@@ -1895,13 +2125,19 @@ function App() {
                               <span className="round-locked-pill">Indisponível</span>
                             ) : isKickoffLocked ? (
                               <span className="round-locked-pill">Prazo encerrado</span>
+                            ) : isPaymentLocked ? (
+                              <button type="button" className="subtle" onClick={() => handleTabClick("payment")}>
+                                Ir para pagamento
+                              </button>
                             ) : (
                               <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id, { confirmUpdate: isSaved })}>
                                 {isSaved ? "Atualizar palpite" : "Salvar palpite"}
                               </button>
                             )}
                             {isSaved && !isLocked && <span className="saved-pill">Palpite salvo</span>}
+                            {paymentRequired && paymentConfirmed && <span className="saved-pill">Pagamento confirmado</span>}
                           </div>
+                          {isPaymentLocked && <span className="payment-required-note">Pagamento pendente para palpitar nos jogos da final.</span>}
                           {predictionFeedback && (
                             <span className={`prediction-feedback-pill ${predictionFeedback.className}`}>
                               {predictionFeedback.label}
@@ -1929,6 +2165,17 @@ function App() {
               <EmptyState text="Seu cadastro entra como participante para registrar palpites." />
             )}
           </section>
+        )}
+
+        {tab === "payment" && (
+          <PaymentPage
+            participant={activeParticipant}
+            payment={activeParticipant ? state.payments?.[activeParticipant.id] : null}
+            value={ENTRY_FEE}
+            finalReady={finalTeamsDefined}
+            onNotifyPayment={() => activeParticipant && notifyManualPayment(activeParticipant.id)}
+            onSavePayout={(payoutInfo) => activeParticipant && savePrizePayout(activeParticipant.id, payoutInfo)}
+          />
         )}
 
         {tab === "results" && (
@@ -1967,6 +2214,15 @@ function App() {
         {tab === "bracket" && <KnockoutBracketBoard bracket={knockoutBracket} />}
 
         {tab === "ranking" && <RankingTable ranking={ranking} matches={state.matches} predictions={state.predictions} currentParticipant={activeParticipant} />}
+
+        {tab === "prizes" && isAdmin && (
+          <PrizeManagementPage
+            participants={state.participants}
+            ranking={ranking}
+            payments={state.payments}
+            onPaymentStatusChange={updateManualPaymentStatus}
+          />
+        )}
 
         {tab === "rules" && <GameRulesPage paidParticipants={ranking.length} />}
 
@@ -2820,6 +3076,239 @@ function ScoreInput({ label, value, onChange, disabled = false }) {
   );
 }
 
+function ManualPixPaymentCard({ value, payment, onNotifyPayment }) {
+  const [qrAvailable, setQrAvailable] = useState(true);
+  const payload = STATIC_PIX_PAYLOAD;
+  const paymentUrl = STATIC_PAYMENT_URL;
+  const hasNotified = Boolean(payment?.status);
+
+  async function copyPayload() {
+    if (!payload || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(payload);
+    } catch {}
+  }
+
+  return (
+    <div className="payment-unlock-card">
+      <div className="payment-unlock-copy">
+        <strong>Pagamento por Pix</strong>
+        <span>O pagamento único de R$ {value} libera o acesso ao palpite final.</span>
+        <div className="payment-unlock-meta">
+          <small>Cobranca Nubank</small>
+          <small>Aprovacao manual</small>
+          <small>{STATIC_PIX_RECEIVER}</small>
+        </div>
+      </div>
+      <div className="payment-unlock-form">
+        <div className="payment-link-card">
+          <span>Cobranca Nubank</span>
+          <strong>R$ {value}</strong>
+        </div>
+        {qrAvailable ? (
+          <img className="payment-static-qr" src={STATIC_PIX_QR_URL} alt="QR Code Pix para pagamento" onError={() => setQrAvailable(false)} />
+        ) : (
+          <div className="payment-qr-placeholder">
+            <strong>Use o link da cobranca</strong>
+            <span>O pagamento esta disponivel pelo link Nubank acima.</span>
+          </div>
+        )}
+        {payload && (
+          <div className="payment-pix-payload">
+            <code>{payload}</code>
+            <button type="button" className="ghost" onClick={copyPayload}>Copiar codigo Pix</button>
+          </div>
+        )}
+        <a className="payment-open-charge" href={paymentUrl} target="_blank" rel="noreferrer">Abrir cobranca</a>
+        {!hasNotified && (
+          <button type="button" onClick={onNotifyPayment}>
+            Ja realizei o pagamento
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function getPaymentStatusView(payment) {
+  const currentPayment = payment || null;
+  if (!currentPayment) return { label: "Nao iniciado", detail: "Nenhuma cobranca Pix foi gerada ainda.", className: "idle" };
+
+  const status = String(currentPayment.status || "").toLowerCase();
+  if (status === "not_started" || status === "reset") return { label: "Nao iniciado", detail: "Nenhum pagamento foi informado ainda.", className: "idle" };
+  if (["paid", "confirmed", "received"].includes(status)) return { label: "Confirmado", detail: "Pagamento recebido e validado.", className: "paid" };
+  if (status === "pending_review" || status === "pending" || status === "manual_pending") return { label: "Em analise", detail: "Pagamento informado e aguardando aprovacao do admin.", className: "pending" };
+  if (status === "overdue") return { label: "Vencido", detail: "Gere ou regularize uma nova cobranca Pix.", className: "error" };
+  if (status === "refunded") return { label: "Estornado", detail: "Pagamento devolvido ao pagador.", className: "error" };
+  if (status === "cancelled" || status === "canceled") return { label: "Cancelado", detail: "Esta cobranca nao esta mais ativa.", className: "error" };
+  return { label: "Pendente", detail: "Aguardando aprovacao manual do admin.", className: "pending" };
+}
+
+function PrizePayoutCard({ participant, onSave }) {
+  const payoutStatus = participant?.prizePayoutStatus ?? {};
+  const [form, setForm] = useState(() => ({
+    holderName: participant?.name || "",
+    holderDocument: "",
+    pixKeyType: "cpf",
+    pixKey: "",
+    bankName: "",
+    notes: ""
+  }));
+  const hasSaved = Boolean(payoutStatus.updatedAt);
+  const updatedLabel = hasSaved
+    ? new Intl.DateTimeFormat("pt-BR", {
+        dateStyle: "short",
+        timeStyle: "short",
+        timeZone: "America/Sao_Paulo"
+      }).format(new Date(payoutStatus.updatedAt))
+    : "";
+
+  function updateField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    onSave(form);
+  }
+
+  return (
+    <form className="prize-payout-card" onSubmit={handleSubmit}>
+      <div className="prize-payout-header">
+        <div>
+          <span className="section-kicker">Premiacao</span>
+          <h3>Conta para recebimento do premio</h3>
+          <p>Se voce ficar entre os 3 primeiros colocados, estes dados serao usados para enviar o valor do premio.</p>
+        </div>
+        <span className={`payment-status-pill ${hasSaved ? "paid" : "early"}`}>
+          {hasSaved ? "Dados salvos" : "Pendente"}
+        </span>
+      </div>
+
+      <div className="prize-payout-grid">
+        <label>
+          <span>Nome do titular</span>
+          <input value={form.holderName} onChange={(event) => updateField("holderName", event.target.value)} placeholder="Nome completo" />
+        </label>
+        <label>
+          <span>CPF ou CNPJ do titular</span>
+          <input value={form.holderDocument} onChange={(event) => updateField("holderDocument", event.target.value)} inputMode="numeric" placeholder="Somente numeros" />
+        </label>
+        <label>
+          <span>Tipo de chave Pix</span>
+          <select value={form.pixKeyType} onChange={(event) => updateField("pixKeyType", event.target.value)}>
+            <option value="cpf">CPF/CNPJ</option>
+            <option value="email">E-mail</option>
+            <option value="phone">Telefone</option>
+            <option value="random">Chave aleatoria</option>
+          </select>
+        </label>
+        <label>
+          <span>Chave Pix</span>
+          <input value={form.pixKey} onChange={(event) => updateField("pixKey", event.target.value)} placeholder="Informe a chave Pix" />
+        </label>
+        <label>
+          <span>Banco ou instituicao</span>
+          <input value={form.bankName} onChange={(event) => updateField("bankName", event.target.value)} placeholder="Opcional" />
+        </label>
+        <label>
+          <span>Observacao</span>
+          <input value={form.notes} onChange={(event) => updateField("notes", event.target.value)} placeholder="Opcional" />
+        </label>
+      </div>
+
+      <div className="prize-payout-actions">
+        <small>{hasSaved ? `Dados enviados em ${updatedLabel}. Para alterar, envie o formulario novamente.` : "Preencha agora para evitar ajustes no fechamento do bolao."}</small>
+        <button type="submit">Salvar dados de premio</button>
+      </div>
+    </form>
+  );
+}
+
+function PaymentPage({ participant, payment, value, finalReady, onNotifyPayment, onSavePayout }) {
+  const currentPayment = payment || null;
+  const isPaid = ["paid", "confirmed", "received", "CONFIRMED", "RECEIVED"].includes(currentPayment?.status);
+  const paymentStatus = getPaymentStatusView(payment);
+  const platformStatus = isPaid
+    ? { label: "Liberado", detail: "Acesso ao bolao confirmado.", className: "paid" }
+    : finalReady
+      ? { label: "Bloqueado", detail: "Aguardando pagamento para liberar o bolao.", className: "pending" }
+      : { label: "Liberado", detail: "Bloqueio automatico so entra quando a final for definida.", className: "idle" };
+
+  return (
+    <section className="panel payment-page">
+      <div className="payment-page-header">
+        <div>
+          <span className="section-kicker">Pagamento</span>
+          <h2>Liberacao do bolao</h2>
+          <p>O pagamento libera o acesso ao bolao. O bloqueio automatico so acontece quando os times da final forem definidos.</p>
+        </div>
+        <span className={`payment-status-pill ${isPaid ? "paid" : finalReady ? "pending" : "early"}`}>
+          {isPaid ? "Confirmado" : finalReady ? "Pendente" : "Antecipado"}
+        </span>
+      </div>
+
+      {!participant ? (
+        <EmptyState text="Entre como participante para consultar ou liberar o pagamento." />
+      ) : (
+        <>
+          <div className="payment-summary-grid">
+            <article>
+              <span>Participante</span>
+              <strong>{participant.name}</strong>
+            </article>
+            <article>
+              <span>Valor</span>
+              <strong>R$ {value}</strong>
+            </article>
+            <article className={`payment-summary-card status ${paymentStatus.className}`}>
+              <span>Status do pagamento</span>
+              <strong className={`payment-summary-status ${paymentStatus.className}`}>{paymentStatus.label}</strong>
+              <small>{paymentStatus.detail}</small>
+            </article>
+            <article className={`payment-summary-card status ${platformStatus.className}`}>
+              <span>Status da plataforma</span>
+              <strong className={`payment-summary-status ${platformStatus.className}`}>{platformStatus.label}</strong>
+              <small>{platformStatus.detail}</small>
+            </article>
+          </div>
+
+          {isPaid ? (
+            <div className="sync-strip success">
+              <strong>Bolao liberado.</strong>
+              <span>Voce ja pode acessar as abas e registrar ou atualizar seus palpites dentro do prazo de cada jogo.</span>
+            </div>
+          ) : (
+            <ManualPixPaymentCard value={value} payment={payment} onNotifyPayment={onNotifyPayment} />
+          )}
+
+          <PrizePayoutCard participant={participant} onSave={onSavePayout} />
+        </>
+      )}
+    </section>
+  );
+}
+
+function PaymentReminderModal({ onClose, onGoToPayment }) {
+  return (
+    <div className="payment-reminder-backdrop" role="dialog" aria-modal="true" aria-labelledby="payment-reminder-title">
+      <section className="payment-reminder-modal">
+        <button type="button" className="modal-close" aria-label="Fechar aviso" onClick={onClose}>×</button>
+        <span className="section-kicker">Pagamento</span>
+        <h2 id="payment-reminder-title">Pagamento da aposta</h2>
+        <p>
+          A semifinal continua liberada para palpites. Quando os times da final forem definidos,
+          o sistema sera bloqueado ate a confirmacao do pagamento de R$ {ENTRY_FEE}.
+        </p>
+        <div className="payment-reminder-actions">
+          <button type="button" onClick={onGoToPayment}>Ir para pagamento</button>
+          <button type="button" className="ghost" onClick={onClose}>Continuar na semifinal</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ParticipantGrid({ title, rows, emptyText, onChange, onResetPassword, onRemove, canRemove = true, removeLabel = "Remover", protectedUserId = "" }) {
   const [editingRow, setEditingRow] = useState(null);
   const [draft, setDraft] = useState({ name: "", email: "", password: "" });
@@ -3024,6 +3513,218 @@ function RankingTable({ ranking, matches = [], predictions = {}, compact = false
         />
       )}
     </section>
+  );
+}
+
+function getPayoutStatusView(participant, protectedPayout = null) {
+  const payoutStatus = participant?.prizePayoutStatus ?? {};
+  const payout = protectedPayout ?? {};
+  if ((payout.pixKey && payout.holderName && payout.holderDocument) || payoutStatus.hasData) {
+    return { label: "Dados informados", detail: "Pronto para conferencia", className: "paid" };
+  }
+  return { label: "Pendente", detail: "Aguardando dados de recebimento", className: "pending" };
+}
+
+function formatPrizeDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "America/Sao_Paulo"
+  }).format(date);
+}
+
+function PrizeManagementPage({ participants = [], ranking = [], payments = {}, onPaymentStatusChange }) {
+  const [selectedParticipant, setSelectedParticipant] = useState(null);
+  const [protectedPayouts, setProtectedPayouts] = useState({});
+  const [protectedStatus, setProtectedStatus] = useState({
+    state: "idle",
+    message: "Carregando dados bancarios..."
+  });
+  const rankingById = new Map(ranking.map((participant, index) => [participant.id, { ...participant, position: index + 1 }]));
+  const rows = participants
+    .map((participant) => {
+      const rankingRow = rankingById.get(participant.id);
+      const paymentStatus = getPaymentStatusView(payments?.[participant.id]);
+      const payoutStatus = getPayoutStatusView(participant, protectedPayouts[participant.id]);
+      return {
+        ...participant,
+        total: rankingRow?.total ?? 0,
+        position: rankingRow?.position ?? null,
+        paymentStatus,
+        payoutStatus
+      };
+    })
+    .sort((a, b) => (a.position ?? 9999) - (b.position ?? 9999) || a.name.localeCompare(b.name));
+  const paidCount = rows.filter((row) => row.paymentStatus.className === "paid").length;
+  const pendingPaymentCount = rows.length - paidCount;
+  const payoutReadyCount = rows.filter((row) => row.payoutStatus.className === "paid").length;
+  const payoutPendingCount = rows.length - payoutReadyCount;
+
+  async function loadProtectedPayouts() {
+    setProtectedStatus({ state: "loading", message: "Carregando dados bancarios..." });
+    try {
+      const payload = await requestPrizePayoutsAdmin();
+      setProtectedPayouts(payload.prizePayouts ?? {});
+      setProtectedStatus({ state: "success", message: "Dados bancarios carregados." });
+    } catch (error) {
+      setProtectedPayouts({});
+      setProtectedStatus({ state: "error", message: error.message });
+    }
+  }
+
+  useEffect(() => {
+    loadProtectedPayouts();
+  }, []);
+
+  return (
+    <section className="panel table-panel prize-management-page">
+      <div className={`prize-admin-status ${protectedStatus.state}`}>
+        <div>
+          <span className="section-kicker">Gestao da premiacao</span>
+          <strong>Dados bancarios dos participantes</strong>
+          <small>{protectedStatus.message}</small>
+        </div>
+        <button type="button" className="ghost" onClick={loadProtectedPayouts} disabled={protectedStatus.state === "loading"}>
+          {protectedStatus.state === "loading" ? "Atualizando..." : "Atualizar"}
+        </button>
+      </div>
+
+      <div className="prize-management-summary">
+        <article>
+          <span>Participantes</span>
+          <strong>{rows.length}</strong>
+        </article>
+        <article>
+          <span>Pagamentos confirmados</span>
+          <strong>{paidCount}</strong>
+        </article>
+        <article>
+          <span>Pagamentos pendentes</span>
+          <strong>{pendingPaymentCount}</strong>
+        </article>
+        <article>
+          <span>Recebimento pendente</span>
+          <strong>{payoutPendingCount}</strong>
+        </article>
+      </div>
+
+      {rows.length ? (
+        <div className="table-wrap prize-table-wrap">
+          <table className="ranking-table prize-management-table">
+            <thead>
+              <tr>
+                <th>Colocacao</th>
+                <th>Participante</th>
+                <th>Pontos</th>
+                <th>Pagamento</th>
+                <th>Recebimento</th>
+                <th>Aprovação</th>
+                <th>Info</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((participant) => (
+                <tr key={participant.id}>
+                  <td>
+                    <span className={`rank-position ${participant.position === 1 ? "rank-position-leader" : ""}`}>
+                      {participant.position ?? "-"}
+                    </span>
+                  </td>
+                  <td className="participant-cell">
+                    <div className="ranking-participant">
+                      <UserAvatar user={participant} protect />
+                      <span>{participant.name}</span>
+                    </div>
+                  </td>
+                  <td><strong className="points-pill">{participant.total}</strong></td>
+                  <td>
+                    <span className={`payment-summary-status ${participant.paymentStatus.className}`}>
+                      {participant.paymentStatus.label}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`payment-summary-status ${participant.payoutStatus.className}`}>
+                      {participant.payoutStatus.label}
+                    </span>
+                  </td>
+                  <td className="audit-cell">
+                    {participant.paymentStatus.className === "paid" ? (
+                      <button type="button" className="subtle" onClick={() => onPaymentStatusChange(participant.id, "pending_review")}>
+                        Marcar pendente
+                      </button>
+                    ) : (
+                      <button type="button" className="subtle" onClick={() => onPaymentStatusChange(participant.id, "paid")}>
+                        Aprovar
+                      </button>
+                    )}
+                  </td>
+                  <td className="audit-cell">
+                    <button type="button" className="audit-eye-btn" onClick={() => setSelectedParticipant(participant)} aria-label={`Ver dados de premiacao de ${participant.name}`} title="Dados de premiacao">
+                      <FontAwesomeIcon icon={faEye} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState text="Os dados de premiacao aparecem quando houver participantes cadastrados." />
+      )}
+
+      {selectedParticipant && (
+        <PrizePayoutInfoModal
+          participant={selectedParticipant}
+          payment={payments?.[selectedParticipant.id]}
+          payout={protectedPayouts[selectedParticipant.id]}
+          protectedLoaded={Boolean(protectedPayouts[selectedParticipant.id])}
+          onClose={() => setSelectedParticipant(null)}
+        />
+      )}
+    </section>
+  );
+}
+
+function PrizePayoutInfoModal({ participant, payment, payout = null, protectedLoaded = false, onClose }) {
+  const protectedPayout = payout ?? {};
+  const paymentStatus = getPaymentStatusView(payment, null);
+  const payoutStatus = getPayoutStatusView(participant, protectedPayout);
+  const details = [
+    ["Status do pagamento", paymentStatus.label],
+    ["Status do recebimento", payoutStatus.label],
+    ["Titular", protectedLoaded ? protectedPayout.holderName || "Nao informado" : "Protegido"],
+    ["CPF/CNPJ do titular", protectedLoaded ? protectedPayout.holderDocument || "Nao informado" : "Protegido"],
+    ["Tipo de chave Pix", protectedLoaded ? protectedPayout.pixKeyType || "Nao informado" : "Protegido"],
+    ["Chave Pix", protectedLoaded ? protectedPayout.pixKey || "Nao informado" : "Protegido"],
+    ["Banco ou instituicao", protectedLoaded ? protectedPayout.bankName || "Nao informado" : "Protegido"],
+    ["Observacao", protectedLoaded ? protectedPayout.notes || "Nenhuma" : "Protegido"],
+    ["Atualizado em", protectedLoaded ? formatPrizeDate(protectedPayout.updatedAt) || "Nao informado" : "Carregue os dados bancarios"]
+  ];
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box prize-info-modal" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className="modal-close" onClick={onClose}>×</button>
+        <div className="stats-modal-header">
+          <UserAvatar user={participant} protect />
+          <div>
+            <span className="section-kicker">Premiacao</span>
+            <h2>{participant.name}</h2>
+          </div>
+        </div>
+        <div className="prize-info-grid">
+          {details.map(([label, value]) => (
+            <article key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </article>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -4205,8 +4906,12 @@ const AUDIT_ACTION_LABELS = {
   user_registered: "Usuário cadastrado",
   participant_added: "Participante adicionado",
   participant_removed: "Participante removido",
+  payment_manual_notified: "Pagamento informado",
+  payment_manual_approved: "Pagamento aprovado",
+  payment_manual_pending: "Pagamento pendente",
   password_reset: "Senha redefinida",
   profile_updated: "Perfil atualizado",
+  prize_payout_updated: "Dados de premio atualizados",
   match_added: "Jogo adicionado",
   match_removed: "Jogo removido",
   results_synced: "Resultados sincronizados",
@@ -4220,8 +4925,12 @@ const AUDIT_ACTION_CLASS = {
   user_registered: "info",
   participant_added: "info",
   participant_removed: "danger",
+  payment_manual_notified: "warning",
+  payment_manual_approved: "success",
+  payment_manual_pending: "warning",
   password_reset: "warning",
   profile_updated: "info",
+  prize_payout_updated: "info",
   match_added: "info",
   match_removed: "danger",
   results_synced: "success",

@@ -903,9 +903,24 @@ h3 {
   font-weight: 600;
 }
 
+.tabs button.locked {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.tabs button.locked:hover {
+  background: var(--soft);
+  color: var(--muted);
+}
+
 .tabs button:hover:not(.active) {
   background: #f5f5f5;
   color: var(--text);
+}
+
+.tabs button.locked:hover:not(.active) {
+  background: var(--soft);
+  color: var(--muted);
 }
 
 .sidebar.collapsed .tabs {
@@ -3782,6 +3797,544 @@ h3 {
   white-space: nowrap;
 }
 
+.payment-required-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+  max-width: 320px;
+}
+
+.payment-page {
+  display: grid;
+  gap: 18px;
+}
+
+.payment-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+
+.payment-page-header h2 {
+  margin: 3px 0 6px;
+  font-size: 1.35rem;
+}
+
+.payment-page-header p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.section-kicker {
+  color: var(--danger);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.payment-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 900;
+  min-height: 36px;
+  padding: 8px 16px;
+  white-space: nowrap;
+}
+
+.payment-status-pill.pending {
+  background: rgba(214, 146, 43, 0.13);
+  color: #b26a00;
+}
+
+.payment-status-pill.early {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.payment-status-pill.paid {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.payment-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.payment-summary-grid article {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 96px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+  overflow: hidden;
+}
+
+.payment-summary-grid span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.payment-summary-grid strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.payment-summary-grid small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.payment-summary-card.status {
+  padding-left: 18px;
+}
+
+.payment-summary-card.status::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--line);
+}
+
+.payment-summary-card.status.idle::before {
+  background: #cbd5e1;
+}
+
+.payment-summary-card.status.pending::before {
+  background: #d6922b;
+}
+
+.payment-summary-card.status.paid::before {
+  background: var(--success);
+}
+
+.payment-summary-card.status.error::before {
+  background: var(--danger);
+}
+
+.payment-summary-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 999px;
+  font-size: 0.86rem;
+  line-height: 1.25;
+  padding: 5px 10px;
+  white-space: normal;
+}
+
+.payment-summary-status.idle {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.payment-summary-status.pending {
+  background: rgba(214, 146, 43, 0.13);
+  color: #b26a00;
+}
+
+.payment-summary-status.paid {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.payment-summary-status.error {
+  background: var(--primary-soft);
+  color: var(--danger);
+}
+
+@media (max-width: 980px) {
+  .payment-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .prize-payout-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .payment-page-header {
+    display: grid;
+  }
+
+  .payment-status-pill {
+    justify-self: start;
+  }
+
+  .payment-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.payment-unlock-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 430px);
+  align-items: stretch;
+  justify-items: stretch;
+  gap: 20px;
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--danger) 22%, var(--line));
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fff 0%, color-mix(in srgb, var(--danger) 4%, #fff) 100%);
+  padding: 22px;
+  color: var(--text);
+  text-align: left;
+}
+
+.payment-unlock-card.error {
+  background: color-mix(in srgb, var(--danger) 8%, #fff);
+}
+
+.payment-unlock-copy {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.payment-unlock-card strong {
+  display: block;
+  color: var(--danger);
+  font-size: 1.12rem;
+}
+
+.payment-unlock-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  margin: 0;
+  max-width: 620px;
+}
+
+.payment-unlock-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.payment-unlock-meta small {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--danger);
+  font-size: 0.76rem;
+  font-weight: 900;
+  padding: 4px 10px;
+}
+
+.payment-unlock-form {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.payment-unlock-form button {
+  min-height: 44px;
+  width: 100%;
+}
+
+.payment-link-card {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+  text-align: center;
+}
+
+.payment-link-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  margin: 0;
+}
+
+.payment-link-card strong {
+  color: var(--text);
+  font-size: 1.2rem;
+}
+
+.payment-open-charge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  width: 100%;
+  border-radius: 8px;
+  background: var(--danger);
+  color: #fff;
+  font-weight: 900;
+  text-decoration: none;
+  padding: 8px 12px;
+}
+
+.payment-open-charge:hover {
+  filter: brightness(0.95);
+}
+
+.payment-unlock-card img {
+  width: 180px;
+  max-width: 100%;
+  justify-self: center;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 6px;
+}
+
+.payment-static-qr {
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
+.payment-qr-placeholder {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  min-height: 180px;
+  border: 1px dashed color-mix(in srgb, var(--danger) 35%, var(--line));
+  border-radius: 8px;
+  background: #fff;
+  padding: 16px;
+  text-align: center;
+}
+
+.payment-qr-placeholder strong {
+  color: var(--danger);
+  font-size: 0.94rem;
+}
+
+.payment-qr-placeholder span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.payment-document-field {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+}
+
+.payment-document-field span {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 900;
+  margin: 0;
+}
+
+.payment-document-field input {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font: inherit;
+  background: #fff;
+}
+
+.payment-pix-payload {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  grid-column: 1 / -1;
+}
+
+.payment-pix-payload code {
+  display: block;
+  max-height: 72px;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--text);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  padding: 8px;
+  text-align: left;
+  word-break: break-all;
+}
+
+.prize-payout-card {
+  display: grid;
+  gap: 18px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 22px;
+}
+
+.prize-payout-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+
+.prize-payout-header h3 {
+  margin: 3px 0 6px;
+  font-size: 1.08rem;
+}
+
+.prize-payout-header p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.prize-payout-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.prize-payout-grid label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.prize-payout-grid span {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.prize-payout-grid input,
+.prize-payout-grid select {
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  padding: 9px 12px;
+}
+
+.prize-payout-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.prize-payout-actions small {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.prize-payout-actions button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .payment-unlock-card {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .payment-unlock-card span {
+    max-width: none;
+  }
+
+  .payment-unlock-form {
+    align-content: stretch;
+  }
+
+  .payment-unlock-card .payment-document-field {
+    max-width: none;
+  }
+
+  .prize-payout-header,
+  .prize-payout-actions {
+    display: grid;
+  }
+
+  .prize-payout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .prize-payout-actions button {
+    width: 100%;
+  }
+}
+
+.payment-reminder-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: grid;
+  place-items: center;
+  background: rgba(17, 24, 39, 0.42);
+  padding: 18px;
+}
+
+.payment-reminder-modal {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  width: min(100%, 460px);
+  border: 1px solid color-mix(in srgb, var(--danger) 22%, var(--line));
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(17, 24, 39, 0.22);
+  padding: 24px;
+}
+
+.payment-reminder-modal h2 {
+  font-size: 1.35rem;
+  margin: 0;
+}
+
+.payment-reminder-modal p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.payment-reminder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.payment-reminder-actions button {
+  flex: 1 1 180px;
+}
+
 .prediction-feedback-pill {
   display: inline-flex;
   align-items: center;
@@ -6097,6 +6650,137 @@ tbody tr:hover {
 .ranking-participant > span {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.prize-management-page {
+  display: grid;
+  gap: 18px;
+}
+
+.prize-admin-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 22%, var(--line));
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fff 0%, color-mix(in srgb, var(--danger) 4%, #fff) 100%);
+  padding: 16px;
+}
+
+.prize-admin-status div {
+  display: grid;
+  gap: 5px;
+}
+
+.prize-admin-status strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.prize-admin-status small {
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.prize-admin-status button {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.prize-management-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.prize-management-summary article {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+}
+
+.prize-management-summary span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.prize-management-summary strong {
+  color: var(--text);
+  font-size: 1.25rem;
+}
+
+.prize-management-table {
+  min-width: 760px;
+}
+
+.prize-management-table th:nth-child(1),
+.prize-management-table th:nth-child(3),
+.prize-management-table th:nth-child(4),
+.prize-management-table th:nth-child(5),
+.prize-management-table th:nth-child(6),
+.prize-management-table th:nth-child(7),
+.prize-management-table td:nth-child(1),
+.prize-management-table td:nth-child(3),
+.prize-management-table td:nth-child(4),
+.prize-management-table td:nth-child(5),
+.prize-management-table td:nth-child(6),
+.prize-management-table td:nth-child(7) {
+  text-align: center;
+}
+
+.prize-info-modal {
+  max-width: 760px;
+}
+
+.prize-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.prize-info-grid article {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+.prize-info-grid span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.prize-info-grid strong {
+  color: var(--text);
+  font-size: 0.94rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .prize-admin-status {
+    grid-template-columns: 1fr;
+  }
+
+  .prize-management-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .prize-management-summary,
+  .prize-info-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .points-pill {

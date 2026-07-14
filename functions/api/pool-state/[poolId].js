@@ -2,6 +2,9 @@ const EMPTY_STATE = {
   users: [],
   participants: [],
   predictions: {},
+  payments: {},
+  paymentEvents: [],
+  prizePayouts: {},
   auditLogs: [],
   matches: [],
   lastResultSyncAt: "",
@@ -23,6 +26,41 @@ function mergeAuditLogs(currentLogs, incomingLogs) {
     .slice(0, 1000);
 }
 
+function getTimestamp(item = {}) {
+  return Math.max(
+    ...[item.updatedAt, item.confirmedAt, item.createdAt].map((value) => {
+      const time = Date.parse(value || "");
+      return Number.isNaN(time) ? 0 : time;
+    })
+  );
+}
+
+function pickNewest(currentItem, incomingItem) {
+  if (!currentItem) return incomingItem;
+  if (!incomingItem) return currentItem;
+  return getTimestamp(incomingItem) >= getTimestamp(currentItem) ? incomingItem : currentItem;
+}
+
+function mergePaymentMaps(currentPayments = {}, incomingPayments = {}) {
+  const participantIds = new Set([...Object.keys(currentPayments ?? {}), ...Object.keys(incomingPayments ?? {})]);
+  return Object.fromEntries(
+    [...participantIds]
+      .map((participantId) => [participantId, pickNewest(currentPayments?.[participantId], incomingPayments?.[participantId])])
+      .filter(([, payment]) => Boolean(payment))
+  );
+}
+
+function mergePaymentEvents(currentEvents = [], incomingEvents = []) {
+  const eventsById = new Map();
+  for (const event of [...(currentEvents ?? []), ...(incomingEvents ?? [])]) {
+    if (!event?.id) continue;
+    eventsById.set(event.id, event);
+  }
+  return [...eventsById.values()]
+    .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""))
+    .slice(0, 300);
+}
+
 function jsonResponse(body, init = {}) {
   return new Response(JSON.stringify(body), {
     ...init,
@@ -31,6 +69,19 @@ function jsonResponse(body, init = {}) {
       ...(init.headers ?? {})
     }
   });
+}
+
+function stripSensitiveParticipantData(participant = {}) {
+  const { prizePayout: _prizePayout, ...safeParticipant } = participant;
+  return safeParticipant;
+}
+
+function getPublicState(state = {}) {
+  const { prizePayouts: _prizePayouts, ...safeState } = state;
+  return {
+    ...safeState,
+    participants: (safeState.participants ?? []).map(stripSensitiveParticipantData)
+  };
 }
 
 function getDb(context) {
@@ -147,7 +198,7 @@ export async function onRequestGet(context) {
   try {
     const poolId = context.params.poolId || "copa-2026";
     const state = await readPoolState(getDb(context), poolId);
-    return jsonResponse(state, { headers: { "Cache-Control": "no-store" } });
+    return jsonResponse(getPublicState(state), { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return jsonResponse({ error: error.message }, { status: 500 });
   }
@@ -157,7 +208,7 @@ export async function onRequestPut(context) {
   try {
     const poolId = context.params.poolId || "copa-2026";
     const body = await context.request.json();
-    const nextState = { ...EMPTY_STATE, ...body };
+    const nextState = getPublicState({ ...EMPTY_STATE, ...body });
     const db = getDb(context);
 
     await ensureSchema(db);
@@ -181,6 +232,9 @@ export async function onRequestPut(context) {
           Number(currentState.releasedPredictionRound) || 1,
           Number(nextState.releasedPredictionRound) || 1
         ),
+        payments: mergePaymentMaps(currentState.payments, nextState.payments),
+        paymentEvents: mergePaymentEvents(currentState.paymentEvents, nextState.paymentEvents),
+        prizePayouts: currentState.prizePayouts ?? {},
         auditLogs: mergeAuditLogs(currentState.auditLogs, nextState.auditLogs)
       };
       const now = new Date().toISOString();
@@ -194,7 +248,7 @@ export async function onRequestPut(context) {
         where pool_state.updated_at = ?
       `).bind(poolId, data, now, now, snapshot.version).run();
 
-      if ((write.meta?.changes ?? 0) > 0) return jsonResponse(finalState);
+      if ((write.meta?.changes ?? 0) > 0) return jsonResponse(getPublicState(finalState));
     }
 
     throw new Error("Nao foi possivel salvar devido a atualizacoes concorrentes.");
