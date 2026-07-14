@@ -4181,6 +4181,16 @@ h3 {
   word-break: break-all;
 }
 
+.payment-copy-feedback {
+  justify-self: center;
+  border-radius: 999px;
+  background: #dff8ec;
+  color: #0f9f6e;
+  font-size: 0.82rem;
+  font-weight: 900;
+  padding: 8px 14px;
+}
+
 .prize-payout-card {
   display: grid;
   gap: 18px;

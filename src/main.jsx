@@ -3109,14 +3109,26 @@ function ScoreInput({ label, value, onChange, disabled = false }) {
 
 function ManualPixPaymentCard({ value, payment, onNotifyPayment }) {
   const [qrAvailable, setQrAvailable] = useState(true);
+  const [copyMessage, setCopyMessage] = useState("");
+  const copyMessageTimerRef = useRef(null);
   const payload = STATIC_PIX_PAYLOAD;
   const paymentUrl = STATIC_PAYMENT_URL;
-  const hasNotified = Boolean(payment?.status);
+  const paymentStatus = String(payment?.status || "").toLowerCase();
+  const hasNotified = paymentStatus && !["not_started", "reset"].includes(paymentStatus);
+
+  useEffect(() => {
+    return () => {
+      if (copyMessageTimerRef.current) window.clearTimeout(copyMessageTimerRef.current);
+    };
+  }, []);
 
   async function copyPayload() {
     if (!payload || !navigator.clipboard) return;
     try {
       await navigator.clipboard.writeText(payload);
+      setCopyMessage("Codigo Pix copiado");
+      if (copyMessageTimerRef.current) window.clearTimeout(copyMessageTimerRef.current);
+      copyMessageTimerRef.current = window.setTimeout(() => setCopyMessage(""), 2800);
     } catch {}
   }
 
@@ -3148,6 +3160,7 @@ function ManualPixPaymentCard({ value, payment, onNotifyPayment }) {
           <div className="payment-pix-payload">
             <code>{payload}</code>
             <button type="button" className="ghost" onClick={copyPayload}>Copiar codigo Pix</button>
+            {copyMessage && <span className="payment-copy-feedback" role="status">{copyMessage}</span>}
           </div>
         )}
         <a className="payment-open-charge" href={paymentUrl} target="_blank" rel="noreferrer">Abrir cobranca</a>
