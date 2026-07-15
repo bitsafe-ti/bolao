@@ -514,6 +514,8 @@ function App() {
   const [selectedResultRound, setSelectedResultRound] = useState(null);
   const [draftPredictions, setDraftPredictions] = useState({});
   const [pendingPredictionUpdate, setPendingPredictionUpdate] = useState(null);
+  const [savingPredictionKeys, setSavingPredictionKeys] = useState(() => new Set());
+  const savingPredictionKeysRef = useRef(new Set());
   const [paymentReminderDismissed, setPaymentReminderDismissed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1045,9 +1047,9 @@ function App() {
     const nextState = typeof recipe === "function" ? recipe(state) : recipe;
     // Skip persist when the recipe returned the same reference. An extra write would race with concurrent writes
     // and could overwrite audit logs written by those concurrent calls.
-    if (nextState === state) return;
+    if (nextState === state) return Promise.resolve();
     setState(nextState);
-    void persistAndSync(nextState);
+    return persistAndSync(nextState);
   }
 
   async function persistAndSync(nextState) {
@@ -1388,6 +1390,21 @@ function App() {
     return `${participantId}__${matchId}`;
   }
 
+  function isPredictionSaving(key) {
+    return savingPredictionKeys.has(key);
+  }
+
+  function setPredictionSaving(key, saving) {
+    const next = new Set(savingPredictionKeysRef.current);
+    if (saving) {
+      next.add(key);
+    } else {
+      next.delete(key);
+    }
+    savingPredictionKeysRef.current = next;
+    setSavingPredictionKeys(next);
+  }
+
   function getDraftPrediction(participantId, matchId, storedPrediction = emptyPrediction) {
     return draftPredictions[getPredictionKey(participantId, matchId)] ?? storedPrediction;
   }
@@ -1405,42 +1422,49 @@ function App() {
     });
   }
 
-  function commitPredictionUpdate(update) {
+  async function commitPredictionUpdate(update) {
     if (!update) return;
+    if (savingPredictionKeysRef.current.has(update.key)) return;
     const match = state.matches.find((item) => item.id === update.matchId);
     if (!match || getMatchRound(match) > activeRound || isMatchClosed(match)) {
       setPendingPredictionUpdate(null);
       return;
     }
-    updateState((current) => appendAuditLog(
-      {
-        ...current,
-        predictions: {
-          ...current.predictions,
-          [update.participantId]: {
-            ...current.predictions[update.participantId],
-            [update.matchId]: (() => {
-              const previous = current.predictions[update.participantId]?.[update.matchId];
-              const previousTime = Date.parse(previous?.updatedAt || previous?.savedAt || "");
-              const nextTime = Math.max(Date.now(), Number.isNaN(previousTime) ? 0 : previousTime + 1);
-              const savedAt = new Date(nextTime).toISOString();
-              return { ...emptyPrediction, ...previous, ...update.normalizedDraft, savedAt, updatedAt: savedAt };
-            })()
+    setPredictionSaving(update.key, true);
+    try {
+      await updateState((current) => appendAuditLog(
+        {
+          ...current,
+          predictions: {
+            ...current.predictions,
+            [update.participantId]: {
+              ...current.predictions[update.participantId],
+              [update.matchId]: (() => {
+                const previous = current.predictions[update.participantId]?.[update.matchId];
+                const previousTime = Date.parse(previous?.updatedAt || previous?.savedAt || "");
+                const nextTime = Math.max(Date.now(), Number.isNaN(previousTime) ? 0 : previousTime + 1);
+                const savedAt = new Date(nextTime).toISOString();
+                return { ...emptyPrediction, ...previous, ...update.normalizedDraft, savedAt, updatedAt: savedAt };
+              })()
+            }
           }
-        }
-      },
-      makeAuditEntry(update.actorName, "prediction_saved", update.detail)
-    ));
-    setDraftPredictions((current) => {
-      const next = { ...current };
-      delete next[update.key];
-      return next;
-    });
-    setPendingPredictionUpdate(null);
+        },
+        makeAuditEntry(update.actorName, "prediction_saved", update.detail)
+      ));
+      setDraftPredictions((current) => {
+        const next = { ...current };
+        delete next[update.key];
+        return next;
+      });
+      setPendingPredictionUpdate(null);
+    } finally {
+      setPredictionSaving(update.key, false);
+    }
   }
 
   function savePrediction(participantId, matchId, { confirmUpdate = false } = {}) {
     const key = getPredictionKey(participantId, matchId);
+    if (savingPredictionKeysRef.current.has(key)) return;
     const match = state.matches.find((item) => item.id === matchId);
     const currentPrediction = state.predictions[participantId]?.[matchId] ?? emptyPrediction;
     if (getMatchRound(match) > activeRound || isMatchClosed(match)) return;
@@ -1815,7 +1839,10 @@ function App() {
       {pendingPredictionUpdate && (
         <PredictionUpdateConfirmModal
           update={pendingPredictionUpdate}
-          onCancel={() => setPendingPredictionUpdate(null)}
+          isSaving={isPredictionSaving(pendingPredictionUpdate.key)}
+          onCancel={() => {
+            if (!isPredictionSaving(pendingPredictionUpdate.key)) setPendingPredictionUpdate(null);
+          }}
           onConfirm={() => commitPredictionUpdate(pendingPredictionUpdate)}
         />
       )}
@@ -2105,9 +2132,11 @@ function App() {
             {activeParticipant ? (
               <div className="match-list">
                 {predictionMatches.map((match) => {
+                  const predictionKey = getPredictionKey(activeParticipant.id, match.id);
                   const storedPrediction = state.predictions[activeParticipant.id]?.[match.id] ?? emptyPrediction;
                   const prediction = getDraftPrediction(activeParticipant.id, match.id, storedPrediction);
                   const isSaved = hasPrediction(storedPrediction);
+                  const isSaving = isPredictionSaving(predictionKey);
                   const isRoundLocked = activePredictionRound > activeRound;
                   const matchHasStarted = hasMatchStarted(match, clockNow);
                   const isKickoffLocked = isMatchClosed(match, clockNow);
@@ -2115,6 +2144,7 @@ function App() {
                   const paymentConfirmed = !paymentRequired || hasConfirmedEntryPayment(state.payments, activeParticipant.id);
                   const isPaymentLocked = paymentRequired && !paymentConfirmed;
                   const isLocked = isRoundLocked || isKickoffLocked || isPaymentLocked;
+                  const isInputLocked = isLocked || isSaving;
                   const predictionFeedback = getPredictionFeedback(storedPrediction, match);
                   const homeTeamName = teamsById[match.homeTeamId]?.name ?? match.homeSlotLabel ?? match.home ?? "time da casa";
                   const awayTeamName = teamsById[match.awayTeamId]?.name ?? match.awaySlotLabel ?? match.away ?? "time visitante";
@@ -2155,9 +2185,9 @@ function App() {
                           </div>
                           <div className="prediction-actions">
                           <div className="prediction-inputs">
-                            <ScoreInput label={`Placar de ${homeTeamName}`} disabled={isLocked} value={prediction.home} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "home", value)} />
+                            <ScoreInput label={`Placar de ${homeTeamName}`} disabled={isInputLocked} value={prediction.home} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "home", value)} />
                             <span>x</span>
-                            <ScoreInput label={`Placar de ${awayTeamName}`} disabled={isLocked} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
+                            <ScoreInput label={`Placar de ${awayTeamName}`} disabled={isInputLocked} value={prediction.away} onChange={(value) => updateDraftPrediction(activeParticipant.id, match.id, "away", value)} />
                           </div>
                           <div className="prediction-action-row">
                             {isRoundLocked ? (
@@ -2169,11 +2199,12 @@ function App() {
                                 Ir para pagamento
                               </button>
                             ) : (
-                              <button type="button" className="subtle" onClick={() => savePrediction(activeParticipant.id, match.id, { confirmUpdate: isSaved })}>
-                                {isSaved ? "Atualizar palpite" : "Salvar palpite"}
+                              <button type="button" className="subtle" disabled={isSaving} onClick={() => savePrediction(activeParticipant.id, match.id, { confirmUpdate: isSaved })}>
+                                {isSaving ? "Salvando..." : isSaved ? "Atualizar palpite" : "Salvar palpite"}
                               </button>
                             )}
-                            {isSaved && !isLocked && <span className="saved-pill">Palpite salvo</span>}
+                            {isSaving && <span className="saved-pill saving">Sincronizando</span>}
+                            {isSaved && !isLocked && !isSaving && <span className="saved-pill">Palpite salvo</span>}
                             {paymentRequired && paymentConfirmed && <span className="saved-pill">Pagamento confirmado</span>}
                           </div>
                           {isPaymentLocked && <span className="payment-required-note">Pagamento pendente para palpitar nos jogos da final.</span>}
@@ -2344,7 +2375,7 @@ function LoginTransitionScreen() {
   );
 }
 
-function PredictionUpdateConfirmModal({ update, onCancel, onConfirm }) {
+function PredictionUpdateConfirmModal({ update, isSaving = false, onCancel, onConfirm }) {
   return (
     <div className="modal-backdrop prediction-confirm-backdrop" role="presentation" onMouseDown={onCancel}>
       <section
@@ -2378,8 +2409,10 @@ function PredictionUpdateConfirmModal({ update, onCancel, onConfirm }) {
         </div>
 
         <div className="modal-actions prediction-confirm-actions">
-          <button type="button" className="ghost" onClick={onCancel}>Cancelar</button>
-          <button type="button" onClick={onConfirm}>Confirmar atualizacao</button>
+          <button type="button" className="ghost" disabled={isSaving} onClick={onCancel}>Cancelar</button>
+          <button type="button" disabled={isSaving} onClick={onConfirm}>
+            {isSaving ? "Confirmando..." : "Confirmar atualizacao"}
+          </button>
         </div>
       </section>
     </div>
