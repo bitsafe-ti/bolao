@@ -114,6 +114,18 @@ function validatePayout(payout) {
   return "";
 }
 
+function mergeWithExistingPayout(payout = {}, existingPayout = {}) {
+  const shouldKeepExistingDocument = !payout.holderDocument && existingPayout.holderDocument;
+  const shouldKeepExistingPixKey = !payout.pixKey && existingPayout.pixKey;
+
+  return {
+    ...payout,
+    holderDocument: shouldKeepExistingDocument ? existingPayout.holderDocument : payout.holderDocument,
+    pixKeyType: shouldKeepExistingPixKey ? existingPayout.pixKeyType || payout.pixKeyType : payout.pixKeyType,
+    pixKey: shouldKeepExistingPixKey ? existingPayout.pixKey : payout.pixKey
+  };
+}
+
 export async function onRequestGet(context) {
   try {
     const url = new URL(context.request.url);
@@ -132,14 +144,18 @@ export async function onRequestPost(context) {
     const participantId = body.participantId;
     if (!participantId) return jsonResponse({ error: "Participante nao informado." }, { status: 400 });
 
-    const payout = cleanPayout(body.payout);
-    const validationError = validatePayout(payout);
-    if (validationError) return jsonResponse({ error: validationError }, { status: 400 });
-
     const db = getDb(context);
     const nextState = await updatePoolState(db, poolId, (current) => {
       const participant = (current.participants ?? []).find((item) => item.id === participantId);
       if (!participant) throw new Error("Participante nao encontrado.");
+
+      const payout = mergeWithExistingPayout(cleanPayout(body.payout), current.prizePayouts?.[participantId]);
+      const validationError = validatePayout(payout);
+      if (validationError) {
+        const error = new Error(validationError);
+        error.status = 400;
+        throw error;
+      }
 
       const updatedAt = new Date().toISOString();
       const participantStatus = {
@@ -184,6 +200,6 @@ export async function onRequestPost(context) {
       state: getPublicState(nextState)
     });
   } catch (error) {
-    return jsonResponse({ error: error.message }, { status: 500 });
+    return jsonResponse({ error: error.message }, { status: error.status || 500 });
   }
 }

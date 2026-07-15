@@ -4259,14 +4259,42 @@ h3 {
   padding-top: 16px;
 }
 
+.prize-payout-feedback {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
 .prize-payout-actions small {
   color: var(--muted);
   font-weight: 700;
 }
 
+.prize-payout-feedback strong {
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.prize-payout-feedback strong.loading {
+  color: var(--warning);
+}
+
+.prize-payout-feedback strong.success {
+  color: var(--success);
+}
+
+.prize-payout-feedback strong.error {
+  color: var(--danger);
+}
+
 .prize-payout-actions button {
   min-height: 44px;
   white-space: nowrap;
+}
+
+.prize-payout-actions button:disabled {
+  cursor: progress;
+  opacity: 0.7;
 }
 
 @media (max-width: 720px) {

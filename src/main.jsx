@@ -1560,25 +1560,30 @@ function App() {
   }
 
   async function savePrizePayout(participantId, payoutInfo) {
-    if (!participantId) return;
+    if (!participantId) return { ok: false, message: "Participante nao informado." };
     const holderName = String(payoutInfo.holderName || "").trim();
     const holderDocument = String(payoutInfo.holderDocument || "").replace(/\D/g, "");
     const pixKeyType = String(payoutInfo.pixKeyType || "cpf").trim();
     const pixKey = String(payoutInfo.pixKey || "").trim();
     const bankName = String(payoutInfo.bankName || "").trim();
     const notes = String(payoutInfo.notes || "").trim();
+    const participant = state.participants.find((item) => item.id === participantId);
+    const hasSavedPayout = Boolean(participant?.prizePayoutStatus?.hasData || participant?.prizePayoutStatus?.updatedAt);
 
     if (!holderName) {
-      setSharedStatus({ state: "error", message: "Informe o nome do titular da conta de premio." });
-      return;
+      const message = "Informe o nome do titular da conta de premio.";
+      setSharedStatus({ state: "error", message });
+      return { ok: false, message };
     }
-    if (!holderDocument || ![11, 14].includes(holderDocument.length)) {
-      setSharedStatus({ state: "error", message: "Informe CPF ou CNPJ valido do titular." });
-      return;
+    if ((!holderDocument && !hasSavedPayout) || (holderDocument && ![11, 14].includes(holderDocument.length))) {
+      const message = "Informe CPF ou CNPJ valido do titular.";
+      setSharedStatus({ state: "error", message });
+      return { ok: false, message };
     }
-    if (!pixKey) {
-      setSharedStatus({ state: "error", message: "Informe a chave Pix para recebimento do premio." });
-      return;
+    if (!pixKey && !hasSavedPayout) {
+      const message = "Informe a chave Pix para recebimento do premio.";
+      setSharedStatus({ state: "error", message });
+      return { ok: false, message };
     }
 
     setSharedStatus({ state: "loading", message: "Salvando dados de recebimento..." });
@@ -1596,9 +1601,12 @@ function App() {
         setState((current) => applyRemoteData(current, cleanedState, { prefer: "shared" }));
         saveCachedPoolState(cleanedState);
       }
-      setSharedStatus({ state: "success", message: "Dados de recebimento do premio salvos com protecao." });
+      const message = "Dados de recebimento do premio salvos com protecao.";
+      setSharedStatus({ state: "success", message });
+      return { ok: true, message };
     } catch (error) {
       setSharedStatus({ state: "error", message: error.message });
+      return { ok: false, message: error.message };
     }
   }
 
@@ -3190,6 +3198,8 @@ function getPaymentStatusView(payment) {
 
 function PrizePayoutCard({ participant, onSave }) {
   const payoutStatus = participant?.prizePayoutStatus ?? {};
+  const hasSaved = Boolean(payoutStatus.hasData || payoutStatus.updatedAt);
+  const hasUpdatedAt = Boolean(payoutStatus.updatedAt);
   const [form, setForm] = useState(() => ({
     holderName: participant?.name || "",
     holderDocument: "",
@@ -3198,8 +3208,9 @@ function PrizePayoutCard({ participant, onSave }) {
     bankName: "",
     notes: ""
   }));
-  const hasSaved = Boolean(payoutStatus.updatedAt);
-  const updatedLabel = hasSaved
+  const [submitStatus, setSubmitStatus] = useState({ state: "idle", message: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const updatedLabel = hasUpdatedAt
     ? new Intl.DateTimeFormat("pt-BR", {
         dateStyle: "short",
         timeStyle: "short",
@@ -3207,13 +3218,38 @@ function PrizePayoutCard({ participant, onSave }) {
       }).format(new Date(payoutStatus.updatedAt))
     : "";
 
+  useEffect(() => {
+    setForm({
+      holderName: participant?.name || "",
+      holderDocument: "",
+      pixKeyType: "cpf",
+      pixKey: "",
+      bankName: "",
+      notes: ""
+    });
+    setSubmitStatus({ state: "idle", message: "" });
+  }, [participant?.id, participant?.name]);
+
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    onSave(form);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setSubmitStatus({ state: "loading", message: "Salvando dados..." });
+    try {
+      const result = await onSave(form);
+      setSubmitStatus({
+        state: result?.ok ? "success" : "error",
+        message: result?.message || (result?.ok ? "Dados salvos." : "Nao foi possivel salvar os dados.")
+      });
+    } catch (error) {
+      setSubmitStatus({ state: "error", message: error.message || "Nao foi possivel salvar os dados." });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -3236,7 +3272,12 @@ function PrizePayoutCard({ participant, onSave }) {
         </label>
         <label>
           <span>CPF ou CNPJ do titular</span>
-          <input value={form.holderDocument} onChange={(event) => updateField("holderDocument", event.target.value)} inputMode="numeric" placeholder="Somente numeros" />
+          <input
+            value={form.holderDocument}
+            onChange={(event) => updateField("holderDocument", event.target.value)}
+            inputMode="numeric"
+            placeholder={hasSaved ? "Protegido - preencha para alterar" : "Somente numeros"}
+          />
         </label>
         <label>
           <span>Tipo de chave Pix</span>
@@ -3249,7 +3290,11 @@ function PrizePayoutCard({ participant, onSave }) {
         </label>
         <label>
           <span>Chave Pix</span>
-          <input value={form.pixKey} onChange={(event) => updateField("pixKey", event.target.value)} placeholder="Informe a chave Pix" />
+          <input
+            value={form.pixKey}
+            onChange={(event) => updateField("pixKey", event.target.value)}
+            placeholder={hasSaved ? "Protegida - preencha para alterar" : "Informe a chave Pix"}
+          />
         </label>
         <label>
           <span>Banco ou instituicao</span>
@@ -3262,8 +3307,15 @@ function PrizePayoutCard({ participant, onSave }) {
       </div>
 
       <div className="prize-payout-actions">
-        <small>{hasSaved ? `Dados enviados em ${updatedLabel}. Para alterar, envie o formulario novamente.` : "Preencha agora para evitar ajustes no fechamento do bolao."}</small>
-        <button type="submit">Salvar dados de premio</button>
+        <div className="prize-payout-feedback" aria-live="polite">
+          <small>
+            {hasSaved
+              ? `Dados enviados${updatedLabel ? ` em ${updatedLabel}` : ""}. CPF/CNPJ e Pix ficam protegidos; preencha esses campos apenas para alterar.`
+              : "Preencha agora para evitar ajustes no fechamento do bolao."}
+          </small>
+          {submitStatus.message && <strong className={submitStatus.state}>{submitStatus.message}</strong>}
+        </div>
+        <button type="submit" disabled={isSubmitting}>{isSubmitting ? "Salvando..." : "Salvar dados de premio"}</button>
       </div>
     </form>
   );
