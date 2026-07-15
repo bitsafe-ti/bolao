@@ -2402,12 +2402,18 @@ function AuthScreen({ error, onLogin, onRegister }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     const payload = Object.fromEntries(new FormData(event.currentTarget).entries());
     setTurnstileError("");
     setTurnstileChecking(true);
 
     if (!IS_LOCAL_ONLY_DEV) {
-      const verification = await verifyTurnstileToken(getTurnstileToken(payload, turnstileToken));
+      let token = getTurnstileToken(payload, turnstileToken);
+      if (!token) {
+        await wait(600);
+        token = getTurnstileToken(Object.fromEntries(new FormData(formElement).entries()), turnstileToken);
+      }
+      const verification = await verifyTurnstileToken(token);
       if (!verification.success) {
         setTurnstileError(verification.message);
         setTurnstileToken("");
