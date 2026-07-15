@@ -44,7 +44,7 @@ import {
   subscribeToPoolChanges,
   unsubscribeFromPoolChanges
 } from "./sharedState.js";
-import { TURNSTILE_SITE_KEY, verifyTurnstileToken } from "./turnstile.js";
+import { TURNSTILE_SITE_KEY, getTurnstileToken, verifyTurnstileToken } from "./turnstile.js";
 import "./styles.css";
 
 const ACTIVE_POOL_ID = import.meta.env.VITE_POOL_ID || "copa-2026";
@@ -2407,7 +2407,7 @@ function AuthScreen({ error, onLogin, onRegister }) {
     setTurnstileChecking(true);
 
     if (!IS_LOCAL_ONLY_DEV) {
-      const verification = await verifyTurnstileToken(turnstileToken);
+      const verification = await verifyTurnstileToken(getTurnstileToken(payload, turnstileToken));
       if (!verification.success) {
         setTurnstileError(verification.message);
         setTurnstileToken("");

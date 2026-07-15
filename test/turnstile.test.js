@@ -1,7 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { TURNSTILE_VERIFY_URL, verifyTurnstileToken } from "../src/turnstile.js";
+import { TURNSTILE_VERIFY_URL, getTurnstileToken, verifyTurnstileToken } from "../src/turnstile.js";
+
+test("Turnstile usa token oculto do formulario quando o callback nao atualiza o estado", () => {
+  assert.equal(
+    getTurnstileToken({ "cf-turnstile-response": " hidden-token " }, ""),
+    "hidden-token"
+  );
+  assert.equal(
+    getTurnstileToken({ "cf-turnstile-response": "hidden-token" }, "state-token"),
+    "state-token"
+  );
+});
 
 test("Turnstile exige token antes de consultar o Worker", async () => {
   let called = false;

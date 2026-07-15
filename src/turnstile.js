@@ -5,6 +5,10 @@ export const TURNSTILE_VERIFY_URL =
   import.meta.env?.VITE_TURNSTILE_VERIFY_URL ||
   "https://turnstile-siteverify-bolao-copa2026.guilherme-saraiva.workers.dev";
 
+export function getTurnstileToken(payload = {}, currentToken = "") {
+  return String(currentToken || payload["cf-turnstile-response"] || "").trim();
+}
+
 export async function verifyTurnstileToken(token, fetchImpl = fetch) {
   if (!token) {
     return { success: false, message: "Conclua a verificação de segurança." };
