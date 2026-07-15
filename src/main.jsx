@@ -2407,7 +2407,7 @@ function AuthScreen({ error, onLogin, onRegister }) {
     setTurnstileError("");
     setTurnstileChecking(true);
 
-    if (!IS_LOCAL_ONLY_DEV) {
+    if (!IS_LOCAL_ONLY_DEV && mode === "register") {
       let token = getTurnstileToken(payload, turnstileToken);
       if (!token) {
         await wait(600);
@@ -2450,7 +2450,7 @@ function AuthScreen({ error, onLogin, onRegister }) {
           {mode === "register" && <label className="form-field"><span>Sobrenome</span><input name="lastName" placeholder="Seu sobrenome" autoComplete="family-name" required /></label>}
           <label className="form-field"><span>E-mail</span><input name="email" type="email" placeholder="voce@exemplo.com" autoComplete="email" required /></label>
           <label className="form-field"><span>Senha</span><input name="password" type="password" placeholder="Sua senha" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength="6" required /></label>
-          {!IS_LOCAL_ONLY_DEV && (
+          {!IS_LOCAL_ONLY_DEV && mode === "register" && (
             <TurnstileWidget
               resetKey={turnstileResetKey}
               onToken={(token) => {
