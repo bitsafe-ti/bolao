@@ -191,7 +191,7 @@ export async function onRequestPost(context) {
             createdAt: updatedAt
           },
           ...(current.auditLogs ?? [])
-        ].slice(0, 1000)
+        ].slice(0, 10000)
       };
     });
 

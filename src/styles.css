@@ -5012,9 +5012,29 @@ h3 {
   padding: 0;
 }
 
-.bracket-final-stage .bracket-match-card {
+.bracket-final-content > .bracket-match-card {
   width: 100%;
   border: 2px solid #e7bd28;
+}
+
+.bracket-third-place-content {
+  align-self: start;
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin-top: 34px;
+}
+
+.bracket-third-place-kicker {
+  color: #8a4a14;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bracket-third-place-content .bracket-match-card {
+  border: 2px solid #c98f55;
 }
 
 .bracket-champion-card {
@@ -5092,8 +5112,8 @@ h3 {
   opacity: 0.6;
 }
 
-.bracket-final-stage .bracket-match-card::before,
-.bracket-final-stage .bracket-match-card::after {
+.bracket-final-content > .bracket-match-card::before,
+.bracket-final-content > .bracket-match-card::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -5102,12 +5122,12 @@ h3 {
   border-top: 2px solid #aeb8c6;
 }
 
-.bracket-final-stage .bracket-match-card::before {
+.bracket-final-content > .bracket-match-card::before {
   left: -14px;
   width: 14px;
 }
 
-.bracket-final-stage .bracket-match-card::after {
+.bracket-final-content > .bracket-match-card::after {
   right: -14px;
   width: 14px;
 }

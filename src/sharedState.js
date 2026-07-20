@@ -130,7 +130,7 @@ function mergeAuditLogs(currentLogs = [], sharedLogs = []) {
   }
   return [...logsById.values()]
     .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""))
-    .slice(0, 1000);
+    .slice(0, 10000);
 }
 
 function deduplicateEmails(users, participants, predictions) {

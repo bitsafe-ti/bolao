@@ -310,7 +310,7 @@ const settingsTabs = [
 ];
 
 const defaultRounds = [1, 2, 3];
-const AUDIT_LOG_LIMIT = 1000;
+const AUDIT_LOG_LIMIT = 10000;
 
 function applyRemoteData(current, remoteData, { prefer = "shared" } = {}) {
   const merged = mergePublicPoolState(current, remoteData, { prefer });
@@ -4914,6 +4914,8 @@ function KnockoutBracketBoard({ bracket }) {
   const round16ById = new Map(bracket.rounds.roundOf16.map((match) => [match.id, match]));
   const quarterById = new Map(bracket.rounds.quarterFinals.map((match) => [match.id, match]));
   const semiById = new Map(bracket.rounds.semiFinals.map((match) => [match.id, match]));
+  const finalMatch = bracket.rounds.final[0];
+  const thirdPlaceMatch = bracket.rounds.thirdPlace[0];
   const selectMatches = (map, ids) => ids.map((id) => map.get(id));
 
   return (
@@ -4941,9 +4943,15 @@ function KnockoutBracketBoard({ bracket }) {
                   <div className="bracket-final-trophy" aria-hidden="true">
                     <img src={TACA_URL} alt="Taça da Copa do Mundo 2026" />
                   </div>
-                  <BracketChampionCard finalMatch={bracket.rounds.final[0]} />
+                  <BracketChampionCard finalMatch={finalMatch} />
                 </div>
-                <BracketMatchCard match={bracket.rounds.final[0]} final />
+                <BracketMatchCard match={finalMatch} final />
+                {thirdPlaceMatch && (
+                  <div className="bracket-third-place-content">
+                    <span className="bracket-third-place-kicker">3&ordm; lugar</span>
+                    <BracketMatchCard match={thirdPlaceMatch} />
+                  </div>
+                )}
               </div>
             </div>
 
