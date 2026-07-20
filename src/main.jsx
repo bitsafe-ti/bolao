@@ -2175,7 +2175,13 @@ function App() {
               {settingsTab === "audit" && (
                 <section className="panel audit-log-panel">
                   <SectionHeader title="Logs do sistema" caption={`${visibleAuditLogCount} / ${AUDIT_LOG_LIMIT} registros`} />
-                  <AuditLogPanel logs={state.auditLogs} participants={state.participants} users={state.users} />
+                  <AuditLogPanel
+                    logs={state.auditLogs}
+                    participants={state.participants}
+                    users={state.users}
+                    matches={state.matches}
+                    predictions={state.predictions}
+                  />
                 </section>
               )}
             </div>
@@ -2387,7 +2393,13 @@ function App() {
         {tab === "logs" && (
           <section className="panel audit-log-panel">
             <SectionHeader title="Logs" caption={`${visibleAuditLogCount} registros visiveis`} />
-            <AuditLogPanel logs={state.auditLogs} participants={state.participants} users={state.users} />
+            <AuditLogPanel
+              logs={state.auditLogs}
+              participants={state.participants}
+              users={state.users}
+              matches={state.matches}
+              predictions={state.predictions}
+            />
           </section>
         )}
 
@@ -5188,16 +5200,32 @@ const AUDIT_ACTION_CLASS = {
 
 const AUDIT_PAGE_SIZE_OPTIONS = [25, 50, 100];
 
-function AuditLogPanel({ logs, participants = [], users = [] }) {
+function hasPredictionScore(prediction = {}) {
+  return String(prediction.home ?? "") !== "" || String(prediction.away ?? "") !== "";
+}
+
+function getAuditTeamName(teamId, fallback = "") {
+  return teamsById[teamId]?.name ?? fallback ?? teamId ?? "?";
+}
+
+function getPredictionAuditDetail(match, prediction) {
+  const homeTeam = getAuditTeamName(match?.homeTeamId, match?.homeSlotLabel ?? match?.home);
+  const awayTeam = getAuditTeamName(match?.awayTeamId, match?.awaySlotLabel ?? match?.away);
+  return `${homeTeam} ${prediction.home} x ${prediction.away} ${awayTeam}`;
+}
+
+function AuditLogPanel({ logs, participants = [], users = [], matches = [], predictions = {} }) {
   const [filter, setFilter] = useState("all");
   const [userFilter, setUserFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
-  const allLogs = (logs ?? []).filter((log) => !log.internalOnly);
+  const rawLogs = (logs ?? []).filter((log) => !log.internalOnly);
   const sortedParticipants = [...(participants ?? [])].sort((a, b) =>
     String(a.name || a.email || a.id).localeCompare(String(b.name || b.email || b.id), "pt-BR", { sensitivity: "base" })
   );
+  const participantsById = new Map(sortedParticipants.map((participant) => [String(participant.id), participant]));
+  const matchesById = new Map((matches ?? []).map((match) => [String(match.id), match]));
   const usersByParticipantId = users.reduce((acc, user) => {
     if (!user.participantId) return acc;
     if (!acc.has(user.participantId)) acc.set(user.participantId, []);
@@ -5212,6 +5240,63 @@ function AuditLogPanel({ logs, participants = [], users = [] }) {
       .trim()
       .toLowerCase();
   }
+
+  function hasMatchingPredictionLog(participant, match, prediction, detail) {
+    const savedAt = Date.parse(prediction.savedAt || "");
+    const participantId = String(participant?.id || "");
+    const actorTerms = [
+      participant?.name,
+      participant?.email,
+      ...(usersByParticipantId.get(participant?.id) ?? []).flatMap((user) => [user.name, user.email])
+    ].map(normalizeAuditText).filter(Boolean);
+    const normalizedDetail = normalizeAuditText(detail);
+
+    return rawLogs.some((log) => {
+      if (log.action !== "prediction_saved") return false;
+      const logParticipantIds = [log.relatedParticipantId, log.actorParticipantId, log.participantId]
+        .map((value) => String(value || ""))
+        .filter(Boolean);
+      const idMatches = participantId && logParticipantIds.includes(participantId);
+      const actorMatches = actorTerms.includes(normalizeAuditText(log.actor));
+      if (!idMatches && !actorMatches) return false;
+      if (log.matchId && String(log.matchId) !== String(match.id)) return false;
+
+      const logTime = Date.parse(log.createdAt || "");
+      const timeMatches =
+        !Number.isNaN(savedAt) &&
+        !Number.isNaN(logTime) &&
+        Math.abs(logTime - savedAt) <= 5000;
+      const detailMatches = normalizedDetail && normalizeAuditText(log.details) === normalizedDetail;
+      return timeMatches || detailMatches;
+    });
+  }
+
+  const predictionLogs = Object.entries(predictions ?? {}).flatMap(([participantId, perMatch]) => {
+    const participant = participantsById.get(String(participantId));
+    if (!participant) return [];
+    return Object.entries(perMatch ?? {}).flatMap(([matchId, prediction]) => {
+      const match = matchesById.get(String(matchId));
+      if (!match || !prediction?.savedAt || !hasPredictionScore(prediction)) return [];
+      const detail = getPredictionAuditDetail(match, prediction);
+      if (hasMatchingPredictionLog(participant, match, prediction, detail)) return [];
+      const matchRound = getMatchRound(match);
+      return [{
+        id: `prediction-current-${participantId}-${matchId}-${prediction.savedAt}`,
+        createdAt: prediction.savedAt,
+        actor: participant.name || "Participante",
+        action: "prediction_saved",
+        details: detail,
+        actorParticipantId: participant.id,
+        relatedParticipantId: participant.id,
+        relatedParticipantName: participant.name || "Participante",
+        matchId,
+        matchRound,
+        roundName: getRoundDisplayName(matchRound),
+        derivedFromPrediction: true
+      }];
+    });
+  });
+  const allLogs = [...rawLogs, ...predictionLogs].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 
   function logMatchesParticipant(log, participant) {
     const participantId = String(participant?.id || "");
