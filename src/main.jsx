@@ -18,6 +18,7 @@ import {
   getMatchRound,
   getReleasedPredictionRound,
   hasConfirmedEntryPayment,
+  hasOpenPaymentRequiredMatch,
   hasMatchStarted,
   isKnockoutMatch,
   isMatchClosed,
@@ -599,7 +600,8 @@ function App() {
   const finalMatch = state.matches.find((match) => Number(match.id) === 104 || String(match.phase || "").toLowerCase() === "final");
   const finalTeamsDefined = Boolean(finalMatch?.homeTeamId && finalMatch?.awayTeamId);
   const hasEntryPayment = Boolean(activeParticipant && hasConfirmedEntryPayment(state.payments, activeParticipant.id));
-  const isPaymentGateActive = Boolean(currentUser && activeParticipant && finalTeamsDefined && !hasEntryPayment);
+  const isFinalPaymentPredictionWindowOpen = hasOpenPaymentRequiredMatch(state.matches);
+  const isPaymentGateActive = Boolean(currentUser && activeParticipant && finalTeamsDefined && isFinalPaymentPredictionWindowOpen && !hasEntryPayment);
   const visibleTabs = isAdmin ? adminTabs : userTabs;
   const adminParticipantIds = useMemo(
     () => new Set(state.users.filter((user) => user.role === "admin").map((user) => user.participantId).filter(Boolean)),
@@ -2243,6 +2245,7 @@ function App() {
             payment={activeParticipant ? state.payments?.[activeParticipant.id] : null}
             value={ENTRY_FEE}
             finalReady={finalTeamsDefined}
+            paymentGateActive={isPaymentGateActive}
             onNotifyPayment={() => activeParticipant && notifyManualPayment(activeParticipant.id)}
             onSavePayout={(payoutInfo) => activeParticipant && savePrizePayout(activeParticipant.id, payoutInfo)}
           />
@@ -2322,6 +2325,9 @@ function TurnstileWidget({ onToken, resetKey }) {
       widgetId = window.turnstile.render(containerRef.current, {
         sitekey: TURNSTILE_SITE_KEY,
         action: "turnstile-spin-v1",
+        appearance: "always",
+        theme: "auto",
+        size: "normal",
         callback: (token) => onTokenRef.current(token),
         "expired-callback": () => onTokenRef.current(""),
         "error-callback": () => onTokenRef.current("")
@@ -2359,6 +2365,9 @@ function TurnstileWidget({ onToken, resetKey }) {
         className="cf-turnstile"
         data-sitekey={TURNSTILE_SITE_KEY}
         data-action="turnstile-spin-v1"
+        data-appearance="always"
+        data-theme="auto"
+        data-size="normal"
       />
     </div>
   );
@@ -2425,6 +2434,7 @@ function AuthScreen({ error, onLogin, onRegister }) {
   const [turnstileError, setTurnstileError] = useState("");
   const [turnstileChecking, setTurnstileChecking] = useState(false);
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const shouldUseTurnstile = !IS_LOCAL_ONLY_DEV;
 
   function changeMode(nextMode) {
     setMode(nextMode);
@@ -2440,7 +2450,7 @@ function AuthScreen({ error, onLogin, onRegister }) {
     setTurnstileError("");
     setTurnstileChecking(true);
 
-    if (!IS_LOCAL_ONLY_DEV && mode === "register") {
+    if (shouldUseTurnstile) {
       let token = getTurnstileToken(payload, turnstileToken);
       if (!token) {
         await wait(600);
@@ -2483,7 +2493,7 @@ function AuthScreen({ error, onLogin, onRegister }) {
           {mode === "register" && <label className="form-field"><span>Sobrenome</span><input name="lastName" placeholder="Seu sobrenome" autoComplete="family-name" required /></label>}
           <label className="form-field"><span>E-mail</span><input name="email" type="email" placeholder="voce@exemplo.com" autoComplete="email" required /></label>
           <label className="form-field"><span>Senha</span><input name="password" type="password" placeholder="Sua senha" autoComplete={mode === "register" ? "new-password" : "current-password"} minLength="6" required /></label>
-          {!IS_LOCAL_ONLY_DEV && mode === "register" && (
+          {shouldUseTurnstile && (
             <TurnstileWidget
               resetKey={turnstileResetKey}
               onToken={(token) => {
@@ -3360,15 +3370,17 @@ function PrizePayoutCard({ participant, onSave }) {
   );
 }
 
-function PaymentPage({ participant, payment, value, finalReady, onNotifyPayment, onSavePayout }) {
+function PaymentPage({ participant, payment, value, finalReady, paymentGateActive, onNotifyPayment, onSavePayout }) {
   const currentPayment = payment || null;
   const isPaid = ["paid", "confirmed", "received", "CONFIRMED", "RECEIVED"].includes(currentPayment?.status);
   const paymentStatus = getPaymentStatusView(payment);
   const platformStatus = isPaid
     ? { label: "Liberado", detail: "Acesso ao bolao confirmado.", className: "paid" }
-    : finalReady
+    : paymentGateActive
       ? { label: "Bloqueado", detail: "Aguardando pagamento para liberar o bolao.", className: "pending" }
-      : { label: "Liberado", detail: "Bloqueio automatico so entra quando a final for definida.", className: "idle" };
+      : finalReady
+        ? { label: "Liberado", detail: "Prazo de palpites da final encerrado; acesso ao bolao liberado.", className: "idle" }
+        : { label: "Liberado", detail: "Bloqueio automatico so entra quando a final for definida.", className: "idle" };
 
   return (
     <section className="panel payment-page">
@@ -3378,8 +3390,8 @@ function PaymentPage({ participant, payment, value, finalReady, onNotifyPayment,
           <h2>Liberacao do bolao</h2>
           <p>O pagamento libera o acesso ao bolao. O bloqueio automatico so acontece quando os times da final forem definidos.</p>
         </div>
-        <span className={`payment-status-pill ${isPaid ? "paid" : finalReady ? "pending" : "early"}`}>
-          {isPaid ? "Confirmado" : finalReady ? "Pendente" : "Antecipado"}
+        <span className={`payment-status-pill ${isPaid ? "paid" : paymentGateActive ? "pending" : "early"}`}>
+          {isPaid ? "Confirmado" : paymentGateActive ? "Pendente" : "Antecipado"}
         </span>
       </div>
 

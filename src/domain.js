@@ -490,6 +490,12 @@ export function isPaymentRequiredForMatch(match) {
   return Number.isFinite(round) && round >= FINAL_PAYMENT_REQUIRED_FROM_ROUND;
 }
 
+export function hasOpenPaymentRequiredMatch(matches = [], now = new Date()) {
+  return (matches ?? [])
+    .filter(isPaymentRequiredForMatch)
+    .some((match) => !isMatchClosed(match, now));
+}
+
 export function hasConfirmedEntryPayment(payments = {}, participantId = "") {
   const payment = payments?.[participantId];
   return CONFIRMED_PAYMENT_STATUSES.has(payment?.status);

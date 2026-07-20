@@ -12,6 +12,7 @@ import {
   getLatestResultMatchId,
   getReleasedPredictionRound,
   hasConfirmedEntryPayment,
+  hasOpenPaymentRequiredMatch,
   hasMatchStarted,
   isPaymentRequiredForMatch,
   normalizeUsers,
@@ -355,6 +356,19 @@ test("requires confirmed payment only for final round predictions", () => {
   assert.equal(hasConfirmedEntryPayment({ p1: { status: "pending" } }, "p1"), false);
   assert.equal(hasConfirmedEntryPayment({ p1: { status: "paid" } }, "p1"), true);
   assert.equal(hasConfirmedEntryPayment({ p1: { status: "CONFIRMED" } }, "p1"), true);
+});
+
+test("keeps payment gate only while final round predictions are open", () => {
+  const matches = [
+    { id: 103, round: 8, date: "2026-07-18T16:00:00.000Z", status: "scheduled" },
+    { id: 104, round: 8, date: "2026-07-19T16:00:00.000Z", status: "scheduled" }
+  ];
+
+  assert.equal(hasOpenPaymentRequiredMatch(matches, new Date("2026-07-18T15:59:59.000Z")), true);
+  assert.equal(hasOpenPaymentRequiredMatch(matches, new Date("2026-07-19T16:00:00.000Z")), false);
+
+  matches[1].status = "finished";
+  assert.equal(hasOpenPaymentRequiredMatch(matches, new Date("2026-07-19T15:00:00.000Z")), false);
 });
 
 test("positions predictions at the first live match while games are in progress", () => {
