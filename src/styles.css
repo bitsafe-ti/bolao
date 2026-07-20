@@ -7305,6 +7305,12 @@ tr:last-child td {
   min-width: 160px;
 }
 
+.audit-filter-bar .audit-search-label {
+  flex: 1 1 280px;
+  max-width: none;
+  min-width: 260px;
+}
+
 .audit-count {
   color: var(--muted);
   font-size: 0.88rem;
@@ -7547,7 +7553,8 @@ tr:last-child td {
   }
 
   .audit-filter-bar .select-label,
-  .audit-filter-bar .audit-page-size {
+  .audit-filter-bar .audit-page-size,
+  .audit-filter-bar .audit-search-label {
     min-width: 100%;
   }
 

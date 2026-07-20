@@ -1405,9 +1405,14 @@ function App() {
     if (!match.homeTeamId || !match.awayTeamId || match.homeTeamId === match.awayTeamId) return;
     const homeTeamName = teamsById[match.homeTeamId]?.name ?? match.homeTeamId;
     const awayTeamName = teamsById[match.awayTeamId]?.name ?? match.awayTeamId;
+    const matchRound = getMatchRound(match);
     updateState((current) => appendAuditLog(
       { ...current, matches: [...current.matches, match] },
-      makeAuditEntry(currentUser ?? "Admin", "match_added", `${homeTeamName} x ${awayTeamName}`, currentAuditMetadata())
+      makeAuditEntry(currentUser ?? "Admin", "match_added", `${homeTeamName} x ${awayTeamName}`, currentAuditMetadata({
+        matchId: match.id,
+        matchRound,
+        roundName: getRoundDisplayName(matchRound)
+      }))
     ));
     event.currentTarget.reset();
   }
@@ -1427,6 +1432,7 @@ function App() {
       const match = current.matches.find((m) => m.id === matchId);
       const home = teamsById[match?.homeTeamId]?.name ?? match?.homeTeamId ?? matchId;
       const away = teamsById[match?.awayTeamId]?.name ?? match?.awayTeamId ?? "";
+      const matchRound = getMatchRound(match);
       const predictions = Object.fromEntries(
         Object.entries(current.predictions).map(([participantId, participantPredictions]) => {
           const nextPredictions = { ...participantPredictions };
@@ -1436,7 +1442,11 @@ function App() {
       );
       return appendAuditLog(
         { ...current, matches: current.matches.filter((m) => m.id !== matchId), predictions },
-        makeAuditEntry(currentUser ?? "Admin", "match_removed", [home, away].filter(Boolean).join(" x "), currentAuditMetadata())
+        makeAuditEntry(currentUser ?? "Admin", "match_removed", [home, away].filter(Boolean).join(" x "), currentAuditMetadata({
+          matchId,
+          matchRound,
+          roundName: getRoundDisplayName(matchRound)
+        }))
       );
     });
   }
@@ -1508,6 +1518,9 @@ function App() {
           actorUserId: currentUser?.id || "",
           actorParticipantId: update.participantId,
           actorRole: currentUser?.role || "",
+          matchId: update.matchId,
+          matchRound: getMatchRound(update.match),
+          roundName: getRoundDisplayName(getMatchRound(update.match)),
           relatedParticipantId: update.participantId,
           relatedParticipantName: update.actorName
         })
@@ -1789,7 +1802,10 @@ function App() {
         ...current,
         releasedPredictionRound: Math.max(Number(current.releasedPredictionRound) || 1, Number(round) || 1)
       },
-      makeAuditEntry(currentUser ?? "Admin", "round_released", roundName, currentAuditMetadata())
+      makeAuditEntry(currentUser ?? "Admin", "round_released", roundName, currentAuditMetadata({
+        round,
+        roundName
+      }))
     ));
     setSharedStatus({ state: "success", message: `${roundName} liberada para votação.` });
   }
@@ -1804,7 +1820,10 @@ function App() {
           getMatchRound(m) === round ? { ...m, locked: true, updatedAt: now } : m
         )
       },
-      makeAuditEntry(currentUser ?? "Admin", "round_locked", roundName, currentAuditMetadata())
+      makeAuditEntry(currentUser ?? "Admin", "round_locked", roundName, currentAuditMetadata({
+        round,
+        roundName
+      }))
     ));
     setSharedStatus({ state: "success", message: `${roundName} travada manualmente.` });
   }
@@ -5172,6 +5191,7 @@ const AUDIT_PAGE_SIZE_OPTIONS = [25, 50, 100];
 function AuditLogPanel({ logs, participants = [], users = [] }) {
   const [filter, setFilter] = useState("all");
   const [userFilter, setUserFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(1);
   const allLogs = (logs ?? []).filter((log) => !log.internalOnly);
@@ -5186,7 +5206,11 @@ function AuditLogPanel({ logs, participants = [], users = [] }) {
   }, new Map());
 
   function normalizeAuditText(value = "") {
-    return String(value || "").trim().toLowerCase();
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
   }
 
   function logMatchesParticipant(log, participant) {
@@ -5232,6 +5256,23 @@ function AuditLogPanel({ logs, participants = [], users = [] }) {
     return true;
   }
 
+  function logMatchesSearch(log) {
+    const query = normalizeAuditText(search);
+    if (!query) return true;
+    const searchableText = [
+      log.actor,
+      log.details,
+      log.relatedParticipantName,
+      log.targetParticipantName,
+      log.roundName,
+      log.matchRound ? `rodada ${log.matchRound}` : "",
+      log.round ? `rodada ${log.round}` : "",
+      AUDIT_ACTION_LABELS[log.action] ?? log.action,
+      formatDate(log.createdAt)
+    ].map(normalizeAuditText).filter(Boolean).join(" ");
+    return searchableText.includes(query);
+  }
+
   const participantOptions = sortedParticipants
     .map((participant) => ({
       value: `participant:${participant.id}`,
@@ -5253,7 +5294,7 @@ function AuditLogPanel({ logs, participants = [], users = [] }) {
 
   const filtered = allLogs.filter((log) => {
     const matchesAction = filter === "all" || log.action === filter;
-    return matchesAction && logMatchesUserFilter(log);
+    return matchesAction && logMatchesUserFilter(log) && logMatchesSearch(log);
   });
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -5266,7 +5307,7 @@ function AuditLogPanel({ logs, participants = [], users = [] }) {
   }, {});
   useEffect(() => {
     setPage(1);
-  }, [filter, userFilter, pageSize]);
+  }, [filter, userFilter, search, pageSize]);
 
   useEffect(() => {
     setPage((currentPage) => Math.min(currentPage, totalPages));
@@ -5315,6 +5356,15 @@ function AuditLogPanel({ logs, participants = [], users = [] }) {
               <option key={option} value={option}>{option}</option>
             ))}
           </select>
+        </label>
+        <label className="select-label audit-search-label">
+          Buscar nos logs
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rodada, final, usuario..."
+            type="search"
+          />
         </label>
         <p className="audit-count">
           {filtered.length
