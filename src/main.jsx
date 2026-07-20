@@ -292,7 +292,8 @@ const userTabs = [
   { id: "groups", label: "Grupos", icon: faLayerGroup },
   { id: "bracket", label: "Chaveamento", icon: faSitemap },
   { id: "ranking", label: "Ranking", icon: faMedal },
-  { id: "rules", label: "Regras", icon: faClipboardList }
+  { id: "rules", label: "Regras", icon: faClipboardList },
+  { id: "logs", label: "Logs", icon: faClipboardList }
 ];
 
 const adminTabs = [
@@ -603,6 +604,7 @@ function App() {
   const isFinalPaymentPredictionWindowOpen = hasOpenPaymentRequiredMatch(state.matches);
   const isPaymentGateActive = Boolean(currentUser && activeParticipant && finalTeamsDefined && isFinalPaymentPredictionWindowOpen && !hasEntryPayment);
   const visibleTabs = isAdmin ? adminTabs : userTabs;
+  const visibleAuditLogCount = (state.auditLogs ?? []).filter((log) => !log.internalOnly).length;
   const adminParticipantIds = useMemo(
     () => new Set(state.users.filter((user) => user.role === "admin").map((user) => user.participantId).filter(Boolean)),
     [state.users]
@@ -1031,7 +1033,7 @@ function App() {
         workspaceRef.current?.scrollTo({ top: 0, behavior: "auto" });
       });
     }
-    if (tabId === "groups" || tabId === "bracket" || tabId === "results" || tabId === "ranking" || tabId === "rules" || tabId === "payment" || tabId === "prizes") {
+    if (tabId === "groups" || tabId === "bracket" || tabId === "results" || tabId === "ranking" || tabId === "rules" || tabId === "logs" || tabId === "payment" || tabId === "prizes") {
       refreshPoolStateFromRemote().catch(() => {});
     }
   }
@@ -2089,7 +2091,7 @@ function App() {
               )}
               {settingsTab === "audit" && (
                 <section className="panel audit-log-panel">
-                  <SectionHeader title="Logs do sistema" caption={`${state.auditLogs?.length ?? 0} / ${AUDIT_LOG_LIMIT} registros`} />
+                  <SectionHeader title="Logs do sistema" caption={`${visibleAuditLogCount} / ${AUDIT_LOG_LIMIT} registros`} />
                   <AuditLogPanel logs={state.auditLogs} />
                 </section>
               )}
@@ -2298,6 +2300,13 @@ function App() {
         )}
 
         {tab === "rules" && <GameRulesPage paidParticipants={ranking.length} />}
+
+        {tab === "logs" && (
+          <section className="panel audit-log-panel">
+            <SectionHeader title="Logs" caption={`${visibleAuditLogCount} registros visiveis`} />
+            <AuditLogPanel logs={state.auditLogs} />
+          </section>
+        )}
 
         <footer className="app-footer">
           <p>© 2026 Bolão Copa do Mundo · Desenvolvido por Guilherme Saraiva</p>
