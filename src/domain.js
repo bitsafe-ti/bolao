@@ -242,14 +242,14 @@ function isLatePrediction(prediction, match, now = new Date()) {
 }
 
 export function purgeExpiredPredictions(state, now = new Date()) {
-  const matchesById = new Map((state.matches ?? []).map((match) => [match.id, match]));
+  const matchesById = new Map((state.matches ?? []).map((match) => [String(match.id), match]));
   let changed = false;
 
   const predictions = Object.fromEntries(
     Object.entries(state.predictions ?? {}).map(([participantId, perMatch]) => {
       const filtered = Object.fromEntries(
         Object.entries(perMatch ?? {}).filter(([matchId, prediction]) => {
-          const match = matchesById.get(matchId);
+          const match = matchesById.get(String(matchId));
           const keep = !match || !isLatePrediction(prediction, match, now);
           if (!keep) changed = true;
           return keep;

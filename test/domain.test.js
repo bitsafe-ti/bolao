@@ -423,6 +423,19 @@ test("purges predictions saved after match kickoff", () => {
   assert.deepEqual(purged.predictions.p1, {});
 });
 
+test("purges late predictions when match ids are numeric", () => {
+  const state = {
+    matches: [{ id: 73, date: "2026-06-28T19:00:00.000Z" }],
+    predictions: {
+      p1: { 73: { home: "0", away: "2", savedAt: "2026-06-28T19:01:00.000Z" } }
+    }
+  };
+
+  const purged = purgeExpiredPredictions(state, new Date("2026-06-29T12:00:00.000Z"));
+
+  assert.deepEqual(purged.predictions.p1, {});
+});
+
 test("keeps predictions saved before match kickoff", () => {
   const state = {
     matches: [{ id: "m1", date: "2026-06-11T16:00:00.000Z" }],

@@ -7301,6 +7301,10 @@ tr:last-child td {
   min-width: 240px;
 }
 
+.audit-filter-bar .audit-page-size {
+  min-width: 160px;
+}
+
 .audit-count {
   color: var(--muted);
   font-size: 0.88rem;
@@ -7404,6 +7408,42 @@ tr:last-child td {
   margin: 0;
 }
 
+.audit-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.audit-pagination .icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.audit-pagination .icon-button:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.audit-pagination .icon-button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 @media (max-width: 620px) {
   .profile-photo-section,
   .profile-form-grid {
@@ -7504,6 +7544,17 @@ tr:last-child td {
 
   .audit-log-time {
     padding-top: 0;
+  }
+
+  .audit-filter-bar .select-label,
+  .audit-filter-bar .audit-page-size {
+    min-width: 100%;
+  }
+
+  .audit-count,
+  .audit-pagination {
+    width: 100%;
+    justify-content: center;
   }
 }
 

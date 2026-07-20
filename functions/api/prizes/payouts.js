@@ -186,6 +186,9 @@ export async function onRequestPost(context) {
           {
             id: `prize-${participantId}-${Date.now()}`,
             actor: participant.name || "Participante",
+            actorParticipantId: participantId,
+            relatedParticipantId: participantId,
+            relatedParticipantName: participant.name || "Participante",
             action: "prize_payout_updated",
             details: "dados de recebimento de premio atualizados",
             createdAt: updatedAt

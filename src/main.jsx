@@ -411,8 +411,23 @@ function appendAuditLog(state, entry) {
   };
 }
 
-function makeAuditEntry(actor, action, details = "") {
-  return { id: makeId("audit"), createdAt: new Date().toISOString(), actor, action, details };
+function makeAuditEntry(actor, action, details = "", metadata = {}) {
+  const actorName = typeof actor === "object" && actor !== null ? actor.name : actor;
+  const actorUserId = metadata.actorUserId ?? (typeof actor === "object" && actor !== null ? actor.id : "");
+  const actorParticipantId = metadata.actorParticipantId ?? (typeof actor === "object" && actor !== null ? actor.participantId : "");
+  const actorRole = metadata.actorRole ?? (typeof actor === "object" && actor !== null ? actor.role : "");
+
+  return {
+    id: makeId("audit"),
+    createdAt: new Date().toISOString(),
+    actor: actorName || "Sistema",
+    action,
+    details,
+    actorUserId,
+    actorParticipantId,
+    actorRole,
+    ...metadata
+  };
 }
 
 function isNotificationVisibleForUser(notification, currentUser) {
@@ -725,6 +740,36 @@ function App() {
     ? state.matches.find((match) => match.id === analysisContext.matchId)
     : null;
   const analysisMatch = analysisStoredMatch ? getDisplayMatch(analysisStoredMatch) : analysisContext?.match ?? null;
+
+  function currentAuditMetadata(extra = {}) {
+    return {
+      actorUserId: currentUser?.id || "",
+      actorParticipantId: currentUser?.participantId || "",
+      actorRole: currentUser?.role || "",
+      ...extra
+    };
+  }
+
+  function participantAuditMetadata(participant, extra = {}) {
+    return {
+      actorUserId: currentUser?.id || "",
+      actorParticipantId: participant?.id || "",
+      actorRole: currentUser?.role || "",
+      relatedParticipantId: participant?.id || "",
+      relatedParticipantName: participant?.name || "",
+      ...extra
+    };
+  }
+
+  function targetParticipantAuditMetadata(participant, extra = {}) {
+    return currentAuditMetadata({
+      relatedParticipantId: participant?.id || "",
+      relatedParticipantName: participant?.name || "",
+      targetParticipantId: participant?.id || "",
+      targetParticipantName: participant?.name || "",
+      ...extra
+    });
+  }
 
   useEffect(() => {
     const now = Date.now();
@@ -1133,7 +1178,10 @@ function App() {
         currentUserId: user.id,
         activeParticipantId: participant.id
       },
-      makeAuditEntry(cleanName, "user_registered", maskEmail(cleanEmail))
+      makeAuditEntry(user, "user_registered", maskEmail(cleanEmail), {
+        relatedParticipantId: participant.id,
+        relatedParticipantName: cleanName
+      })
     );
 
     setAuthError("");
@@ -1267,7 +1315,7 @@ function App() {
         participants: [...current.participants, participant],
         activeParticipantId: current.activeParticipantId || participant.id
       },
-      makeAuditEntry(currentUser?.name ?? "Admin", "participant_added", name)
+      makeAuditEntry(currentUser ?? "Admin", "participant_added", name, targetParticipantAuditMetadata(participant))
     ));
     event.currentTarget.reset();
     setParticipantModalOpen(false);
@@ -1325,7 +1373,10 @@ function App() {
             ? participants[0]?.id ?? ""
             : current.activeParticipantId
         },
-        makeAuditEntry(currentUser?.name ?? "Admin", "participant_removed", row.name)
+        makeAuditEntry(currentUser ?? "Admin", "participant_removed", row.name, targetParticipantAuditMetadata({
+          id: row.participantId,
+          name: row.name
+        }))
       );
     });
   }
@@ -1356,7 +1407,7 @@ function App() {
     const awayTeamName = teamsById[match.awayTeamId]?.name ?? match.awayTeamId;
     updateState((current) => appendAuditLog(
       { ...current, matches: [...current.matches, match] },
-      makeAuditEntry(currentUser?.name ?? "Admin", "match_added", `${homeTeamName} x ${awayTeamName}`)
+      makeAuditEntry(currentUser ?? "Admin", "match_added", `${homeTeamName} x ${awayTeamName}`, currentAuditMetadata())
     ));
     event.currentTarget.reset();
   }
@@ -1385,7 +1436,7 @@ function App() {
       );
       return appendAuditLog(
         { ...current, matches: current.matches.filter((m) => m.id !== matchId), predictions },
-        makeAuditEntry(currentUser?.name ?? "Admin", "match_removed", [home, away].filter(Boolean).join(" x "))
+        makeAuditEntry(currentUser ?? "Admin", "match_removed", [home, away].filter(Boolean).join(" x "), currentAuditMetadata())
       );
     });
   }
@@ -1453,7 +1504,13 @@ function App() {
             }
           }
         },
-        makeAuditEntry(update.actorName, "prediction_saved", update.detail)
+        makeAuditEntry(update.actorName, "prediction_saved", update.detail, {
+          actorUserId: currentUser?.id || "",
+          actorParticipantId: update.participantId,
+          actorRole: currentUser?.role || "",
+          relatedParticipantId: update.participantId,
+          relatedParticipantName: update.actorName
+        })
       ));
       setDraftPredictions((current) => {
         const next = { ...current };
@@ -1546,7 +1603,7 @@ function App() {
         },
         notifications: [adminNotification, ...(current.notifications ?? [])].slice(0, 300)
       },
-      makeAuditEntry(participantName, "payment_manual_notified", "pagamento informado para conferencia manual")
+      makeAuditEntry(participantName, "payment_manual_notified", "pagamento informado para conferencia manual", participantAuditMetadata(participant))
     ));
     setSharedStatus({ state: "success", message: "Pagamento informado. Aguarde a aprovacao do admin." });
   }
@@ -1576,9 +1633,10 @@ function App() {
         }
       },
       makeAuditEntry(
-        currentUser?.name ?? "Admin",
+        currentUser ?? "Admin",
         approved ? "payment_manual_approved" : "payment_manual_pending",
-        participant?.name ?? participantId
+        participant?.name ?? participantId,
+        targetParticipantAuditMetadata(participant)
       )
     ));
     setSharedStatus({
@@ -1653,7 +1711,10 @@ function App() {
         ...current,
         users: current.users.map((u) => u.id === userId ? updatedUser : u)
       },
-      makeAuditEntry(currentUser?.name ?? "Admin", "password_reset", user.name)
+      makeAuditEntry(currentUser ?? "Admin", "password_reset", user.name, targetParticipantAuditMetadata({
+        id: user.participantId,
+        name: user.name
+      }))
     ));
   }
 
@@ -1705,7 +1766,10 @@ function App() {
             : participant
         )
       },
-      makeAuditEntry(cleanName, "profile_updated", changedFields.length ? changedFields.join(", ") : "sem alterações")
+      makeAuditEntry(updatedUser, "profile_updated", changedFields.length ? changedFields.join(", ") : "sem alterações", {
+        relatedParticipantId: currentUser.participantId || "",
+        relatedParticipantName: cleanName
+      })
     ));
     setSharedStatus({ state: "success", message: "Perfil atualizado com sucesso." });
   }
@@ -1714,7 +1778,7 @@ function App() {
     if (!confirm("Apagar todos os dados do bolão? Esta ação não pode ser desfeita.")) return;
     updateState(appendAuditLog(
       createInitialState(),
-      makeAuditEntry(currentUser?.name ?? "Admin", "data_reset", "")
+      makeAuditEntry(currentUser ?? "Admin", "data_reset", "", currentAuditMetadata())
     ));
   }
 
@@ -1725,7 +1789,7 @@ function App() {
         ...current,
         releasedPredictionRound: Math.max(Number(current.releasedPredictionRound) || 1, Number(round) || 1)
       },
-      makeAuditEntry(currentUser?.name ?? "Admin", "round_released", roundName)
+      makeAuditEntry(currentUser ?? "Admin", "round_released", roundName, currentAuditMetadata())
     ));
     setSharedStatus({ state: "success", message: `${roundName} liberada para votação.` });
   }
@@ -1740,7 +1804,7 @@ function App() {
           getMatchRound(m) === round ? { ...m, locked: true, updatedAt: now } : m
         )
       },
-      makeAuditEntry(currentUser?.name ?? "Admin", "round_locked", roundName)
+      makeAuditEntry(currentUser ?? "Admin", "round_locked", roundName, currentAuditMetadata())
     ));
     setSharedStatus({ state: "success", message: `${roundName} travada manualmente.` });
   }
@@ -2092,7 +2156,7 @@ function App() {
               {settingsTab === "audit" && (
                 <section className="panel audit-log-panel">
                   <SectionHeader title="Logs do sistema" caption={`${visibleAuditLogCount} / ${AUDIT_LOG_LIMIT} registros`} />
-                  <AuditLogPanel logs={state.auditLogs} />
+                  <AuditLogPanel logs={state.auditLogs} participants={state.participants} users={state.users} />
                 </section>
               )}
             </div>
@@ -2304,7 +2368,7 @@ function App() {
         {tab === "logs" && (
           <section className="panel audit-log-panel">
             <SectionHeader title="Logs" caption={`${visibleAuditLogCount} registros visiveis`} />
-            <AuditLogPanel logs={state.auditLogs} />
+            <AuditLogPanel logs={state.auditLogs} participants={state.participants} users={state.users} />
           </section>
         )}
 
@@ -5103,14 +5167,110 @@ const AUDIT_ACTION_CLASS = {
   round_locked: "warning"
 };
 
-function AuditLogPanel({ logs }) {
+const AUDIT_PAGE_SIZE_OPTIONS = [25, 50, 100];
+
+function AuditLogPanel({ logs, participants = [], users = [] }) {
   const [filter, setFilter] = useState("all");
+  const [userFilter, setUserFilter] = useState("all");
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1);
   const allLogs = (logs ?? []).filter((log) => !log.internalOnly);
-  const filtered = filter === "all" ? allLogs : allLogs.filter((log) => log.action === filter);
+  const sortedParticipants = [...(participants ?? [])].sort((a, b) =>
+    String(a.name || a.email || a.id).localeCompare(String(b.name || b.email || b.id), "pt-BR", { sensitivity: "base" })
+  );
+  const usersByParticipantId = users.reduce((acc, user) => {
+    if (!user.participantId) return acc;
+    if (!acc.has(user.participantId)) acc.set(user.participantId, []);
+    acc.get(user.participantId).push(user);
+    return acc;
+  }, new Map());
+
+  function normalizeAuditText(value = "") {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function logMatchesParticipant(log, participant) {
+    const participantId = String(participant?.id || "");
+    const relatedIds = [
+      log.relatedParticipantId,
+      log.actorParticipantId,
+      log.targetParticipantId,
+      log.participantId
+    ].map((value) => String(value || "")).filter(Boolean);
+    if (participantId && relatedIds.includes(participantId)) return true;
+
+    const linkedUsers = usersByParticipantId.get(participant?.id) ?? [];
+    const userIds = linkedUsers.map((user) => String(user.id || "")).filter(Boolean);
+    if (log.actorUserId && userIds.includes(String(log.actorUserId))) return true;
+
+    const participantTerms = [
+      participant?.name,
+      participant?.email,
+      ...linkedUsers.flatMap((user) => [user.name, user.email])
+    ].map(normalizeAuditText).filter(Boolean);
+    const logTerms = [
+      log.actor,
+      log.relatedParticipantName,
+      log.targetParticipantName,
+      log.details
+    ].map(normalizeAuditText).filter(Boolean);
+
+    return participantTerms.some((term) => logTerms.includes(term));
+  }
+
+  function logMatchesUserFilter(log) {
+    if (userFilter === "all") return true;
+    if (userFilter.startsWith("participant:")) {
+      const participantId = userFilter.slice("participant:".length);
+      const participant = sortedParticipants.find((item) => String(item.id) === participantId);
+      return Boolean(participant && logMatchesParticipant(log, participant));
+    }
+    if (userFilter.startsWith("actor:")) {
+      const actor = userFilter.slice("actor:".length);
+      return normalizeAuditText(log.actor || "Sistema") === actor;
+    }
+    return true;
+  }
+
+  const participantOptions = sortedParticipants
+    .map((participant) => ({
+      value: `participant:${participant.id}`,
+      label: participant.name || participant.email || participant.id,
+      count: allLogs.filter((log) => logMatchesParticipant(log, participant)).length
+    }))
+    .filter((option) => option.count > 0);
+
+  const legacyActorCounts = allLogs.reduce((acc, log) => {
+    if (sortedParticipants.some((participant) => logMatchesParticipant(log, participant))) return acc;
+    const actor = log.actor || "Sistema";
+    const key = normalizeAuditText(actor);
+    acc.set(key, { label: actor, count: (acc.get(key)?.count ?? 0) + 1 });
+    return acc;
+  }, new Map());
+  const legacyActorOptions = [...legacyActorCounts.entries()]
+    .map(([key, value]) => ({ value: `actor:${key}`, label: value.label, count: value.count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }));
+
+  const filtered = allLogs.filter((log) => {
+    const matchesAction = filter === "all" || log.action === filter;
+    return matchesAction && logMatchesUserFilter(log);
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = filtered.length ? (safePage - 1) * pageSize : 0;
+  const pageEnd = Math.min(pageStart + pageSize, filtered.length);
+  const visibleLogs = filtered.slice(pageStart, pageEnd);
   const actionCounts = allLogs.reduce((acc, log) => {
     acc[log.action] = (acc[log.action] ?? 0) + 1;
     return acc;
   }, {});
+  useEffect(() => {
+    setPage(1);
+  }, [filter, userFilter, pageSize]);
+
+  useEffect(() => {
+    setPage((currentPage) => Math.min(currentPage, totalPages));
+  }, [totalPages]);
 
   if (!allLogs.length) {
     return (
@@ -5135,10 +5295,35 @@ function AuditLogPanel({ logs }) {
             })}
           </select>
         </label>
-        <p className="audit-count">{filtered.length} registro{filtered.length === 1 ? "" : "s"}</p>
+        <label className="select-label">
+          Filtrar por usuario
+          <select value={userFilter} onChange={(e) => setUserFilter(e.target.value)}>
+            <option value="all">Todos ({allLogs.length})</option>
+            {participantOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label} ({option.count})</option>
+            ))}
+            {legacyActorOptions.length > 0 && <option value="__legacy" disabled>Outros autores</option>}
+            {legacyActorOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label} ({option.count})</option>
+            ))}
+          </select>
+        </label>
+        <label className="select-label audit-page-size">
+          Registros por pagina
+          <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+            {AUDIT_PAGE_SIZE_OPTIONS.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </label>
+        <p className="audit-count">
+          {filtered.length
+            ? `${pageStart + 1}-${pageEnd} de ${filtered.length}`
+            : "0 registros"}
+        </p>
       </div>
       <div className="audit-log-list">
-        {filtered.map((log) => {
+        {visibleLogs.map((log) => {
           const cls = AUDIT_ACTION_CLASS[log.action] ?? "info";
           return (
             <div className={`audit-log-entry audit-log-${cls}`} key={log.id ?? log.createdAt}>
@@ -5155,6 +5340,29 @@ function AuditLogPanel({ logs }) {
             </div>
           );
         })}
+      </div>
+      <div className="audit-pagination" aria-label="Paginacao dos logs">
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+          disabled={safePage <= 1}
+          aria-label="Pagina anterior"
+          title="Pagina anterior"
+        >
+          <FontAwesomeIcon icon={faChevronLeft} />
+        </button>
+        <span>Pagina {safePage} de {totalPages}</span>
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => setPage((currentPage) => Math.min(totalPages, currentPage + 1))}
+          disabled={safePage >= totalPages}
+          aria-label="Proxima pagina"
+          title="Proxima pagina"
+        >
+          <FontAwesomeIcon icon={faChevronRight} />
+        </button>
       </div>
     </>
   );
